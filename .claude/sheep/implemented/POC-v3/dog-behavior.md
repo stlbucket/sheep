@@ -1,8 +1,8 @@
 # POC-v3 · Feature: Dog Commands & Influence v2 — Semantic Rules
 
-**Status:** reviewed 2026-07-13 — all seven open questions resolved by owner
-(Q1 direction: tradition kept, come-by = CW); **living rules list**.
-Ready to plan.
+**Status:** **implemented 2026-07-13** — C/D/E measured at the P4 acceptance
+gate (log below); still a **living rules list**. D2's dart event and POC-v2
+Q8 await the owner's hands-on read.
 
 Semantic rules for how the **dog** behaves per command and how its influence
 cone reads to the flock — observable behavior, stated independently of the
@@ -19,6 +19,14 @@ Related: current command steering lives in
 threat cone model in [`../../brainstorming/threat-model.md`](../../brainstorming/threat-model.md).
 
 ---
+
+## Setting changes
+
+- **`dogVMax` gets a slider.** The dog's top speed exists (`dogVMax`, default
+  135 px/s ≈ 1.5× sheep) but is **hidden** (`exposed: false`) — which is why
+  the owner sees no obvious speed slider. Expose it, and **lower the default**:
+  the dog currently reads as **too fast** (owner, 2026-07-13). New default
+  parked as Q8.
 
 ## Semantic rules
 
@@ -41,6 +49,13 @@ threat cone model in [`../../brainstorming/threat-model.md`](../../brainstorming
   precondition for flanking.
 - **C5.** **Away** is the same flanking behavior in the **counter-clockwise**
   direction.
+- **C6.** A flank is **finite**: the dog circles the flock **only until** he
+  reaches the fence at the spot from which pushing the flock heads it **back
+  toward the target** (the gate) — there he **transitions on his own into a
+  walk-on posture** and drives. Come-by/away ends in a drive, **NOT** an
+  endless orbit; the command-strip highlight follows to walk-on (same
+  actual-state convention as E2/Q5). *(Added 2026-07-13 from hands-on play,
+  after P0–P3.)*
 
 ### D. Stationary pressure — lie-down / stand
 
@@ -103,6 +118,14 @@ threat cone model in [`../../brainstorming/threat-model.md`](../../brainstorming
 - **E3 impulse**: temporary intensity (and/or cone strength) boost with fast
   decay (~1 s), then stand. Repeatable — the player taps walk-on to meter
   pressure at the gate.
+- **C6 is a handoff condition on the P0 flank loop**, not a new movement mode:
+  each tick, test whether the dog's current spot is (a) fence-side of the
+  flock and (b) roughly opposite the target through the flock (flock GCM
+  between dog and target, within a tolerance angle). When both hold, exit
+  flank → enter the existing walk-on state (P2 machinery: trail gap, stall,
+  auto-stand all apply). The tolerance angle is the new tunable; too tight
+  and the dog orbits past the handoff point forever, too loose and he cuts
+  the flank short.
 
 ## Tunables likely involved
 
@@ -114,6 +137,9 @@ Likely **new** (names TBD in planning): flank standoff, flank cone angle
 strength / cone tightness, stand block strength / cone tightness, dart
 boldness threshold (~0.8 — Q4), drive trail gap, stall threshold, and the
 three impulse shapes (strength + duration + decay each — Q6).
+Added 2026-07-13 (C6 + setting change): `dogVMax` (exists, hidden → becomes a
+slider with a lower default — Q8), flank→drive handoff tolerance angle
+(name TBD).
 
 ---
 
@@ -136,6 +162,21 @@ three impulse shapes (strength + duration + decay each — Q6).
    v3 acceptance includes the measured 80-sheep full-field gather-and-drive;
    Q8 closes if it now works with reasonable effort.
 
+### New (added 2026-07-13, with C6 / the `dogVMax` change)
+
+8. **How slow should the dog be?** "Not so fast" needs a number. (Guess:
+   default **135 → ~110 px/s** (~1.2× sheep `vMax` 90) — he must still be
+   able to head a fleeing sheep, so staying above 1× matters; **tune
+   hands-on** with the new slider.)
+9. **C6 handoff tolerance:** how exactly "opposite the target" must the dog
+   be before the flank converts to a drive? (Guess: within **~±30°** of the
+   target–GCM line, exposed as a slider.)
+10. **C6 with no fence nearby** (mid-field flock, C4 case): does the flank
+    still convert once the dog is opposite the target, fence or not?
+    (Guess: **yes** — "reaches the fence" is the usual case, but the real
+    condition is *positioned to drive toward the target*; fence contact is
+    not required.)
+
 ---
 
 ## Acceptance (for the C/D/E rules so far)
@@ -145,6 +186,10 @@ NOT trace a circle around the GCM; he makes for the fence side beyond the
 nearest sheep and works around the flock edge, eye held ~45° off his line of
 travel toward the flock; passed sheep push inward, not straight away. Reverse
 with away mid-field: he keeps a flanking standoff without needing a fence.
+**C6:** issue a single come-by with the flock between dog and gate reversed:
+the dog rounds the flock and, on reaching the far (fence) side opposite the
+gate, drops into walk-on **without another command** — strip highlight shows
+walk-on; he never completes a second lap.
 
 **D — blocking:** park the dog lying between flock and gate: sheep visibly
 refuse to cross the covered arc, squeezing through only under backpressure;
@@ -160,3 +205,53 @@ modifier-tap variants read punchier (bark) and gentler (lean).
 **Q8 closure (from POC-v2):** re-run the measured 80-sheep full-field
 gather-and-drive with the new commands — it should now complete with
 reasonable effort (flanking collect + trailing drive + pulsed gate work).
+
+---
+
+## Acceptance log — P4 gate, 2026-07-13 (perimeter-gate course, seeds 1337 & 42)
+
+All measured in-browser per the `/sheep verify` playbook, at shipped defaults
+(including the P4 boldness recalibration — see D2 note).
+
+**C — flanking: PASS.** No orbit: dog-radius-from-GCM sd **113 / 45 px** over
+the flank (a fixed orbit would be ~0). Fence-hugging: min wall distance
+**15 px** (the seek clamp) on both seeds. Eye: mean **45.1° / 44.9°** off the
+travel line vs the 45° slider (C3). Passed sheep push inward: mean velocity
+toward GCM **+19.5 / +17.6 px/s** over 1.9k/6.6k stressed samples. Mid-field
+away reversal: pure CCW (166° CCW vs 1° CW), min transit gap 48 px, no fence
+needed (C4/C5). **C6:** come-by auto-converts to walk-on at **201° / 268°**
+of sweep (18.3 s / 10.4 s) — no second lap, strip follows.
+
+**D — postures: PASS with one item parked.** Behavioral wall (80 sheep
+pressed against the posture at a jam, 180 s per posture): **12–14 sheep
+visited the covered arc, 0 crossed** — for both lie and stand (D1). The
+lie < stand ordering rests on P1's measured threat profile (front wall 0.609
+vs 0.942, flanks 0.025). **D2 parked for hands-on:** the P4 gate found
+boldness was drawn gauss(0.3, **0.1**) — boldness > 0.8 was a 5σ event, the
+"0–2 per 80" top tail could never exist. Fixed by promoting the draw to
+schema tunables (`boldMean` 0.3, `boldSd` **0.22** → measured census 1/0/1/0/0
+per 80 across five seeds). The dart event itself was still not observed in
+~13 min of automated posture scenarios (the bold sheep never came within
+R_flee of the posturing dog) — it is rare-by-design; owner judges live.
+
+**E — drive: PASS.** E1: min front-hemisphere gap **47 / 40 px** vs the 40 px
+trail gap over full drives, **zero** time below gap−5 (P5's transit-dip watch
+item resolved). E2: zero false auto-stands in open-field drives on both
+seeds; a manufactured jam (80 sheep, 12 px mouth) auto-converted at t≈23 s
+with the nearest driven sheep at 59 px, and the **command strip followed to
+stand** (state-driven, Q5). E3 envelopes at the schema shapes: shove
+**1.5×/0.80 s/0.48 s**, bark **2.0×/0.40 s/0.28 s**, lean
+**1.2×/1.50 s/0.47 s**; double-tap does not stack (peak stays 2.0×).
+
+**Q8: STAYS OPEN with data** — see the full entry in
+[`flock-behavior.md`](../POC-v2/flock-behavior.md) open Q8: 20-sheep runs
+complete in 28–45 s with 1–3 commands, but scripted 600 s budgets at 80 sheep
+ended 7/80 and 3/80 — one dog cannot compact the full scattered field before
+it relaxes. Owner's hands-on judgment pending.
+
+**Follow-ups logged for v4:** `setCommand` leaves the previous command's
+`dog.target` for one tick (butterfly nondeterminism between back-to-back
+scripted runs); walk-on with no sheep in the front hemisphere parks silently
+(`fwdN 0` starves E2) — a "regather" behavior or HUD hint may be wanted;
+crush now peaks ~0.6–1.3 vs 3–3.9 pre-G1 (the funnel drains jams), so
+`crushThreshold` 1.5 needs re-calibration if injuries are re-enabled.

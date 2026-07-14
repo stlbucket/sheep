@@ -46,6 +46,10 @@ as the owner adds them (e.g. `B#` under-pressure, `C#` gate behavior, …).
 - **A5.** Sheep sit in **several small loose groups of ~2–5**, standing in
   **different places** across the field. *Group size 2–5 is the invariant;
   group count scales with `sheepCount` (~18–24 groups at 80). (Q1)*
+  *(Group size 2–5 superseded 2026-07-13 by
+  [POC-v3 H1](../../spec/POC-v3/course-and-flock.md) — groups now vary
+  **1–n**, n a slider, default 10 / max 20; the scattered-loose-groups
+  picture stands.)*
 - **A6.** Those groups start **spatially separated** (scattered across the play
   area), not spawned as one clump that then disperses.
 - **A7.** An **idle dog exerts no pressure**: with the dog at heel / stood down
@@ -151,6 +155,22 @@ idle-dog avoidance radius (A8), calm-relax timescale for re-scattering (B2).
    drive need help (e.g. driven sheep keep a forward bias longer, or
    `calmDelay` scales up while moving)? (Default: **play it first** — judge
    hands-on before changing the model.)
+   **POC-v3 P4 re-measure (2026-07-13, perimeter-gate course, new commands)
+   → STAYS OPEN with data.** Small-flock work is transformed: 20 sheep
+   gather→drive→pen completes in **28–45 s with 1–3 commands** (flank →
+   auto-handoff → trailing drive → G1 commitment), and the P7 battery penned
+   20/20 on every no-intervention seed ≤ 240 s. But the full 80-sheep field
+   still does not complete under scripted play: **600 s budgets ended at
+   7/80 (seed 42, 43 cmds) and 3/80 (seed 1337, 31 cmds, alternating
+   gather-sweep strategy)** — the working flock never compacts below ~470 px
+   spread; one dog's sweep mobilizes only the sector he passes while the
+   rest calm (5 s) and re-scatter (B2 crowd drift), and a walk-on aimed at
+   the centroid of a dissolved field parks with nobody in flee range (E2
+   can't fire with `fwdN 0`). The v3 hypothesis (flanking + trailing drive +
+   impulses close Q8) holds at ≤ ~20–40 sheep and fails at 80 under
+   automation. Owner judgment still pending: a human may pace sweeps better,
+   or this **is** the intended 1-dog skill ceiling (the brainstorming scale
+   note always said 3–4 dogs for ~150 sheep).
 
 ---
 

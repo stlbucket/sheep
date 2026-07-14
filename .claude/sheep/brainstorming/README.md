@@ -15,12 +15,13 @@ collect the flock to a target (pen / gate / field corner).
 
 Commands (voice-flavored buttons; you say the dog's name in multi-dog scenarios):
 
-| Command | Effect |
+| Command | Effect *(as of POC-v3, 2026-07-13)* |
 |---|---|
-| **Come by** | Orbit the herd **clockwise** → herd drifts to the far side, compacting; sweeps stragglers into the mass on the way around. |
-| **Away** | Same, **counter-clockwise**. |
-| **Walk on** | Dog holds position, creeps straight in; steady rising pressure. A brave sheep or two protests, then backs down — or bolts past if there's a gap (forcing a come-by/away to reset). |
-| **Lie down** | Dog lies facing the herd; pressure **released** so the front can trickle through a gate/bottleneck without pile-ups/accidents. |
+| **Come by** | **Flank** the flock **clockwise** — not a fixed orbit: the dog works around the flock edge, slotting between sheep and fence, eye held ~45° off his travel line so passed sheep push inward. Finite: on reaching the spot opposite the target he hands off to walk-on by himself (C6). |
+| **Away** | Same flanking, **counter-clockwise**. |
+| **Walk on** | **Trailing drive**: the dog presses from behind but never catches up (trail-gap governor). If the flock stalls against backpressure he auto-converts to **stand** (the strip follows); tapping walk-on from there fires a pressure **impulse** — plain tap = shove, Shift = bark (punchier), Alt = lean (calmer). |
+| **Lie down** | Blocking posture: the covered arc reads as a soft one-way wall (crossable only under crowd backpressure); pressure elsewhere released so a gate front can trickle through. |
+| **Stand** | 6th command (POC-v3): the firmer blocking posture — same shape as lie-down, harder wall. |
 | **That'll do** | Job done; dog runs back to the owner's side. |
 
 Scale ranges from **1 dog vs 1 sheep** up to **3–4 dogs vs ~150 sheep**;

@@ -38,8 +38,11 @@ and `verify`/`tune` running against the PoC at any time.
 ## Global invariants (every subcommand obeys these)
 
 1. **This is a design/sim side-project — no fnb DB/GraphQL/backend, ever.**
-2. **The PoC is one HTML file, one plain `<script>`** (not `type=module`); runs
-   from `file://` by double-click; lil-gui is the UMD build via CDN.
+2. **The PoC is one HTML file, one plain `<script>`** (not `type=module`),
+   **plus one defaults file** `sheep-defaults.json.js` — a pure JSON literal
+   in a single `const SHEEP_DEFAULTS =` assignment *(amended by owner
+   2026-07-13; POC-v3 course-and-flock Q2)*; runs from `file://` by
+   double-click; lil-gui is the UMD build via CDN.
 3. **Section convention is the module boundary:** `§0 PARAMS · §1 SIM · §2 RENDER
    · §3 INPUT · §4 BOOTSTRAP`. **§1 SIM stays DOM-free** — no `canvas`,
    `document`, `window`, or GUI wiring; it takes `params` as data and exposes

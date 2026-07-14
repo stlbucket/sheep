@@ -295,3 +295,49 @@ ranges for hidden rows are proposals. Units: px, px/s, px/s², rad/s, s, — .
 | seed | PRNG seed | int | 1337 | — | — | no | Seed for reproducible runs (reseed via the reseed button). |
 | dt | fixed timestep | float | 0.0167 | — | s | no | Fixed simulation step (1/60 s). |
 | maxFrameDelta | max frame delta | float | 0.25 | — | s | no | Clamp on real elapsed time to prevent spiral-of-death. |
+
+---
+
+## Appendix A.1 — POC-v3 deltas (2026-07-13)
+
+The tables above are the POC-v2 snapshot. POC-v3 (see
+[`../POC-v3/`](../POC-v3/)) changed the inventory as follows; the live schema
+in `poc/sheep-poc.html §0` is authoritative, and every default now also lives
+in [`poc/sheep-defaults.json.js`](../../poc/sheep-defaults.json.js) (Q2 —
+edit the file, reload, no HTML changes).
+
+### New (Dog — flanking / postures / drive, P0–P5)
+| key | label | default | range | unit | notes |
+|---|---|---|---|---|---|
+| dogVMax | dog max speed | 110 | 40–300·5 | px/s | was hidden at 135; exposed + lowered (Q8 guess) |
+| flankStandoff | flank standoff | 140 | 60–300·5 | px | distance beyond the flock EDGE while flanking |
+| flankConeDeg | flank eye angle | 45 | 20–70·1 | ° | C3 held eye |
+| flankAdvance | flank advance rate | 1.0 | 0.2–3·0.1 | rad/s | linear speed capped at 0.9·dogVMax (P5) |
+| fenceSeekBias | fence seek bias | 0.6 | 0–1·0.05 | — | C2 slot between sheep and fence |
+| flankHandoffDeg | flank handoff angle | 30 | 10–90·1 | ° | C6 finite-flank tolerance |
+| driveTrailGap | drive trail gap | 40 | 20–160·5 | px | E1 governor (replaces driveShrink) |
+| stallSpeed / stallDwell | stall detect | 8 / 1.5 | — | px/s · s | E2 auto-stand |
+| shove/bark/lean Mult·Dur·Decay | impulse shapes | 1.5·0.8·0.5 / 2·0.4·0.3 / 1.2·1.5·0.5 | — | — · s · s | E3 flavors |
+| R_driveMin | drive standoff floor | 55 | 40–160·5 | px | |
+| lieDownBlock / standBlock | posture walls | 1.4 / 2.2 | 0–3 / 0–4 | — | D1/D3 (stand > lie) |
+| postureConeK / postureRange | posture shape | 4 / 0.6 | — | — | tight arc, short reach |
+
+### New (Course & flock, P6–P8 + P4)
+| key | label | default | range | unit | notes |
+|---|---|---|---|---|---|
+| gateCornerMargin | gate corner margin | 80 | 40–200·5 | px | F1 perimeter-gate draw |
+| spawnGateOffset / spawnDepth | spawn anchor | 200 / 140 | — | px | F2 near-gate-one-side |
+| gateApproachR / w_through | gate commitment | 60 / 2.0 | — | px · — | G1 sticky funnel |
+| clusterSizeMax | max group size | **10** (was 5) | 1–20·1 | — | H1 slider; sizes draw uniform 1..n |
+| boldMean / boldSd | boldness draw | 0.3 / 0.22 | 0–1 / 0–0.5 | — | was hard-coded gauss(0.3, 0.1); sd raised so D2's >0.8 tail exists (~0–2 per 80) |
+| debug.gateZone | gate approach zone | false | — | — | draws the G1 zone |
+
+### Superseded (kept in the schema as `exposed:false` documentation)
+| key | superseded by | phase |
+|---|---|---|
+| R_orbit, omega | flanking (C1–C6) | v3 P0 |
+| driveShrink | driveTrailGap governor (E1) | v3 P2 |
+| fenceX, gateY | seeded perimeter gate (`sim.gate`) | v3 P6 |
+| spawnMinX, spawnMaxX | gate-anchored spawn (F2) | v3 P6 |
+| clusterSizeMin | fixed at 1 (H1) | v3 P8 |
+| goal | DERIVED (pen center outside the gate; also `export:false`) | v3 P6/P4 |

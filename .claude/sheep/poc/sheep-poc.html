@@ -88,6 +88,26 @@
   #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
   #card .row span:last-child { color: #e08a8a; }
   #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
+  /* [throwaway] P9 (Q1) panel split: sheep-side left, dog-side right,
+     Course & Meta collapsed below the dog panel */
+  #panel-sheep {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+  #panel-dog-col {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 1000;
+    max-height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
   /* [throwaway] settings inspector: hover tooltip + per-category ⓘ grid */
   #tip {
     display: none;
@@ -166,8 +186,14 @@
 </style>
 <!-- [throwaway] lil-gui UMD build (window.lil.GUI) — plain <script> can't import ESM -->
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
+<!-- P9 (Q2): slider defaults live in ONE editable sibling file — a pure JSON
+     literal in a `const SHEEP_DEFAULTS =` assignment (a real .json can't be
+     fetched from file://). Missing file → schema defaults + one warning. -->
+<script src="sheep-defaults.json.js"></script>
 </head>
 <body>
+<div id="panel-sheep"></div>
+<div id="panel-dog-col"><div id="panel-dog"></div><div id="panel-meta"></div></div>
 <div id="wrap">
   <canvas id="field" width="1120" height="720"></canvas>
   <div id="hud">boot…</div>
@@ -201,7 +227,7 @@ const SETTINGS = [
   // Stage
   { key: 'canvasW', category: 'Stage', label: 'canvas width', type: 'int', default: 1120, unit: 'px', description: 'Field width; structural (read-only).', exposed: false },
   { key: 'canvasH', category: 'Stage', label: 'canvas height', type: 'int', default: 720, unit: 'px', description: 'Field height; structural (read-only).', exposed: false },
-  { key: 'fenceInset', category: 'Stage', label: 'fence inset', type: 'int', default: 20, min: 0, max: 60, step: 1, unit: 'px', description: 'Play-area border margin inside the canvas.', exposed: true },
+  { key: 'fenceInset', category: 'Stage', label: 'fence inset', type: 'int', default: 56, min: 20, max: 80, step: 1, unit: 'px', description: 'Play-area border margin inside the canvas — also the pen apron outside the perimeter gate (widened 20→56 in POC-v3 P6 so penned sheep have somewhere to stand).', exposed: true, onChange: 'respawn' },
   { key: 'L', category: 'Stage', label: 'body length', type: 'int', default: 12, unit: 'px', description: 'One sheep body-length; the unit most radii derive from.', exposed: false },
 
   // Sheep
@@ -212,8 +238,8 @@ const SETTINGS = [
   { key: 'wanderTurn', category: 'Sheep', label: 'wander turn rate', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: 'rad/s', description: 'How fast graze heading random-walks.', exposed: false },
 
   // Idle (POC-v2 flock-behavior: the unpressured field — rules A1–A6)
-  { key: 'clusterSizeMin', category: 'Idle', label: 'group size min', type: 'int', default: 2, min: 1, max: 8, step: 1, unit: '—', description: 'Smallest spawn group of sheep.', exposed: true, onChange: 'respawn' },
-  { key: 'clusterSizeMax', category: 'Idle', label: 'group size max', type: 'int', default: 5, min: 2, max: 12, step: 1, unit: '—', description: 'Largest spawn group of sheep.', exposed: true, onChange: 'respawn' },
+  { key: 'clusterSizeMin', category: 'Idle', label: 'group size min', type: 'int', default: 1, min: 1, max: 8, step: 1, unit: '—', description: 'Smallest spawn group — FIXED at 1 since POC-v3 P8 (H1: singleton sheep are legal idle groups). Kept as documentation.', exposed: false },
+  { key: 'clusterSizeMax', category: 'Idle', label: 'max group size', type: 'int', default: 10, min: 1, max: 20, step: 1, unit: '—', description: 'The H1 slider: at-rest group sizes draw uniformly from 1 to this. Changing it respawns the herd.', exposed: true, onChange: 'respawn' },
   { key: 'clusterSpread', category: 'Idle', label: 'group spread', type: 'float', default: 24, min: 6, max: 60, step: 1, unit: 'px', description: 'Jitter of members around their group seed (~2 body-lengths).', exposed: true, onChange: 'respawn' },
   { key: 'clusterMinGap', category: 'Idle', label: 'group min gap', type: 'float', default: 120, min: 40, max: 300, step: 5, unit: 'px', description: 'Minimum distance between spawn-group seeds (best-effort).', exposed: true, onChange: 'respawn' },
   { key: 'wandererFrac', category: 'Idle', label: 'wanderer fraction', type: 'float', default: 0.12, min: 0, max: 0.5, step: 0.01, unit: '—', description: 'Share of sheep that slowly drift instead of grazing in place.', exposed: true, onChange: 'respawn' },
@@ -239,7 +265,7 @@ const SETTINGS = [
   { key: 'accelScale', category: 'Boids', label: 'accel scale', type: 'float', default: 250, min: 0, max: 800, step: 10, unit: 'px/s²', description: 'Global responsiveness: accel per unit steering force.', exposed: true },
 
   // Flee / Eye
-  { key: 'dogVMax', category: 'Flee / Eye', label: 'dog max speed', type: 'float', default: 135, min: 40, max: 300, step: 5, unit: 'px/s', description: 'Top dog speed (≈1.5× sheep).', exposed: false },
+  { key: 'dogVMax', category: 'Flee / Eye', label: 'dog max speed', type: 'float', default: 110, min: 40, max: 300, step: 5, unit: 'px/s', description: 'Top dog speed (≈1.2× sheep — lowered from 135 and exposed, POC-v3 P5/Q8).', exposed: true },
   { key: 'R_flee', category: 'Flee / Eye', label: 'flee radius', type: 'float', default: 120, min: 40, max: 300, step: 5, unit: 'px', description: 'Distance within which the dog scares sheep.', exposed: true },
   { key: 'w_flee', category: 'Flee / Eye', label: 'flee weight', type: 'float', default: 2.0, min: 0, max: 5, step: 0.1, unit: '—', description: 'Strength of the run-from-dog force.', exposed: true },
   { key: 'ambient', category: 'Flee / Eye', label: 'eye ambient floor', type: 'float', default: 0.2, min: 0, max: 1, step: 0.05, unit: '—', description: '1 = pure radius threat, 0 = pure gaze-cone threat.', exposed: true },
@@ -252,6 +278,7 @@ const SETTINGS = [
   { key: 'flankConeDeg', category: 'Dog', label: 'flank eye angle', type: 'float', default: 45, min: 20, max: 70, step: 1, unit: '—', description: 'Degrees the flanking dog\'s eye is held off his line of travel, toward the flock (C3).', exposed: true },
   { key: 'flankAdvance', category: 'Dog', label: 'flank advance rate', type: 'float', default: 1.0, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'How fast the flank point works around the flock edge.', exposed: true },
   { key: 'fenceSeekBias', category: 'Dog', label: 'fence seek bias', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'How strongly the flank path hugs a nearby field boundary — the dog slots between sheep and fence (C2).', exposed: true },
+  { key: 'flankHandoffDeg', category: 'Dog', label: 'flank handoff angle', type: 'float', default: 30, min: 10, max: 90, step: 1, unit: '—', description: 'Half-angle of "opposite the target": a flank ends and hands off to walk-on once the dog is on station within this many degrees of the goal→flock line extended (C6).', exposed: true },
   { key: 'R_drive', category: 'Dog', label: 'drive standoff', type: 'float', default: 140, min: 80, max: 260, step: 5, unit: 'px', description: 'Walk-on standoff behind the flock.', exposed: true },
   { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'SUPERSEDED (POC-v3 P2: the trail-gap governor replaced creep-forever). Kept for reference.', exposed: false },
   { key: 'driveTrailGap', category: 'Dog', label: 'drive trail gap', type: 'float', default: 40, min: 20, max: 160, step: 5, unit: 'px', description: 'Walk-on never closes on the nearest driven sheep past this gap — the dog trails, he doesn\'t catch (E1). Must sit inside the threat range that actually mobilizes sheep (~R_flee/3).', exposed: true },
@@ -273,21 +300,28 @@ const SETTINGS = [
   { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'Cone exponent while lying/standing — a tight hard arc with soft flanks (darting space).', exposed: true },
   { key: 'postureRange', category: 'Dog', label: 'posture range', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Posture threat reach as a fraction of R_flee — fierce close-in wall, faint at driving distance (keeps lie-down\'s gate relief).', exposed: true },
   { key: 'heelIntensity', category: 'Dog', label: 'heel intensity', type: 'float', default: 0, min: 0, max: 1, step: 0.05, unit: '—', description: 'Dog pressure while stood down at the owner\'s side — 0 = an idle dog exerts none (A7).', exposed: true },
-  { key: 'goal', category: 'Dog', label: 'goal / pen center', type: 'point', default: { x: 970, y: 360 }, min: { x: 820, y: 20 }, max: { x: 1100, y: 700 }, step: 5, unit: 'px', description: 'Where the flock is being driven.', exposed: false },
+  { key: 'goal', category: 'Dog', label: 'goal / pen center', type: 'point', default: { x: 970, y: 360 }, min: { x: 0, y: 0 }, max: { x: 1120, y: 720 }, step: 5, unit: 'px', description: 'Where the flock is being driven. DERIVED since POC-v3 P6: set to the pen center outside the perimeter gate on every reseed (and excluded from param export — it is course state, not a tunable).', exposed: false, export: false },
 
   // Gate + Crush
-  { key: 'fenceX', category: 'Gate + Crush', label: 'fence x', type: 'int', default: 820, min: 600, max: 1000, step: 5, unit: 'px', description: 'Interior fence line; goal pen is x > fenceX.', exposed: false },
-  { key: 'gateY', category: 'Gate + Crush', label: 'gate center y', type: 'int', default: 360, min: 20, max: 700, step: 5, unit: 'px', description: 'Vertical center of the gate gap.', exposed: false },
+  { key: 'fenceX', category: 'Gate + Crush', label: 'fence x', type: 'int', default: 820, min: 600, max: 1000, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P6: the interior fence retired; the gate moved to the perimeter). Kept for reference.', exposed: false },
+  { key: 'gateY', category: 'Gate + Crush', label: 'gate center y', type: 'int', default: 360, min: 20, max: 700, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P6: gate position is a seeded perimeter draw). Kept for reference.', exposed: false },
   { key: 'gateWidth', category: 'Gate + Crush', label: 'gate width', type: 'int', default: 42, min: 12, max: 60, step: 1, unit: 'px', description: 'Gate opening size (default tuned up from 30 during P5).', exposed: true },
-  { key: 'w_fence', category: 'Gate + Crush', label: 'fence weight', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of fence repulsion.', exposed: true },
+  { key: 'gateCornerMargin', category: 'Gate + Crush', label: 'gate corner margin', type: 'int', default: 80, min: 40, max: 200, step: 5, unit: 'px', description: 'Minimum distance of the gate mouth from any field corner (F1).', exposed: true, onChange: 'respawn' },
+  { key: 'spawnGateOffset', category: 'Gate + Crush', label: 'spawn gate offset', type: 'float', default: 200, min: 60, max: 500, step: 10, unit: 'px', description: 'How far along the fence (to the seeded side) the spawn region sits from the gate (F2).', exposed: true, onChange: 'respawn' },
+  { key: 'spawnDepth', category: 'Gate + Crush', label: 'spawn depth', type: 'float', default: 140, min: 60, max: 300, step: 10, unit: 'px', description: 'How far the spawn region reaches into the field from the fence (F2).', exposed: true, onChange: 'respawn' },
+  { key: 'gateApproachR', category: 'Gate + Crush', label: 'gate approach radius', type: 'float', default: 60, min: 20, max: 160, step: 5, unit: 'px', description: 'Commitment zone around the gate mouth: a non-idle sheep inside it moving gateward commits and carries on through (G1).', exposed: true },
+  { key: 'w_through', category: 'Gate + Crush', label: 'through bias', type: 'float', default: 2.0, min: 0, max: 5, step: 0.1, unit: '—', description: 'Strength of the gateward commitment bias — must beat the gate posts\' repulsion and crowd back-push (G1).', exposed: true },
+  { key: 'w_fence', category: 'Gate + Crush', label: 'fence weight', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of fence repulsion (perimeter walls, gapped at the gate mouth).', exposed: true },
   { key: 'r_fence', category: 'Gate + Crush', label: 'fence range', type: 'float', default: 30, min: 10, max: 80, step: 1, unit: 'px', description: 'Distance at which the fence pushes sheep.', exposed: true },
-  { key: 'spawnMinX', category: 'Gate + Crush', label: 'spawn region min x', type: 'int', default: 220, min: 20, max: 800, step: 5, unit: 'px', description: 'Left edge of the cluster-seed spawn region.', exposed: false },
-  { key: 'spawnMaxX', category: 'Gate + Crush', label: 'spawn region max x', type: 'int', default: 700, min: 20, max: 800, step: 5, unit: 'px', description: 'Right edge of the cluster-seed spawn region (widened 500→700 for scattered groups, POC-v2 P2).', exposed: false },
+  { key: 'spawnMinX', category: 'Gate + Crush', label: 'spawn region min x', type: 'int', default: 220, min: 20, max: 800, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P6: spawn is anchored near the gate). Kept for reference.', exposed: false },
+  { key: 'spawnMaxX', category: 'Gate + Crush', label: 'spawn region max x', type: 'int', default: 700, min: 20, max: 800, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P6: spawn is anchored near the gate). Kept for reference.', exposed: false },
   { key: 'crushRadius', category: 'Gate + Crush', label: 'crush radius', type: 'float', default: 40, min: 20, max: 80, step: 1, unit: 'px', description: 'Gate-mouth neighborhood used to measure crush.', exposed: true },
   { key: 'crushThreshold', category: 'Gate + Crush', label: 'crush threshold', type: 'float', default: 1.5, min: 0.5, max: 8, step: 0.1, unit: '—', description: 'Density×pressure above which sustained crush injures (calibrated P5).', exposed: true },
   { key: 'crushSustain', category: 'Gate + Crush', label: 'crush sustain', type: 'float', default: 0.8, min: 0, max: 3, step: 0.1, unit: 's', description: 'Seconds over threshold before an injury event fires.', exposed: false },
 
   // Boldness
+  { key: 'boldMean', category: 'Boldness', label: 'boldness mean', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Center of the per-sheep boldness draw (gaussian, clamped 0–1). Was a magic number until POC-v3 P4.', exposed: true, onChange: 'respawn' },
+  { key: 'boldSd', category: 'Boldness', label: 'boldness spread', type: 'float', default: 0.22, min: 0, max: 0.5, step: 0.01, unit: '—', description: 'Spread of the boldness draw. Default 0.22 puts ~0–2 sheep per 80 above the dart threshold (D2\'s top tail); the old hard-coded 0.1 made boldness > 0.8 a 5σ event — darts could never happen.', exposed: true, onChange: 'respawn' },
   { key: 'boldnessTheta', category: 'Boldness', label: 'boldness hold', type: 'float', default: 0.5, min: 0, max: 1.5, step: 0.05, unit: '—', description: 'Sheep ignores the dog while threat < boldness·θ.', exposed: true },
   { key: 'panicThreshold', category: 'Boldness', label: 'panic threshold', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Threat above this triggers a panic sprint (enables bolting).', exposed: true },
   { key: 'panicMult', category: 'Boldness', label: 'panic multiplier', type: 'float', default: 1.6, min: 1, max: 2.5, step: 0.1, unit: '—', description: 'vMax multiplier while panicking.', exposed: true },
@@ -313,6 +347,7 @@ const SETTINGS = [
   { key: 'debug.neighbors', category: 'Debug', label: 'neighbor links', type: 'boolean', default: false, unit: '—', description: 'Draw alignment-neighbor links.', exposed: true, export: false },
   { key: 'debug.gcm', category: 'Debug', label: 'flock GCM', type: 'boolean', default: false, unit: '—', description: 'Draw the flock\'s center of mass.', exposed: true, export: false },
   { key: 'debug.dogTarget', category: 'Debug', label: 'dog target', type: 'boolean', default: false, unit: '—', description: 'Draw the dog\'s current steering target.', exposed: true, export: false },
+  { key: 'debug.gateZone', category: 'Debug', label: 'gate approach zone', type: 'boolean', default: false, unit: '—', description: 'Draw the G1 commitment zone around the gate mouth.', exposed: true, export: false },
   { key: 'debug.state', category: 'Debug', label: 'collect / drive', type: 'boolean', default: false, unit: '—', description: 'Label the dog\'s current collect/drive state.', exposed: true, export: false },
 
   // Sim (structural — read-only)
@@ -335,25 +370,57 @@ function settingTarget(obj, key, create) {
   return [obj, path[path.length - 1]]
 }
 
-// The plain `params` object §1 consumes — reduced from the schema.
+// The plain `params` object §1 consumes — reduced from the schema, with each
+// default OVERRIDDEN by `sheep-defaults.json.js` (SHEEP_DEFAULTS) when the key
+// is present there (P9/Q2). Missing file → schema defaults; unknown keys in
+// the file → one console warning (typo guard). Overrides land before `sim` is
+// constructed, so no hook replay is needed.
 function buildParams(settings) {
+  const o = typeof SHEEP_DEFAULTS !== 'undefined' ? SHEEP_DEFAULTS : {}
+  if (typeof SHEEP_DEFAULTS === 'undefined')
+    console.warn('[sheep-poc] sheep-defaults.json.js missing — using schema defaults')
+  const known = new Set(settings.map((e) => e.key))
+  const unknown = Object.keys(o).filter((k) => !known.has(k))
+  if (unknown.length)
+    console.warn('[sheep-poc] sheep-defaults.json.js: unknown keys ignored: ' + unknown.join(', '))
   const p = {}
   for (const e of settings) {
     const [holder, prop] = settingTarget(p, e.key, true)
-    holder[prop] = e.type === 'point' ? { ...e.default } : e.default
+    const v = e.key in o ? o[e.key] : e.default
+    holder[prop] = e.type === 'point' ? { ...v } : v
   }
   return p
 }
 const params = buildParams(SETTINGS)
 
-// lil-gui panel (UMD build → window.lil.GUI) — fully generated from SETTINGS.
-// Folders appear in first-appearance order; only `exposed` entries get
-// controllers (hidden-only categories still get a folder → P1's ⓘ grid host).
+// Q1 panel map (P9): which schema categories live in which of the three GUI
+// roots. Sheep-side left · dog-side right · Course & Meta collapsed below the
+// dog panel. Data, not wiring — §1 never sees any of this.
+const PANELS = [
+  { id: 'panel-sheep', title: 'Sheep', categories: ['Sheep', 'Idle', 'Boids', 'Boldness'] },
+  { id: 'panel-dog', title: 'Dog', categories: ['Dog', 'Flee / Eye'] },
+  { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Scoring', 'Debug', 'Sim'], collapsed: true },
+]
+
+// lil-gui panels (UMD build → window.lil.GUI) — fully generated from SETTINGS,
+// one root per PANELS entry (explicit containers; autoPlace would stack all
+// three top-right). Folders appear in first-appearance order; only `exposed`
+// entries get controllers (hidden-only categories still get a folder → the
+// ⓘ grid host). Returns { roots, meta } — §3 walks all roots.
 function buildGui(settings, params, hooks) {
-  const gui = new lil.GUI({ title: 'sheep-poc' })
+  const catRoot = {}
+  const roots = PANELS.map((pn) => {
+    const g = new lil.GUI({ title: pn.title, container: document.getElementById(pn.id) })
+    if (pn.collapsed) g.close()
+    for (const c of pn.categories) catRoot[c] = g
+    return g
+  })
   const folders = {}
   for (const e of settings) {
-    if (!folders[e.category]) folders[e.category] = gui.addFolder(e.category)
+    if (!folders[e.category]) {
+      if (!catRoot[e.category]) console.warn('[sheep-poc] category not mapped to a panel: ' + e.category)
+      folders[e.category] = (catRoot[e.category] || roots[roots.length - 1]).addFolder(e.category)
+    }
     if (!e.exposed) continue
     const f = folders[e.category]
     const [holder, prop] = settingTarget(params, e.key, false)
@@ -367,9 +434,9 @@ function buildGui(settings, params, hooks) {
     for (const c of ctrls) c._setting = e // back-link for tooltips/grid (§3 inspector)
     if (e.onChange) for (const c of ctrls) c.onChange(hooks[e.onChange])
   }
-  return gui
+  return { roots, meta: roots[roots.length - 1] }
 }
-const gui = buildGui(SETTINGS, params, HOOKS)
+const guis = buildGui(SETTINGS, params, HOOKS)
 
 // ============================================================================
 // §1 SIM  ◀── PURE, DOM-FREE — ports to Godot FlockSim 1:1.
@@ -435,24 +502,20 @@ class FlockSim {
     this.sheep = []
     this.reseed(params.seed)
     // dog: a steering agent. `command` sets target/facing/intensity (P4); facing
-    // is derived (eye on the flock's GCM), never manually steered.
-    const home = { x: 100, y: params.canvasH / 2 }
+    // is derived (eye on the flock's GCM), never manually steered. The home
+    // post comes from placeGate (the handler stands by the gate, P6).
+    const home = { ...this.home }
     this.gcm = { x: params.canvasW / 2, y: params.canvasH / 2 }
     this.dog = {
       pos: { ...home }, vel: { x: 0, y: 0 }, facing: 0,
       command: 'that_ll_do', target: { ...home }, intensity: 1,
-      owner: { ...home }, flankAngle: 0, flankR: 0, driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
+      owner: { ...home }, flankAngle: 0, flankR: 0, flankT: 0, handoff: null,
+      driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
       impulse: null, impulseFactor: 1,
     }
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
     this.crushTime = 0    // seconds sustained over threshold
     this.injuries = 0     // down-sheep count (welfare hit; scoring uses it in P6)
-    // ideal path for the line axis: herd start → gate → pen center
-    this.idealPath = [
-      { x: (params.spawnMinX + Math.min(params.spawnMaxX, params.fenceX - 60)) / 2, y: params.canvasH / 2 },
-      { x: params.fenceX, y: params.gateY },
-      { x: params.goal.x, y: params.goal.y },
-    ]
     this.resetRun()
   }
 
@@ -461,12 +524,17 @@ class FlockSim {
     this.run = { t: 0, lineDev: 0, strag: 0, split: 0, stress: 0, won: false, finished: false }
   }
 
-  // Flock centroid (global center of mass) — drives all dog steering.
+  // Working-flock centroid — drives all dog steering. Excludes penned (through)
+  // and down sheep: since P6 the pen is OUTSIDE the field, and a centroid that
+  // counted penned sheep dragged the dog to the gate once most were through —
+  // he circled the pen instead of fetching the last stragglers (measured).
   computeGCM() {
-    const n = this.sheep.length
+    let cx = 0, cy = 0, n = 0
+    for (const s of this.sheep) {
+      if (s.through || s.down) continue
+      cx += s.pos.x; cy += s.pos.y; n++
+    }
     if (n === 0) return { x: this.p.canvasW / 2, y: this.p.canvasH / 2 }
-    let cx = 0, cy = 0
-    for (const s of this.sheep) { cx += s.pos.x; cy += s.pos.y }
     return { x: cx / n, y: cy / n }
   }
 
@@ -474,7 +542,7 @@ class FlockSim {
   // r_sep·N^(2/3) of the GCM; otherwise collect the outliers first.
   isCohesive() {
     const p = this.p
-    const active = this.sheep.filter((s) => !s.down)
+    const active = this.sheep.filter((s) => !s.down && !s.through)
     if (!active.length) return true
     const fN = p.r_sep * Math.pow(active.length, 2 / 3)
     for (const s of active) if (vec2.dist(s.pos, this.gcm) > fN) return false
@@ -500,6 +568,7 @@ class FlockSim {
     if (cmd === 'come_by' || cmd === 'away') {    // start the flank from current bearing
       d.flankAngle = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
       d.flankR = Math.hypot(d.pos.x - g.x, d.pos.y - g.y) // seed ring at the dog's radius
+      d.flankT = 0; d.handoff = null // fresh flank → fresh C6 handoff watch
     }
     // Reset the walk-on standoff only on a *reposition* command — so it stays
     // crept-in through a lie-down ↔ walk-on rhythm (otherwise each walk-on
@@ -525,38 +594,97 @@ class FlockSim {
     return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
   }
 
-  // (re)seed the PRNG and respawn the whole herd — deterministic given seed.
+  // (re)seed the PRNG, place the course, and respawn the whole herd —
+  // deterministic given seed (same seed → same gate, same spawn side).
   reseed(seed) {
     this.rng = makePRNG(seed >>> 0)
+    this.placeGate()
     this.spawn()
   }
 
-  // Scattered spawn (POC-v2 A5/A6): the herd starts as many small groups of
-  // clusterSizeMin..Max, seeded ≥ clusterMinGap apart (best-effort rejection
-  // sampling) across the left field, members jittered clusterSpread around
-  // their seed. A random wandererFrac of sheep drift; the rest graze in place.
+  // P6 (F1): the gate lives on the PERIMETER at a seeded random spot. Sides:
+  // 0 N, 1 E, 2 S, 3 W; (nx,ny) points OUT of the field, (tx,ty) runs along
+  // the wall. The drive goal (pen center outside the mouth), the spawn side,
+  // and the owner's post (handler stands by the gate, spawn-opposite side)
+  // all derive from it — nothing else may assume a fixed course.
+  placeGate() {
+    const p = this.p, r = this.playRect()
+    const side = Math.floor(this.rng() * 4) % 4
+    const horiz = side === 0 || side === 2
+    const len = horiz ? r.x1 - r.x0 : r.y1 - r.y0
+    const m = Math.min(p.gateCornerMargin, (len - p.gateWidth) / 2)
+    const t = m + this.rng() * (len - 2 * m)
+    const g = side === 0 ? { x: r.x0 + t, y: r.y0, nx: 0, ny: -1 }
+            : side === 1 ? { x: r.x1, y: r.y0 + t, nx: 1, ny: 0 }
+            : side === 2 ? { x: r.x0 + t, y: r.y1, nx: 0, ny: 1 }
+            :              { x: r.x0, y: r.y0 + t, nx: -1, ny: 0 }
+    g.side = side
+    g.tx = -g.ny; g.ty = g.nx
+    this.gate = g
+    const penOut = Math.min(28, Math.max(10, p.fenceInset * 0.5))
+    p.goal.x = g.x + g.nx * penOut
+    p.goal.y = g.y + g.ny * penOut
+    this.spawnSide = this.rng() < 0.5 ? -1 : 1   // F2: which side the flock starts
+    this.home = {
+      x: g.x - g.tx * this.spawnSide * 90 - g.nx * 40,
+      y: g.y - g.ty * this.spawnSide * 90 - g.ny * 40,
+    }
+    if (this.dog) {                              // respawn mid-session → fresh course
+      this.dog.owner = { ...this.home }
+      this.dog.pos = { ...this.home }
+      this.dog.vel = { x: 0, y: 0 }
+    }
+  }
+
+  // Scattered spawn (POC-v2 A5/A6, region reshaped by POC-v3 F2): the herd
+  // starts as many small groups of clusterSizeMin..Max, seeded ≥ clusterMinGap
+  // apart (best-effort rejection sampling) in a region anchored NEAR THE GATE,
+  // off to the seeded side — the start point sits beside the destination.
+  // Members jitter clusterSpread around their seed; wandererFrac drift.
   spawn() {
     const r = this.playRect()
     const p = this.p, n = p.sheepCount
-    const x0 = p.spawnMinX, x1 = Math.min(p.spawnMaxX, p.fenceX - 60) // herd starts left
+    const clampv = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+    const gt = this.gate, sideSign = this.spawnSide
+    const alongC = sideSign * p.spawnGateOffset
+    // gate-local frame: along the fence (one side only — never straddle the
+    // mouth) × into the field. `grow` widens the box away from the gate and
+    // deeper as min-gap sampling fails, so a small flock huddles by the gate
+    // while a big one trails off along the fence — the region scales with
+    // the herd instead of packing 80 sheep into one indistinguishable blob.
+    const sampleSpawn = (grow) => {
+      const along = sideSign * (60 + this.rng() * (270 + 450 * grow))
+      const depth = 30 + this.rng() * p.spawnDepth * (1 + grow)
+      return {
+        x: clampv(gt.x + gt.tx * along - gt.nx * depth, r.x0 + 30, r.x1 - 30),
+        y: clampv(gt.y + gt.ty * along - gt.ny * depth, r.y0 + 30, r.y1 - 30),
+      }
+    }
+    // H1 (P8): group sizes draw uniformly 1..clusterSizeMax — singletons are
+    // legal idle groups, so no lone-remainder guard. Group COUNT still derives
+    // from sheepCount (draw until the herd is exhausted).
     const sizes = []
     for (let left = n; left > 0;) {
-      const lo = Math.min(p.clusterSizeMin, left), hi = Math.min(p.clusterSizeMax, left)
-      let s = lo + Math.floor(this.rng() * (hi - lo + 1))
-      if (left - s === 1) s = s < hi ? s + 1 : s - 1 // never strand a lone remainder
+      const s = 1 + Math.floor(this.rng() * Math.min(p.clusterSizeMax, left))
       sizes.push(s); left -= s
     }
     const seeds = []
     for (let g = 0; g < sizes.length; g++) {
       let best = null, bestD = -1
       for (let a = 0; a < 150; a++) {
-        const c = { x: x0 + this.rng() * (x1 - x0), y: r.y0 + 30 + this.rng() * (r.y1 - r.y0 - 60) }
+        const c = sampleSpawn(a / 150)
         const d = seeds.length ? Math.min(...seeds.map((q) => Math.hypot(q.x - c.x, q.y - c.y))) : Infinity
         if (d >= p.clusterMinGap) { best = c; break }
         if (d > bestD) { bestD = d; best = c } // fall back to the most-isolated try
       }
       seeds.push(best)
     }
+    // ideal path (line axis): spawn-region center → gate mouth → pen center
+    const sc = {
+      x: clampv(gt.x + gt.tx * alongC - gt.nx * (30 + p.spawnDepth / 2), r.x0 + 30, r.x1 - 30),
+      y: clampv(gt.y + gt.ty * alongC - gt.ny * (30 + p.spawnDepth / 2), r.y0 + 30, r.y1 - 30),
+    }
+    this.idealPath = [sc, { x: gt.x, y: gt.y }, { x: p.goal.x, y: p.goal.y }]
     this.sheep = []
     for (let g = 0; g < sizes.length; g++) {
       for (let m = 0; m < sizes[g]; m++) this.spawnSheep(seeds[g], g, p, r)
@@ -600,7 +728,7 @@ class FlockSim {
 
   spawnSheep(seed, group, p, r) {
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-    const boldness = clamp(this.gauss(0.3, 0.1), 0, 1)
+    const boldness = clamp(this.gauss(p.boldMean, p.boldSd), 0, 1)
     // uniform disc jitter — bounded (≤ clusterSpread), so adjacent groups can't
     // chain into one cluster the way gaussian tails would
     const jAng = this.rng() * Math.PI * 2, jRad = p.clusterSpread * Math.sqrt(this.rng())
@@ -628,6 +756,7 @@ class FlockSim {
         stragTime: 0,                      // time spent outside the main blob (s)
         through: false,                    // passed the gate → commits forward, never turns back
         throughDir: null,                  // locked into-pen heading once through
+        committed: false,                  // G1: inside the approach zone with momentum → carries on out
     })
   }
 
@@ -744,9 +873,15 @@ class FlockSim {
         const act = this.sheep.filter((s) => !s.down && !s.through)
         if (!act.length) { d.target = { x: d.owner.x, y: d.owner.y }; d.facing = faceGCM; break }
         // advance the flank bearing — full pace when on station, slower while
-        // still running to it (or the point outruns the dog)
+        // still running to it (or the point outruns the dog). The advance is
+        // capped so the point's LINEAR speed stays inside what the dog can
+        // track: at 80 scattered sheep the ring is ~500 px, where 1 rad/s is
+        // 185 px/s — an uncapped point laps the dog forever and he oscillates
+        // on one side of the flock instead of circling (P5 as-built fix; the
+        // cap also keeps the flank honest when the dogVMax slider is lowered).
         const near = vec2.dist(d.pos, d.target) < 60 ? 1 : 0.35
-        d.flankAngle += sign * p.flankAdvance * near * dt
+        const advCap = 0.9 * p.dogVMax / Math.max(1, d.flankR || 1)
+        d.flankAngle += sign * Math.min(p.flankAdvance, advCap) * near * dt
         // flock-edge radius in the flank bearing's sector (±45°)
         let edge = 0, anyDist = 0
         for (const s of act) {
@@ -788,6 +923,24 @@ class FlockSim {
         d.target = {
           x: Math.max(r.x0 + m, Math.min(r.x1 - m, px)),
           y: Math.max(r.y0 + m, Math.min(r.y1 - m, py)),
+        }
+        // C6: a flank is FINITE. Once the dog is on station opposite the
+        // target through the flock — his bearing from the GCM within
+        // flankHandoffDeg of the goal→GCM line extended — the flank hands
+        // off to the walk-on drive by itself. Fence contact is the usual
+        // geometry there, not the condition (Q10); the 0.5 s arm-delay
+        // keeps a come-by issued from an already-opposite spot from
+        // converting before it reads as a command at all.
+        d.flankT += dt
+        const opp = Math.atan2(g.y - p.goal.y, g.x - p.goal.x)
+        const bear = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
+        if (d.flankT > 0.5 && vec2.dist(d.pos, d.target) < 60 &&
+            Math.abs(angleDiff(bear, opp)) < p.flankHandoffDeg * Math.PI / 180) {
+          d.handoff = { x: d.pos.x, y: d.pos.y }
+          d.command = 'walk_on'                   // strip follows (state-driven)
+          d.driveT = 0; d.stallT = 0; d.fwdEMA = p.stallSpeed * 3
+          d.facing = faceGCM
+          break
         }
         // the eye (C3): held flankConeDeg off the line of travel, toward the
         // flock side (sign of the flank direction); face the flock when slow
@@ -894,38 +1047,33 @@ class FlockSim {
     const speed = dist < arriveR ? p.dogVMax * (dist / arriveR) : p.dogVMax
     d.vel = dist > 0.5 ? vec2.scale(vec2.norm(to), Math.min(speed, dist / dt))
                        : { x: 0, y: 0 }
-    const prev = { x: d.pos.x, y: d.pos.y }
     d.pos = vec2.add(d.pos, vec2.scale(d.vel, dt))
-    const r = this.playRect()
+    const r = this.playRect()             // the dog stays in the field (no pen exit)
     d.pos.x = Math.max(r.x0, Math.min(r.x1, d.pos.x))
     d.pos.y = Math.max(r.y0, Math.min(r.y1, d.pos.y))
-    this.fenceBlock(prev, d.pos, d.vel) // dog can't cheat through the wall
   }
 
-  // Interior fence: a vertical wall at fenceX with a gap of gateWidth at gateY.
-  // Repulsion pushes agents horizontally off the walled span (none in the gap).
+  // Perimeter fence repulsion (P6 — replaces the interior fence): each of the
+  // four walls pushes inward within r_fence, EXCEPT across the gate mouth,
+  // which stays free so approaching sheep funnel into the opening.
   fenceForce(pos) {
-    const p = this.p
-    const dxWall = pos.x - p.fenceX
-    if (Math.abs(dxWall) > p.r_fence) return { x: 0, y: 0 }
+    const p = this.p, r = this.playRect(), g = this.gate
     const half = p.gateWidth / 2
-    if (pos.y > p.gateY - half && pos.y < p.gateY + half) return { x: 0, y: 0 } // aperture → free
-    const g = smoothstep(p.r_fence, 0, Math.abs(dxWall))      // 1 at wall → 0 at r_fence
-    return { x: (dxWall >= 0 ? 1 : -1) * g, y: 0 }
-  }
-
-  // Hard anti-tunnel clamp: if an agent crossed the fence line at a walled y,
-  // put it back on the side it came from and kill the inward x-velocity. Applies
-  // to sheep AND dog (so the dog can't cheat through walls during orbits).
-  fenceBlock(prev, pos, vel) {
-    const p = this.p, half = p.gateWidth / 2
-    const inGap = pos.y > p.gateY - half && pos.y < p.gateY + half
-    const crossed = (prev.x - p.fenceX) * (pos.x - p.fenceX) < 0
-    if (crossed && !inGap) {
-      const side = prev.x < p.fenceX ? -1 : 1
-      pos.x = p.fenceX + side * (p.L * 0.5 + 1)
-      if ((side < 0 && vel.x > 0) || (side > 0 && vel.x < 0)) vel.x = 0
+    const alongGate = Math.abs((pos.x - g.x) * g.tx + (pos.y - g.y) * g.ty)
+    const walls = [
+      { d: pos.y - r.y0, nx: 0, ny: 1, gate: g.side === 0 },
+      { d: r.x1 - pos.x, nx: -1, ny: 0, gate: g.side === 1 },
+      { d: r.y1 - pos.y, nx: 0, ny: -1, gate: g.side === 2 },
+      { d: pos.x - r.x0, nx: 1, ny: 0, gate: g.side === 3 },
+    ]
+    let fx = 0, fy = 0
+    for (const w of walls) {
+      if (w.d > p.r_fence) continue
+      if (w.gate && alongGate < half) continue           // aperture → free
+      const s = smoothstep(p.r_fence, 0, Math.max(0, w.d))
+      fx += w.nx * s; fy += w.ny * s
     }
+    return { x: fx, y: fy }
   }
 
   // Ambient-cone flee + boldness gate. Records `stress` (incoming threat T),
@@ -976,7 +1124,10 @@ class FlockSim {
     }
     if (T > p.panicThreshold) a.panic = true // panic sprint → can bolt through a gap
     const f = vec2.scale(dir, T)
-    a.fleeFwd = Math.max(0, f.x)            // forward (+goal) component feeds crush
+    // goal-ward component feeds crush (P6: projected on the live goal
+    // direction — the gate can be on any side now, not just +x)
+    const tg = vec2.norm(vec2.sub(p.goal, a.pos))
+    a.fleeFwd = Math.max(0, f.x * tg.x + f.y * tg.y)
     return f
   }
 
@@ -984,22 +1135,26 @@ class FlockSim {
     const s = this.sheep[i], p = this.p
     if (s.down) { s.vel = { x: 0, y: 0 }; return } // injured → frozen obstacle
 
-    // Once through the gate (goal side), a sheep commits forward and never turns
-    // back — no boids/flee steer it. Lock an into-pen heading and cruise straight
-    // until it settles against the pen wall.
-    if (s.through || s.pos.x > p.fenceX) {
-      s.through = true; s.fwdPush = 0; s.stress = 0
+    // Once out the perimeter gate a sheep commits forward and never turns back
+    // (P6 — the v1 `through` mechanic in the gate's frame): it fans into the
+    // pen apron just outside the fence and settles there, out of the sim.
+    if (s.through) {
+      s.fwdPush = 0; s.stress = 0
+      const g = this.gate
       if (!s.throughDir) {
-        let d = vec2.len(s.vel) > 1e-3 ? vec2.norm(s.vel) : { x: 1, y: 0 }
-        if (d.x < 0.2) d = vec2.norm({ x: 0.2, y: d.y }) // guarantee it heads into the pen
-        s.throughDir = d
+        const fan = (this.rng() - 0.5) * 0.9   // spread the pen, don't queue on a line
+        s.throughDir = vec2.norm({ x: g.nx + g.tx * fan, y: g.ny + g.ty * fan })
       }
       s.vel = vec2.scale(s.throughDir, p.vMax * 0.6)
       s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
-      const rr = this.playRect()
-      if (s.pos.x > rr.x1) { s.pos.x = rr.x1; s.vel.x = 0 }
-      if (s.pos.y < rr.y0) { s.pos.y = rr.y0; s.vel.y = 0 }
-      if (s.pos.y > rr.y1) { s.pos.y = rr.y1; s.vel.y = 0 }
+      const out = (s.pos.x - g.x) * g.nx + (s.pos.y - g.y) * g.ny
+      const lim = p.fenceInset - 8             // settle inside the canvas apron
+      if (out > lim) {
+        s.pos.x -= g.nx * (out - lim); s.pos.y -= g.ny * (out - lim)
+        s.vel = { x: 0, y: 0 }
+      }
+      s.pos.x = Math.max(4, Math.min(p.canvasW - 4, s.pos.x))
+      s.pos.y = Math.max(4, Math.min(p.canvasH - 4, s.pos.y))
       if (vec2.len(s.vel) > 2) s.facing = Math.atan2(s.vel.y, s.vel.x)
       return
     }
@@ -1010,9 +1165,36 @@ class FlockSim {
     const fAli = this.alignment(i, nbrs)
     const fFlee = this.flee(i, dt)
     const fFen = this.fenceForce(s.pos)
-    // forward (+goal) push from the crowd behind + the dog — spikes when a sheep
-    // is jammed against the pile at the gate. Feeds the crush metric.
-    s.fwdPush = Math.max(0, fSep.x + fFlee.x)
+    // Commitment funnel (P7 — G1): a WORKED sheep (not idle; the B1/B2
+    // hysteresis keeps it alert ~calmDelay after pressure drops, which covers
+    // the last body-lengths with no dog) inside gateApproachR with real
+    // gateward speed (stallSpeed is the momentum floor) COMMITS: it gains a
+    // bias toward/through the mouth that outweighs the posts' repulsion and
+    // crowd back-push. Commitment is STICKY until the sheep is through — a
+    // per-tick force stalled sheep mid-zone whenever a neighbor bump or the
+    // calm timer cut the condition (measured: 6/10 lingered at the threshold
+    // after the dog quit a jam). The leash (1.5×R) is the escape hatch: shoved
+    // well clear → uncommitted, so the dog can still pull sheep off the mouth
+    // and idle grazers are never sucked in (they can't trip it — idle sheep
+    // don't commit).
+    let fThrough = { x: 0, y: 0 }
+    {
+      const gt = this.gate
+      const gdist = vec2.dist(s.pos, gt)
+      if (!s.committed && !s.idle && gdist < p.gateApproachR) {
+        const outSpeed = s.vel.x * gt.nx + s.vel.y * gt.ny
+        if (outSpeed > p.stallSpeed) s.committed = true
+      }
+      if (s.committed) {
+        if (gdist > p.gateApproachR * 1.5) s.committed = false
+        else fThrough = vec2.norm({ x: gt.x + gt.nx * 8 - s.pos.x, y: gt.y + gt.ny * 8 - s.pos.y })
+      }
+    }
+    // goal-ward push from the crowd behind + the dog — spikes when a sheep is
+    // jammed against the pile at the gate. Feeds the crush metric. (P6:
+    // projected on the live goal direction, not +x.)
+    const tGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+    s.fwdPush = Math.max(0, (fSep.x + fFlee.x) * tGoal.x + (fSep.y + fFlee.y) * tGoal.y)
 
     // idle ⇄ alert state machine (POC-v2 B1/B2). Threat dissolves idle
     // instantly; idle only resumes after calmDelay of continuous zero threat
@@ -1087,6 +1269,7 @@ class FlockSim {
     accel = vec2.add(accel, vec2.scale(fAvoid, p.w_avoid))
     accel = vec2.add(accel, vec2.scale(fFlee, p.w_flee))
     accel = vec2.add(accel, vec2.scale(fFen, p.w_fence))
+    accel = vec2.add(accel, vec2.scale(fThrough, p.w_through))
     accel = vec2.scale(accel, p.accelScale)
 
     // integrate: v ← clampLen((v + a·dt)·damping, vMax) ; p ← p + v·dt
@@ -1094,17 +1277,23 @@ class FlockSim {
     // hard-capped low so the unpressured field stays calm (A1).
     let vmax = s.panic ? p.vMax * p.panicMult : p.vMax
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
-    const prev = { x: s.pos.x, y: s.pos.y }
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
 
-    // hard boundary clamp + zero the outward velocity component
-    const r = this.playRect()
-    if (s.pos.x < r.x0) { s.pos.x = r.x0; if (s.vel.x < 0) s.vel.x = 0 }
-    if (s.pos.x > r.x1) { s.pos.x = r.x1; if (s.vel.x > 0) s.vel.x = 0 }
-    if (s.pos.y < r.y0) { s.pos.y = r.y0; if (s.vel.y < 0) s.vel.y = 0 }
-    if (s.pos.y > r.y1) { s.pos.y = r.y1; if (s.vel.y > 0) s.vel.y = 0 }
-    this.fenceBlock(prev, s.pos, s.vel)   // interior fence (anti-tunnel)
+    // hard boundary clamp + zero the outward velocity component — EXCEPT
+    // outward through the gate mouth (P6): a sheep carried past the wall line
+    // inside the gate span has left the field and is `through`.
+    const r = this.playRect(), gt = this.gate
+    const alongGate = Math.abs((s.pos.x - gt.x) * gt.tx + (s.pos.y - gt.y) * gt.ty)
+    const outGate = (s.pos.x - gt.x) * gt.nx + (s.pos.y - gt.y) * gt.ny
+    if (alongGate < p.gateWidth / 2 && outGate > 0) {
+      s.through = true
+    } else {
+      if (s.pos.x < r.x0) { s.pos.x = r.x0; if (s.vel.x < 0) s.vel.x = 0 }
+      if (s.pos.x > r.x1) { s.pos.x = r.x1; if (s.vel.x > 0) s.vel.x = 0 }
+      if (s.pos.y < r.y0) { s.pos.y = r.y0; if (s.vel.y < 0) s.vel.y = 0 }
+      if (s.pos.y > r.y1) { s.pos.y = r.y1; if (s.vel.y > 0) s.vel.y = 0 }
+    }
 
     // stable facing: track heading only when actually moving (no flicker at rest)
     if (vec2.len(s.vel) > 2) s.facing = Math.atan2(s.vel.y, s.vel.x)
@@ -1114,7 +1303,7 @@ class FlockSim {
   // over threshold injures a sheep. Lie-down (low intensity → low flee → low
   // fleeFwd) and a dissipating pile both drop crush, so lie-down relieves it.
   updateCrush(dt) {
-    const p = this.p, mx = p.fenceX, my = p.gateY
+    const p = this.p, mx = this.gate.x, my = this.gate.y
     let count = 0, sumFwd = 0
     for (const s of this.sheep) {
       if (s.down) continue
@@ -1133,7 +1322,7 @@ class FlockSim {
 
   // Down the most-central sheep at the mouth (big welfare hit; becomes an obstacle).
   injureAtGate() {
-    const p = this.p, mx = p.fenceX, my = p.gateY
+    const p = this.p, mx = this.gate.x, my = this.gate.y
     let best = -1, bestD = p.crushRadius
     for (let i = 0; i < this.sheep.length; i++) {
       const s = this.sheep[i]; if (s.down) continue
@@ -1185,7 +1374,7 @@ class FlockSim {
     const active = []
     for (let i = 0; i < this.sheep.length; i++) {
       const s = this.sheep[i]
-      if (!s.down && s.pos.x <= p.fenceX) active.push(i); else s.stragTime = 0
+      if (!s.down && !s.through) active.push(i); else s.stragTime = 0
     }
     if (active.length >= 2) {
       const { labels, sizes, mainLabel } = this.clusterLabels(active)
@@ -1208,7 +1397,7 @@ class FlockSim {
     run.stress += (sum / this.sheep.length) * dt           // calm: mean-stress integral
 
     let penned = 0
-    for (const s of this.sheep) if (s.pos.x > p.fenceX) penned++
+    for (const s of this.sheep) if (s.through) penned++
     if (penned >= this.sheep.length) { run.won = true; run.finished = true } // win = all penned
   }
 
@@ -1222,7 +1411,7 @@ class FlockSim {
     const cohesion = p.w_cohesion * (run.strag + 1.5 * run.split)
     const calm = p.w_calm * (run.stress + p.injuryWeight * this.injuries)
     let penned = 0
-    for (const s of this.sheep) if (s.pos.x > p.fenceX) penned++
+    for (const s of this.sheep) if (s.through) penned++
     return {
       time, line, cohesion, calm,
       total: Math.max(0, 100 - time - line - cohesion - calm),
@@ -1276,21 +1465,10 @@ function render(fps) {
   ctx.fillRect(fenceInset, fenceInset,
                canvasW - 2 * fenceInset, canvasH - 2 * fenceInset)
 
-  // goal pen shading (region right of the interior fence)
-  ctx.fillStyle = 'rgba(95,191,122,0.06)'
-  ctx.fillRect(params.fenceX, fenceInset,
-               canvasW - params.fenceX - fenceInset, canvasH - 2 * fenceInset)
-
-  // fence rectangle (inset play rect)
-  ctx.strokeStyle = '#6b7a5a'
-  ctx.lineWidth = 2
-  ctx.strokeRect(fenceInset + 1, fenceInset + 1,
-                 canvasW - 2 * fenceInset - 2, canvasH - 2 * fenceInset - 2)
-
   // ideal path (line-axis reference), shaded by current deviation
   drawPath()
 
-  // interior fence + gate + crush indicator
+  // perimeter fence with the gate mouth open + pen apron + crush indicator
   drawFence()
   drawCrush()
 
@@ -1383,6 +1561,16 @@ function drawDebugOverlays() {
     ctx.restore()
   }
 
+  if (d.gateZone) {                       // G1 commitment zone at the mouth
+    const g = sim.gate
+    ctx.save()
+    ctx.strokeStyle = 'rgba(95,191,122,0.5)'; ctx.lineWidth = 1
+    ctx.setLineDash([3, 5])
+    ctx.beginPath(); ctx.arc(g.x, g.y, params.gateApproachR, 0, Math.PI * 2); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.restore()
+  }
+
   if (d.dogTarget) {                      // dog → target
     const dg = sim.dog
     ctx.save()
@@ -1402,6 +1590,14 @@ function drawDebugOverlays() {
     ctx.fillStyle = drive ? '#7fd79a' : '#e0b070'
     ctx.textAlign = 'center'
     ctx.fillText(drive ? 'DRIVE' : 'COLLECT', g.x, g.y - 26)
+    if (sim.dog.handoff) {                // C6: where the last flank became a drive
+      const h = sim.dog.handoff
+      ctx.strokeStyle = '#e0b070'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.arc(h.x, h.y, 7, 0, Math.PI * 2); ctx.stroke()
+      ctx.font = '10px ui-monospace, monospace'
+      ctx.fillStyle = '#e0b070'
+      ctx.fillText('handoff', h.x, h.y - 11)
+    }
     ctx.textAlign = 'left'
     ctx.restore()
   }
@@ -1422,32 +1618,61 @@ function drawStressMeter() {
   ctx.restore()
 }
 
+// Perimeter fence (P6): four walls with the gate mouth open on sim.gate's
+// side, posts at the mouth, and the pen apron shaded just outside it.
 function drawFence() {
-  const { fenceX, gateY, gateWidth, fenceInset, canvasH } = params
-  const half = gateWidth / 2
+  const { gateWidth, fenceInset, canvasW, canvasH } = params
+  const g = sim.gate, half = gateWidth / 2
+  const r = { x0: fenceInset, y0: fenceInset, x1: canvasW - fenceInset, y1: canvasH - fenceInset }
+  const corners = [
+    [{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }], // 0 N
+    [{ x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }], // 1 E
+    [{ x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }], // 2 S
+    [{ x: r.x0, y: r.y1 }, { x: r.x0, y: r.y0 }], // 3 W
+  ]
+  const gA = { x: g.x - g.tx * half, y: g.y - g.ty * half }
+  const gB = { x: g.x + g.tx * half, y: g.y + g.ty * half }
   ctx.save()
+  // pen apron shading outside the mouth
+  const d = fenceInset - 6
+  ctx.fillStyle = 'rgba(95,191,122,0.10)'
+  ctx.beginPath()
+  ctx.moveTo(gA.x, gA.y)
+  ctx.lineTo(gA.x + g.nx * d, gA.y + g.ny * d)
+  ctx.lineTo(gB.x + g.nx * d, gB.y + g.ny * d)
+  ctx.lineTo(gB.x, gB.y)
+  ctx.closePath(); ctx.fill()
+  // walls (the gate side splits into two segments around the mouth)
   ctx.strokeStyle = '#8a7a52'
   ctx.lineWidth = 4
-  ctx.beginPath()                       // upper segment
-  ctx.moveTo(fenceX, fenceInset); ctx.lineTo(fenceX, gateY - half); ctx.stroke()
-  ctx.beginPath()                       // lower segment
-  ctx.moveTo(fenceX, gateY + half); ctx.lineTo(fenceX, canvasH - fenceInset); ctx.stroke()
+  ctx.beginPath()
+  for (let side = 0; side < 4; side++) {
+    const [a, b] = corners[side]
+    if (side !== g.side) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); continue }
+    // order the mouth endpoints along a→b so the segments don't overlap it
+    const aFirst = (gA.x - a.x) * (b.x - a.x) + (gA.y - a.y) * (b.y - a.y) <
+                   (gB.x - a.x) * (b.x - a.x) + (gB.y - a.y) * (b.y - a.y)
+    const m1 = aFirst ? gA : gB, m2 = aFirst ? gB : gA
+    ctx.moveTo(a.x, a.y); ctx.lineTo(m1.x, m1.y)
+    ctx.moveTo(m2.x, m2.y); ctx.lineTo(b.x, b.y)
+  }
+  ctx.stroke()
   ctx.fillStyle = '#c2ab68'             // gate posts
-  ctx.fillRect(fenceX - 3, gateY - half - 3, 6, 6)
-  ctx.fillRect(fenceX - 3, gateY + half - 3, 6, 6)
+  ctx.fillRect(gA.x - 3, gA.y - 3, 6, 6)
+  ctx.fillRect(gB.x - 3, gB.y - 3, 6, 6)
   ctx.restore()
 }
 
 // Gate-mouth heat: warms yellow→red as crush climbs, flares past threshold. Must
 // be visible BEFORE it injures, so the player can read the danger and lie down.
 function drawCrush() {
-  const { fenceX, gateY, crushRadius, crushThreshold } = params
+  const { crushRadius, crushThreshold } = params
   const t = crushThreshold > 0 ? sim.crush / crushThreshold : 0
   if (t < 0.05) return
   const tc = Math.min(t, 1)
   ctx.save()
   ctx.beginPath()
-  ctx.arc(fenceX, gateY, crushRadius, 0, Math.PI * 2)
+  ctx.arc(sim.gate.x, sim.gate.y, crushRadius, 0, Math.PI * 2)
   const green = Math.round(180 * (1 - tc))
   ctx.fillStyle = `rgba(255,${green},40,${(0.10 + 0.30 * Math.min(t, 1.3)).toFixed(3)})`
   ctx.fill()
@@ -1595,7 +1820,7 @@ function fmtRange(e) {
 const tip = document.createElement('div')
 tip.id = 'tip'
 document.body.appendChild(tip)
-for (const c of gui.controllersRecursive()) {
+for (const g of guis.roots) for (const c of g.controllersRecursive()) {
   if (!c._setting) continue // Tools buttons etc.
   const e = c._setting
   c.domElement.addEventListener('mouseenter', () => {
@@ -1608,7 +1833,9 @@ for (const c of gui.controllersRecursive()) {
     const r = c.domElement.getBoundingClientRect()
     tip.style.display = 'block'
     const w = tip.offsetWidth, h = tip.offsetHeight
-    tip.style.left = Math.max(4, r.left - w - 10) + 'px'
+    // P9: panels sit on BOTH edges now — show the tip on the field side
+    const left = r.left < window.innerWidth / 2 ? r.right + 10 : r.left - w - 10
+    tip.style.left = Math.max(4, Math.min(window.innerWidth - w - 4, left)) + 'px'
     tip.style.top = Math.min(window.innerHeight - h - 4, r.top) + 'px'
   })
   c.domElement.addEventListener('mouseleave', () => { tip.style.display = 'none' })
@@ -1671,7 +1898,7 @@ function openInspector(category) {
 // ⓘ button in each schema folder's title row (skip Tools — not a category)
 {
   const categories = new Set(SETTINGS.map((e) => e.category))
-  for (const f of gui.foldersRecursive()) {
+  for (const g of guis.roots) for (const f of g.foldersRecursive()) {
     if (!categories.has(f._title)) continue
     const b = document.createElement('button')
     b.className = 'info-btn'
@@ -1697,8 +1924,11 @@ const sim = new FlockSim(params)
 
 issue(sim.dog.command) // reflect the initial command in the button strip
 
-// P7 salvage artifact: export the tuned §0 params as JSON to the clipboard +
-// console — schema-driven: only entries with export !== false (drops debug.*).
+// P7(v1) salvage artifact, reshaped by P9: export the tuned §0 params in the
+// sheep-defaults.json.js FORMAT (one `const SHEEP_DEFAULTS =` statement around
+// a pure JSON literal) to the clipboard + console, so a tuning session
+// round-trips into the defaults file by paste. Schema-driven: only entries
+// with export !== false (drops debug.*).
 function exportParams() {
   const out = {}
   for (const e of SETTINGS) {
@@ -1706,11 +1936,11 @@ function exportParams() {
     const [holder, prop] = settingTarget(params, e.key, false)
     out[e.key] = e.type === 'point' ? { ...holder[prop] } : holder[prop]
   }
-  const json = JSON.stringify(out, null, 2)
-  console.log('[sheep-poc] params:\n' + json)
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).catch(() => {})
+  const text = 'const SHEEP_DEFAULTS = ' + JSON.stringify(out, null, 2) + '\n'
+  console.log('[sheep-poc] sheep-defaults.json.js:\n' + text)
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
 }
-const fTools = gui.addFolder('Tools')
+const fTools = guis.meta.addFolder('Tools')
 fTools.add({ f: () => { params.seed = Math.floor(Math.random() * 1e6); sim.reseed(params.seed); hideCard(); issue('that_ll_do') } }, 'f').name('Reseed → new flock')
 fTools.add({ f: () => restartRun() }, 'f').name('Reset run')
 fTools.add({ f: exportParams }, 'f').name('Export params → clipboard')

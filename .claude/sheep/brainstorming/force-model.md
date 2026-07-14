@@ -168,6 +168,15 @@ otherwise → *collect* the furthest outlier first.
 
 ## Dog steering (command → target → seek)
 
+> **⚠ Superseded by POC-v3** (2026-07-13,
+> [dog-behavior](../implemented/POC-v3/dog-behavior.md) rules C/D/E):
+> come-by/away are now moment-by-moment **flanking** around the flock edge
+> (fence-seeking, 45° held eye, finite — auto-handoff to walk-on opposite the
+> goal, C6), walk-on is a **trailing drive** (gap governor, never catches up,
+> auto-stand on stall, pulsed impulses from stand), and **stand** joined as a
+> 6th command (lie-down/stand = escalation pair of blocking postures). The
+> table below is the POC-v1 model, kept for history.
+
 The dog is a seek/arrive steering agent with obstacle avoidance. The **player's
 command sets its target/behavior** — the player never touches a sheep.
 
