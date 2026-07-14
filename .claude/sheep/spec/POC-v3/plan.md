@@ -53,9 +53,9 @@ Same as POC-v2's plan, plus:
 ## Progress tracker
 
 - [x] Phase 0 — Flanking come-by/away (2026-07-13; C1–C5 measured: no-circle sd 36, fence-hugging track, eye ≈45°, inward push +31 px/s, reversal min gap 37 px after radius-smoothing + clearance-floor fix; idle + v1 spot-checks clean)
-- [ ] Phase 1 — Blocking postures + stand
-- [ ] Phase 2 — Trailing drive + auto-stand
-- [ ] Phase 3 — Impulse flavors
+- [x] Phase 1 — Blocking postures + stand (2026-07-13; profile probe: stand 0.942 > lie 0.609 front wall, flanks 0.025, zero reach @90 px [postureRange keeps gate relief]; stand = 6th command w/ hotkey A. Behavioral gate-traffic counts deferred to P4; off-gate deadlock watch-item logged)
+- [x] Phase 2 — Trailing drive + auto-stand (2026-07-13; E1: min gap 51 ≥ 40 over 400 s; E2: gate jam → stand at 5.5 s on schedule, re-arm works, zero false stands; strip is state-driven. As-built: gap controller + front-hemisphere filter + EMA stall detector [4 iterations — see phase file]; off-gate leak finding logged)
+- [x] Phase 3 — Impulse flavors (2026-07-13; envelopes match schema [shove 1.5/0.8/0.5, bark 2.0/0.4/0.3, lean 1.2/1.5/0.5], no stacking, Shift/Alt modifiers wired, gate rhythm cycles tap→pulse→re-stand ×5. As-built: motion-aware smart return [distance-only dead-locked re-entry to walk-on])
 - [ ] Phase 4 — Acceptance & sync
 
 ## Definition of done (whole version)

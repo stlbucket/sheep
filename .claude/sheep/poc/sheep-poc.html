@@ -253,7 +253,19 @@ const SETTINGS = [
   { key: 'flankAdvance', category: 'Dog', label: 'flank advance rate', type: 'float', default: 1.0, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'How fast the flank point works around the flock edge.', exposed: true },
   { key: 'fenceSeekBias', category: 'Dog', label: 'fence seek bias', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'How strongly the flank path hugs a nearby field boundary — the dog slots between sheep and fence (C2).', exposed: true },
   { key: 'R_drive', category: 'Dog', label: 'drive standoff', type: 'float', default: 140, min: 80, max: 260, step: 5, unit: 'px', description: 'Walk-on standoff behind the flock.', exposed: true },
-  { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'How fast walk-on closes that standoff over time.', exposed: true },
+  { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'SUPERSEDED (POC-v3 P2: the trail-gap governor replaced creep-forever). Kept for reference.', exposed: false },
+  { key: 'driveTrailGap', category: 'Dog', label: 'drive trail gap', type: 'float', default: 40, min: 20, max: 160, step: 5, unit: 'px', description: 'Walk-on never closes on the nearest driven sheep past this gap — the dog trails, he doesn\'t catch (E1). Must sit inside the threat range that actually mobilizes sheep (~R_flee/3).', exposed: true },
+  { key: 'stallSpeed', category: 'Dog', label: 'stall speed', type: 'float', default: 8, min: 2, max: 30, step: 1, unit: 'px/s', description: 'Goal-ward flock speed below which a pressured drive counts as stalled.', exposed: true },
+  { key: 'stallDwell', category: 'Dog', label: 'stall dwell', type: 'float', default: 1.5, min: 0, max: 5, step: 0.25, unit: 's', description: 'How long a pressured stall must hold before walk-on auto-converts to stand (E2).', exposed: true },
+  { key: 'shoveMult', category: 'Dog', label: 'shove strength', type: 'float', default: 1.5, min: 1, max: 3, step: 0.1, unit: '—', description: 'Impulse multiplier of a plain walk-on tap from stand (E3 default flavor).', exposed: true },
+  { key: 'shoveDur', category: 'Dog', label: 'shove duration', type: 'float', default: 0.8, min: 0.1, max: 3, step: 0.1, unit: 's', description: 'How long the shove holds before decaying.', exposed: true },
+  { key: 'shoveDecay', category: 'Dog', label: 'shove decay', type: 'float', default: 0.5, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Shove fade-back time to the stand profile.', exposed: true },
+  { key: 'barkMult', category: 'Dog', label: 'bark strength', type: 'float', default: 2.0, min: 1, max: 4, step: 0.1, unit: '—', description: 'Impulse multiplier of Shift+walk-on — punchier, riskier (E3).', exposed: true },
+  { key: 'barkDur', category: 'Dog', label: 'bark duration', type: 'float', default: 0.4, min: 0.1, max: 3, step: 0.1, unit: 's', description: 'How long the bark holds.', exposed: true },
+  { key: 'barkDecay', category: 'Dog', label: 'bark decay', type: 'float', default: 0.3, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Bark fade-back time.', exposed: true },
+  { key: 'leanMult', category: 'Dog', label: 'lean strength', type: 'float', default: 1.2, min: 1, max: 2, step: 0.05, unit: '—', description: 'Impulse multiplier of Alt+walk-on — a calm lean-in (E3).', exposed: true },
+  { key: 'leanDur', category: 'Dog', label: 'lean duration', type: 'float', default: 1.5, min: 0.1, max: 4, step: 0.1, unit: 's', description: 'How long the lean holds.', exposed: true },
+  { key: 'leanDecay', category: 'Dog', label: 'lean decay', type: 'float', default: 0.5, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Lean fade-back time.', exposed: true },
   { key: 'R_driveMin', category: 'Dog', label: 'drive standoff floor', type: 'float', default: 55, min: 40, max: 160, step: 5, unit: 'px', description: 'Closest walk-on gets before stopping (do not walk into the blob).', exposed: true },
   { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Ambient (out-of-cone) dog pressure while lying down / standing.', exposed: true },
   { key: 'lieDownBlock', category: 'Dog', label: 'lie-down block', type: 'float', default: 1.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a lying dog — the covered arc reads as a wall (D1).', exposed: true },
@@ -429,7 +441,8 @@ class FlockSim {
     this.dog = {
       pos: { ...home }, vel: { x: 0, y: 0 }, facing: 0,
       command: 'that_ll_do', target: { ...home }, intensity: 1,
-      owner: { ...home }, flankAngle: 0, flankR: 0, driveDist: params.R_drive,
+      owner: { ...home }, flankAngle: 0, flankR: 0, driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
+      impulse: null, impulseFactor: 1,
     }
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
     this.crushTime = 0    // seconds sustained over threshold
@@ -470,8 +483,20 @@ class FlockSim {
 
   // Player input calls this (via §3) — sets only the command + per-command entry
   // state, so §1 owns the whole player→command→target→steering chain.
-  setCommand(cmd) {
-    const d = this.dog, g = this.gcm
+  setCommand(cmd, opts = {}) {
+    const d = this.dog, g = this.gcm, p = this.p
+    // E3: walk-on while standing = a pressure IMPULSE, not a command change —
+    // the dog fires a brief envelope and stays in his stand. Flavor named by
+    // the caller (§3 modifiers): shove (default) / bark / lean.
+    if (cmd === 'walk_on' && d.command === 'stand') {
+      const f = opts.impulse || 'shove'
+      const K = { shove: ['shoveMult', 'shoveDur', 'shoveDecay'],
+                  bark: ['barkMult', 'barkDur', 'barkDecay'],
+                  lean: ['leanMult', 'leanDur', 'leanDecay'] }[f] || []
+      d.impulse = { name: f, mult: p[K[0]], dur: p[K[1]], decay: p[K[2]], t: 0 }
+      return
+    }
+    d.impulse = null
     if (cmd === 'come_by' || cmd === 'away') {    // start the flank from current bearing
       d.flankAngle = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
       d.flankR = Math.hypot(d.pos.x - g.x, d.pos.y - g.y) // seed ring at the dog's radius
@@ -481,6 +506,8 @@ class FlockSim {
     // re-entry kicks the dog back out to arm's length and kills the drive).
     if (cmd === 'come_by' || cmd === 'away' || cmd === 'that_ll_do')
       d.driveDist = this.p.R_drive
+    d.stallT = 0; d.driveT = 0 // fresh command → fresh stall watch + spool-up (E2)
+    d.fwdEMA = this.p.stallSpeed * 3 // seeded optimistic so spool-up can't false-trip
     d.command = cmd
   }
 
@@ -703,6 +730,7 @@ class FlockSim {
     const p = this.p, d = this.dog, g = this.gcm
     const faceGCM = Math.atan2(g.y - d.pos.y, g.x - d.pos.x)
     d.intensity = 1                              // default; lie_down lowers it
+    d.impulseFactor = 1                          // default; a stand impulse raises it
 
     switch (d.command) {
       // Flanking (POC-v3 C1–C5): not a fixed orbit — the flank point works
@@ -769,11 +797,44 @@ class FlockSim {
           : faceGCM
         break
       }
-      case 'walk_on': {                          // stand behind GCM, opposite the goal
-        const away = vec2.norm(vec2.sub(g, p.goal)) // GCM-side away from goal
-        d.driveDist = Math.max(p.R_driveMin, d.driveDist - p.driveShrink * dt)
-        d.target = { x: g.x + away.x * d.driveDist, y: g.y + away.y * d.driveDist }
+      case 'walk_on': {                          // trail behind GCM, opposite the goal
         d.facing = faceGCM                        // aimed forward drive
+        // Survey the sheep he is DRIVING (his front hemisphere) — stragglers
+        // beside/behind must not freeze him.
+        const fx = Math.cos(d.facing), fy = Math.sin(d.facing)
+        let nearest = Infinity, fwdSum = 0, fwdN = 0
+        d.driveT += dt
+        for (const s of this.sheep) {
+          if (s.down || s.through) continue       // penned sheep aren't "ahead"
+          const dx = s.pos.x - d.pos.x, dy = s.pos.y - d.pos.y
+          const dd = Math.hypot(dx, dy)
+          if (dd > 1e-6 && (dx * fx + dy * fy) / dd < 0.3) continue // not ahead
+          if (dd < nearest) nearest = dd
+          if (dd < p.R_flee) {                    // in the pressure arc
+            const toGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+            fwdSum += s.vel.x * toGoal.x + s.vel.y * toGoal.y
+            fwdN++
+          }
+        }
+        // E1 gap controller: CLOSE on the flock while the ahead-gap is ample,
+        // back off when it tightens — the dog presses but never catches.
+        // (Replaces driveShrink's blind creep with feedback on the actual gap.)
+        if (nearest > p.driveTrailGap + 15) d.driveDist = Math.max(p.R_driveMin, d.driveDist - 25 * dt)
+        else if (nearest < p.driveTrailGap) d.driveDist = Math.min(p.R_drive, d.driveDist + 40 * dt)
+        const away = vec2.norm(vec2.sub(g, p.goal)) // GCM-side away from goal
+        d.target = { x: g.x + away.x * d.driveDist, y: g.y + away.y * d.driveDist }
+        if (nearest < p.driveTrailGap) d.target = { x: d.pos.x, y: d.pos.y } // hard hold at the gap
+        // E2: the dog is AT his gap pressing a crowd whose smoothed mass
+        // motion has died (EMA of arc-mean goal-ward speed: jitter cancels in
+        // the mean, the EMA — seeded high on command — bridges spool-up lulls)
+        // → auto-convert to stand.
+        const fwdMean = fwdN ? fwdSum / fwdN : 0
+        d.fwdEMA += (fwdMean - d.fwdEMA) * Math.min(1, dt / 1.5)
+        if (d.driveT > 4 && fwdN >= 3 && nearest <= p.driveTrailGap + 20 &&
+            d.fwdEMA < p.stallSpeed) {
+          d.stallT += dt
+          if (d.stallT >= p.stallDwell) { d.command = 'stand'; d.stallT = 0 }
+        } else d.stallT = 0
         break
       }
       case 'lie_down':                           // stop; the posture profile in
@@ -781,6 +842,37 @@ class FlockSim {
         d.target = { x: d.pos.x, y: d.pos.y }
         d.intensity = p.lieDownIntensity          // HUD/ambient; cone strength via block params
         d.facing = faceGCM
+        // E3 impulse envelope: hold at mult for dur, decay linearly back to 1
+        if (d.command === 'stand' && d.impulse) {
+          const im = d.impulse
+          im.t += dt
+          if (im.t < im.dur) d.impulseFactor = im.mult
+          else if (im.t < im.dur + im.decay)
+            d.impulseFactor = im.mult + (1 - im.mult) * (im.t - im.dur) / im.decay
+          else {
+            d.impulse = null
+            // Smart return: resume the drive if the shove WORKED (crowd ahead
+            // is moving, or gone) — stay standing only while the jam persists.
+            let nearestAhead = Infinity, movingAhead = false
+            const nfx = Math.cos(d.facing), nfy = Math.sin(d.facing)
+            for (const s of this.sheep) {
+              if (s.down || s.through) continue
+              const dx = s.pos.x - d.pos.x, dy = s.pos.y - d.pos.y
+              const dd = Math.hypot(dx, dy)
+              if (dd > 1e-6 && (dx * nfx + dy * nfy) / dd >= 0.3) {
+                nearestAhead = Math.min(nearestAhead, dd)
+                if (dd < p.R_flee) {
+                  const toGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+                  if (s.vel.x * toGoal.x + s.vel.y * toGoal.y >= p.stallSpeed) movingAhead = true
+                }
+              }
+            }
+            if (nearestAhead > p.driveTrailGap + 30 || movingAhead) {
+              d.command = 'walk_on'
+              d.driveT = 0; d.stallT = 0; d.fwdEMA = p.stallSpeed * 3
+            }
+          }
+        }
         break
       }
       case 'that_ll_do':                         // return to owner, eye off the herd
@@ -864,7 +956,8 @@ class FlockSim {
         a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
       }
       const gp = smoothstep(Rp, 0, dist)
-      T = gp * (p.ambient * p.lieDownIntensity + Math.pow(cosT, p.postureConeK) * block)
+      T = gp * (p.ambient * p.lieDownIntensity + Math.pow(cosT, p.postureConeK) * block) *
+          (d.impulseFactor || 1) // E3: a stand impulse scales the whole posture profile
     } else {
       const g = smoothstep(p.R_flee, 0, dist)                 // 1 at contact → 0 at edge
       const eye = p.ambient + (1 - p.ambient) * Math.pow(cosT, p.coneK)
@@ -1223,7 +1316,7 @@ function render(fps) {
   // HUD readout
   const sc = sim.score()
   hud.textContent =
-    `fps ${fps.toFixed(0)}   cmd ${sim.dog.command}   intensity ${sim.dog.intensity.toFixed(2)}\n` +
+    `fps ${fps.toFixed(0)}   cmd ${sim.dog.command}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}   intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}\n` +
     `crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}   ` +
     `injuries ${sim.injuries}   penned ${sc.penned}/${sim.sheep.length}\n` +
     `time ${sc.raw.t.toFixed(0)}s   score ${sc.total.toFixed(0)}`
@@ -1458,12 +1551,18 @@ function drawDog(d) {
 //   §1 does all the steering. No sheep are ever touched by input.
 // ============================================================================
 const cmdButtons = Array.from(document.querySelectorAll('#controls button[data-cmd]'))
-function issue(cmd) {
-  sim.setCommand(cmd)
+// The strip shows the dog's ACTUAL state (locked Q5): §4's frame loop calls
+// updateStrip(sim.dog.command) every render, so auto-stand (E2) lights up.
+function updateStrip(cmd) {
   for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
 }
+function issue(cmd, flavor) {
+  sim.setCommand(cmd, flavor ? { impulse: flavor } : {})
+  updateStrip(sim.dog.command) // an E3 impulse keeps the dog standing
+}
+const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
 function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do') }
-for (const b of cmdButtons) b.addEventListener('click', () => issue(b.dataset.cmd))
+for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
 document.querySelector('[data-action="finish"]').addEventListener('click', () => sim.finishRun())
 document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
 const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', a: 'stand', d: 'that_ll_do' }
@@ -1472,7 +1571,10 @@ window.addEventListener('keydown', (ev) => {
   if (k === 'f') return sim.finishRun()
   if (k === 'r') return restartRun()
   const cmd = HOTKEYS[k]
-  if (cmd) issue(cmd)
+  if (cmd) {
+    if (ev.altKey) ev.preventDefault() // keep Alt+W from focusing the browser menu
+    issue(cmd, flavorOf(ev))
+  }
 })
 // (initial button highlight is set in §4, once `sim` exists)
 
@@ -1643,6 +1745,7 @@ function frame(nowMs) {
     fpsFrames = 0
   }
 
+  updateStrip(sim.dog.command) // strip follows the dog's actual state (E2 auto-stand)
   render(fps)
   requestAnimationFrame(frame)
 }

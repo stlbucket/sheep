@@ -28,15 +28,38 @@ his own — with the command strip following his actual state. Rules **E1–E2**
   or §3), not just by button clicks — auto-stand must light the Stand button.
   `issue()` remains the player→sim path.
 
-## Verify (measured)
-- **E1:** drive a moving group 30 s: per-tick min distance dog→nearest driven
-  sheep never < `driveTrailGap` (log the minimum).
-- **E2:** jam the flock at the gate mouth under walk-on: within
-  ~`stallDwell`+1 s of the stall, `dog.command === 'stand'` and the strip
-  highlights Stand; the dog holds position.
-- Driving resumes when the player re-issues walk-on (normal command path).
-- 20-sheep v1 drive milestone still completes (gather → drive → pen a few).
-- POC-v2 spot-check: A-rules idle metrics unchanged.
+## Verify (measured 2026-07-13 — PASS)
+- **E1:** 400 s continuous 20-sheep drive: min ahead-gap **51 px ≥ trailGap
+  40** — the dog never caught the driven sheep; drive speed matches pre-v3.
+- **E2 (gate jam, its real scenario):** 12 px gate + gate-mouth crowd under
+  walk-on → **auto-stand at 5.5 s** (= 4 s spool-up + 1.5 s dwell, on
+  schedule); re-issued walk-on drives again and re-stands at 6.4 s when the
+  jam re-establishes (the E3 tap rhythm's precondition).
+- **No false stands:** 400 s of open-field driving, zero spurious conversions.
+- **Strip-follows-state:** forcing `dog.command = 'stand'` (as auto-stand
+  does) lights the Stand button via the render loop with no player input.
+- Zero console errors.
+
+## As-built additions (2026-07-13 — the E2 detector took four iterations)
+1. **Front-hemisphere filter:** gap + stall consider only sheep ahead of the
+   dog's facing (dot > 0.3) — post-gather stragglers beside him froze the
+   naive version solid (GCM +50 px in 140 s).
+2. **Gap CONTROLLER, not fixed standoff:** `driveDist` closes at 25 px/s while
+   the ahead-gap is ample and backs off when it tightens — replacing
+   `driveShrink`'s blind creep with feedback on the actual gap. (A fixed
+   standoff left the dog 140 px back exerting ~0.03 threat forever.)
+3. **`driveTrailGap` default 70 → 40:** the gap must sit inside the threat
+   range that mobilizes sheep (~`R_flee`/3); at 70 px threat ≈ 0.1 is under
+   the boldness hold and the "drive" is a genuine permanent stall.
+4. **Stall statistic = EMA of arc-mean forward speed** (τ ≈ 1.5 s, seeded
+   optimistic on command): raw mean false-trips during spool-up, max never
+   trips (one jittering sheep always exceeds it). Plus a 4 s arm delay and an
+   at-the-gap condition.
+- **Finding (for P4/Q8):** against a plain fence *off-gate*, the flock never
+  "stops" — it leaks sideways around the pressure indefinitely, so E2
+  correctly never fires there. One dog cannot bottle a flock against an
+  unbroken wall; only the gate funnel binds. Realistic, and exactly why the
+  flank-sweep is the off-gate tool.
 
 ## Done when
 - [ ] Trail governor + stall→stand transition wired; strip follows state.

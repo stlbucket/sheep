@@ -177,6 +177,7 @@
   <button data-cmd="away">Away <kbd>E</kbd></button>
   <button data-cmd="walk_on">Walk On <kbd>W</kbd></button>
   <button data-cmd="lie_down">Lie Down <kbd>S</kbd></button>
+  <button data-cmd="stand">Stand <kbd>A</kbd></button>
   <button data-cmd="that_ll_do">That'll Do <kbd>D</kbd></button>
   <span class="sep"></span>
   <button data-action="finish">Finish <kbd>F</kbd></button>
@@ -210,6 +211,21 @@ const SETTINGS = [
   { key: 'damping', category: 'Sheep', label: 'damping', type: 'float', default: 0.9, min: 0.5, max: 0.99, step: 0.01, unit: '—', description: 'Velocity retained per tick (drag).', exposed: true },
   { key: 'wanderTurn', category: 'Sheep', label: 'wander turn rate', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: 'rad/s', description: 'How fast graze heading random-walks.', exposed: false },
 
+  // Idle (POC-v2 flock-behavior: the unpressured field — rules A1–A6)
+  { key: 'clusterSizeMin', category: 'Idle', label: 'group size min', type: 'int', default: 2, min: 1, max: 8, step: 1, unit: '—', description: 'Smallest spawn group of sheep.', exposed: true, onChange: 'respawn' },
+  { key: 'clusterSizeMax', category: 'Idle', label: 'group size max', type: 'int', default: 5, min: 2, max: 12, step: 1, unit: '—', description: 'Largest spawn group of sheep.', exposed: true, onChange: 'respawn' },
+  { key: 'clusterSpread', category: 'Idle', label: 'group spread', type: 'float', default: 24, min: 6, max: 60, step: 1, unit: 'px', description: 'Jitter of members around their group seed (~2 body-lengths).', exposed: true, onChange: 'respawn' },
+  { key: 'clusterMinGap', category: 'Idle', label: 'group min gap', type: 'float', default: 120, min: 40, max: 300, step: 5, unit: 'px', description: 'Minimum distance between spawn-group seeds (best-effort).', exposed: true, onChange: 'respawn' },
+  { key: 'wandererFrac', category: 'Idle', label: 'wanderer fraction', type: 'float', default: 0.12, min: 0, max: 0.5, step: 0.01, unit: '—', description: 'Share of sheep that slowly drift instead of grazing in place.', exposed: true, onChange: 'respawn' },
+  { key: 'idleSpeedCap', category: 'Idle', label: 'idle speed cap', type: 'float', default: 25, min: 0, max: 90, step: 1, unit: 'px/s', description: 'Hard speed limit on unpressured sheep — keeps the idle field calm.', exposed: true },
+  { key: 'grazeStepEvery', category: 'Idle', label: 'graze step every', type: 'float', default: 4, min: 0.5, max: 12, step: 0.5, unit: 's', description: 'Mean time between a grazing sheep\'s shuffle-steps.', exposed: true },
+  { key: 'grazeStepLen', category: 'Idle', label: 'graze step length', type: 'float', default: 12, min: 0, max: 48, step: 1, unit: 'px', description: 'How far one shuffle-step carries (~1 body-length).', exposed: true },
+  { key: 'idleCohRadius', category: 'Idle', label: 'idle cohesion radius', type: 'float', default: 60, min: 20, max: 160, step: 5, unit: 'px', description: 'Group-membership range: used to re-derive idle groups after pressure (idle cohesion itself is same-group only).', exposed: true },
+  { key: 'dogAvoidRadius', category: 'Idle', label: 'dog avoid radius', type: 'float', default: 45, min: 0, max: 120, step: 5, unit: 'px', description: 'Idle sheep drift away from a stood-down dog inside this range — a soft keep-out, not flight (A8).', exposed: true },
+  { key: 'w_avoid', category: 'Idle', label: 'dog avoid weight', type: 'float', default: 0.4, min: 0, max: 2, step: 0.05, unit: '—', description: 'Strength of the idle keep-out drift around a stood-down dog.', exposed: true },
+  { key: 'calmDelay', category: 'Idle', label: 'calm delay', type: 'float', default: 5, min: 0, max: 20, step: 0.5, unit: 's', description: 'Continuous zero-threat time before an alert sheep settles back to idle (B1/B2 hysteresis).', exposed: true },
+  { key: 'crowdTolerance', category: 'Idle', label: 'crowd tolerance', type: 'int', default: 2, min: 0, max: 10, step: 1, unit: '—', description: 'Idle sheep drift off when more than this many strangers stand within the idle cohesion radius — paces the B2 re-scatter.', exposed: true },
+
   // Boids
   { key: 'r_sep', category: 'Boids', label: 'separation radius', type: 'float', default: 18, min: 4, max: 60, step: 1, unit: 'px', description: 'Distance below which sheep push apart.', exposed: true },
   { key: 'minSep', category: 'Boids', label: 'min-separation clamp', type: 'float', default: 4, min: 1, max: 20, step: 1, unit: 'px', description: 'Floor on separation distance so the (inverse-linear) close-range repulsion cannot explode.', exposed: true },
@@ -230,12 +246,33 @@ const SETTINGS = [
   { key: 'coneK', category: 'Flee / Eye', label: 'eye cone tightness', type: 'float', default: 2, min: 0.5, max: 8, step: 0.5, unit: '—', description: 'How focused the dog\'s "eye" cone is (cos^k).', exposed: true },
 
   // Dog
-  { key: 'R_orbit', category: 'Dog', label: 'orbit radius', type: 'float', default: 160, min: 60, max: 300, step: 5, unit: 'px', description: 'Come-by/away standoff distance around the flock center.', exposed: true },
-  { key: 'omega', category: 'Dog', label: 'orbit speed', type: 'float', default: 1.2, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'How fast the dog circles during come-by/away.', exposed: true },
+  { key: 'R_orbit', category: 'Dog', label: 'orbit radius', type: 'float', default: 160, min: 60, max: 300, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P0: flanking replaced the fixed orbit). Kept for reference.', exposed: false },
+  { key: 'omega', category: 'Dog', label: 'orbit speed', type: 'float', default: 1.2, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'SUPERSEDED (POC-v3 P0: flanking replaced the fixed orbit). Kept for reference.', exposed: false },
+  { key: 'flankStandoff', category: 'Dog', label: 'flank standoff', type: 'float', default: 140, min: 60, max: 300, step: 5, unit: 'px', description: 'Distance the flanking dog keeps beyond the flock EDGE (not the center) while working around it.', exposed: true },
+  { key: 'flankConeDeg', category: 'Dog', label: 'flank eye angle', type: 'float', default: 45, min: 20, max: 70, step: 1, unit: '—', description: 'Degrees the flanking dog\'s eye is held off his line of travel, toward the flock (C3).', exposed: true },
+  { key: 'flankAdvance', category: 'Dog', label: 'flank advance rate', type: 'float', default: 1.0, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'How fast the flank point works around the flock edge.', exposed: true },
+  { key: 'fenceSeekBias', category: 'Dog', label: 'fence seek bias', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'How strongly the flank path hugs a nearby field boundary — the dog slots between sheep and fence (C2).', exposed: true },
   { key: 'R_drive', category: 'Dog', label: 'drive standoff', type: 'float', default: 140, min: 80, max: 260, step: 5, unit: 'px', description: 'Walk-on standoff behind the flock.', exposed: true },
-  { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'How fast walk-on closes that standoff over time.', exposed: true },
+  { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'SUPERSEDED (POC-v3 P2: the trail-gap governor replaced creep-forever). Kept for reference.', exposed: false },
+  { key: 'driveTrailGap', category: 'Dog', label: 'drive trail gap', type: 'float', default: 40, min: 20, max: 160, step: 5, unit: 'px', description: 'Walk-on never closes on the nearest driven sheep past this gap — the dog trails, he doesn\'t catch (E1). Must sit inside the threat range that actually mobilizes sheep (~R_flee/3).', exposed: true },
+  { key: 'stallSpeed', category: 'Dog', label: 'stall speed', type: 'float', default: 8, min: 2, max: 30, step: 1, unit: 'px/s', description: 'Goal-ward flock speed below which a pressured drive counts as stalled.', exposed: true },
+  { key: 'stallDwell', category: 'Dog', label: 'stall dwell', type: 'float', default: 1.5, min: 0, max: 5, step: 0.25, unit: 's', description: 'How long a pressured stall must hold before walk-on auto-converts to stand (E2).', exposed: true },
+  { key: 'shoveMult', category: 'Dog', label: 'shove strength', type: 'float', default: 1.5, min: 1, max: 3, step: 0.1, unit: '—', description: 'Impulse multiplier of a plain walk-on tap from stand (E3 default flavor).', exposed: true },
+  { key: 'shoveDur', category: 'Dog', label: 'shove duration', type: 'float', default: 0.8, min: 0.1, max: 3, step: 0.1, unit: 's', description: 'How long the shove holds before decaying.', exposed: true },
+  { key: 'shoveDecay', category: 'Dog', label: 'shove decay', type: 'float', default: 0.5, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Shove fade-back time to the stand profile.', exposed: true },
+  { key: 'barkMult', category: 'Dog', label: 'bark strength', type: 'float', default: 2.0, min: 1, max: 4, step: 0.1, unit: '—', description: 'Impulse multiplier of Shift+walk-on — punchier, riskier (E3).', exposed: true },
+  { key: 'barkDur', category: 'Dog', label: 'bark duration', type: 'float', default: 0.4, min: 0.1, max: 3, step: 0.1, unit: 's', description: 'How long the bark holds.', exposed: true },
+  { key: 'barkDecay', category: 'Dog', label: 'bark decay', type: 'float', default: 0.3, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Bark fade-back time.', exposed: true },
+  { key: 'leanMult', category: 'Dog', label: 'lean strength', type: 'float', default: 1.2, min: 1, max: 2, step: 0.05, unit: '—', description: 'Impulse multiplier of Alt+walk-on — a calm lean-in (E3).', exposed: true },
+  { key: 'leanDur', category: 'Dog', label: 'lean duration', type: 'float', default: 1.5, min: 0.1, max: 4, step: 0.1, unit: 's', description: 'How long the lean holds.', exposed: true },
+  { key: 'leanDecay', category: 'Dog', label: 'lean decay', type: 'float', default: 0.5, min: 0.1, max: 2, step: 0.1, unit: 's', description: 'Lean fade-back time.', exposed: true },
   { key: 'R_driveMin', category: 'Dog', label: 'drive standoff floor', type: 'float', default: 55, min: 40, max: 160, step: 5, unit: 'px', description: 'Closest walk-on gets before stopping (do not walk into the blob).', exposed: true },
-  { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Residual dog pressure while lying down.', exposed: true },
+  { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Ambient (out-of-cone) dog pressure while lying down / standing.', exposed: true },
+  { key: 'lieDownBlock', category: 'Dog', label: 'lie-down block', type: 'float', default: 1.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a lying dog — the covered arc reads as a wall (D1).', exposed: true },
+  { key: 'standBlock', category: 'Dog', label: 'stand block', type: 'float', default: 2.2, min: 0, max: 4, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a standing dog — firmer than lie-down (D3).', exposed: true },
+  { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'Cone exponent while lying/standing — a tight hard arc with soft flanks (darting space).', exposed: true },
+  { key: 'postureRange', category: 'Dog', label: 'posture range', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Posture threat reach as a fraction of R_flee — fierce close-in wall, faint at driving distance (keeps lie-down\'s gate relief).', exposed: true },
+  { key: 'heelIntensity', category: 'Dog', label: 'heel intensity', type: 'float', default: 0, min: 0, max: 1, step: 0.05, unit: '—', description: 'Dog pressure while stood down at the owner\'s side — 0 = an idle dog exerts none (A7).', exposed: true },
   { key: 'goal', category: 'Dog', label: 'goal / pen center', type: 'point', default: { x: 970, y: 360 }, min: { x: 820, y: 20 }, max: { x: 1100, y: 700 }, step: 5, unit: 'px', description: 'Where the flock is being driven.', exposed: false },
 
   // Gate + Crush
@@ -244,8 +281,8 @@ const SETTINGS = [
   { key: 'gateWidth', category: 'Gate + Crush', label: 'gate width', type: 'int', default: 42, min: 12, max: 60, step: 1, unit: 'px', description: 'Gate opening size (default tuned up from 30 during P5).', exposed: true },
   { key: 'w_fence', category: 'Gate + Crush', label: 'fence weight', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of fence repulsion.', exposed: true },
   { key: 'r_fence', category: 'Gate + Crush', label: 'fence range', type: 'float', default: 30, min: 10, max: 80, step: 1, unit: 'px', description: 'Distance at which the fence pushes sheep.', exposed: true },
-  { key: 'spawnMinX', category: 'Gate + Crush', label: 'spawn box min x', type: 'int', default: 220, min: 20, max: 800, step: 5, unit: 'px', description: 'Left edge of the herd\'s start box.', exposed: false },
-  { key: 'spawnMaxX', category: 'Gate + Crush', label: 'spawn box max x', type: 'int', default: 500, min: 20, max: 800, step: 5, unit: 'px', description: 'Right edge of the herd\'s start box.', exposed: false },
+  { key: 'spawnMinX', category: 'Gate + Crush', label: 'spawn region min x', type: 'int', default: 220, min: 20, max: 800, step: 5, unit: 'px', description: 'Left edge of the cluster-seed spawn region.', exposed: false },
+  { key: 'spawnMaxX', category: 'Gate + Crush', label: 'spawn region max x', type: 'int', default: 700, min: 20, max: 800, step: 5, unit: 'px', description: 'Right edge of the cluster-seed spawn region (widened 500→700 for scattered groups, POC-v2 P2).', exposed: false },
   { key: 'crushRadius', category: 'Gate + Crush', label: 'crush radius', type: 'float', default: 40, min: 20, max: 80, step: 1, unit: 'px', description: 'Gate-mouth neighborhood used to measure crush.', exposed: true },
   { key: 'crushThreshold', category: 'Gate + Crush', label: 'crush threshold', type: 'float', default: 1.5, min: 0.5, max: 8, step: 0.1, unit: '—', description: 'Density×pressure above which sustained crush injures (calibrated P5).', exposed: true },
   { key: 'crushSustain', category: 'Gate + Crush', label: 'crush sustain', type: 'float', default: 0.8, min: 0, max: 3, step: 0.1, unit: 's', description: 'Seconds over threshold before an injury event fires.', exposed: false },
@@ -256,6 +293,7 @@ const SETTINGS = [
   { key: 'panicMult', category: 'Boldness', label: 'panic multiplier', type: 'float', default: 1.6, min: 1, max: 2.5, step: 0.1, unit: '—', description: 'vMax multiplier while panicking.', exposed: true },
   { key: 'protestProb', category: 'Boldness', label: 'protest chance', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'Per-second chance a brave sheep protests just below threshold.', exposed: false },
   { key: 'protestDur', category: 'Boldness', label: 'protest duration', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: 's', description: 'How long a protest stamp lasts.', exposed: false },
+  { key: 'dartBoldness', category: 'Boldness', label: 'dart boldness', type: 'float', default: 0.8, min: 0.5, max: 1, step: 0.05, unit: '—', description: 'Boldness above which a sheep may dart around a lying/standing dog (D2 — the rare top tail).', exposed: true },
 
   // Scoring — subtractive: total = 100 − Σ weighted penalties; each axis
   // accumulates a normalized 0..1 fraction/s, so weights read as points/s of full badness.
@@ -357,6 +395,12 @@ function clampLen(v, max) {
 }
 
 // Hermite smoothstep; returns 0 at e0 → 1 at e1 (params may be reversed).
+function angleDiff(a, b) { // signed smallest difference a−b, wrapped to [−π, π]
+  let d = (a - b) % (Math.PI * 2)
+  if (d > Math.PI) d -= Math.PI * 2
+  if (d < -Math.PI) d += Math.PI * 2
+  return d
+}
 function smoothstep(e0, e1, x) {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)))
   return t * t * (3 - 2 * t)
@@ -397,7 +441,8 @@ class FlockSim {
     this.dog = {
       pos: { ...home }, vel: { x: 0, y: 0 }, facing: 0,
       command: 'that_ll_do', target: { ...home }, intensity: 1,
-      owner: { ...home }, orbitAngle: 0, driveDist: params.R_drive,
+      owner: { ...home }, flankAngle: 0, flankR: 0, driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
+      impulse: null, impulseFactor: 1,
     }
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
     this.crushTime = 0    // seconds sustained over threshold
@@ -438,15 +483,31 @@ class FlockSim {
 
   // Player input calls this (via §3) — sets only the command + per-command entry
   // state, so §1 owns the whole player→command→target→steering chain.
-  setCommand(cmd) {
-    const d = this.dog, g = this.gcm
-    if (cmd === 'come_by' || cmd === 'away')      // start orbit from current bearing
-      d.orbitAngle = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
+  setCommand(cmd, opts = {}) {
+    const d = this.dog, g = this.gcm, p = this.p
+    // E3: walk-on while standing = a pressure IMPULSE, not a command change —
+    // the dog fires a brief envelope and stays in his stand. Flavor named by
+    // the caller (§3 modifiers): shove (default) / bark / lean.
+    if (cmd === 'walk_on' && d.command === 'stand') {
+      const f = opts.impulse || 'shove'
+      const K = { shove: ['shoveMult', 'shoveDur', 'shoveDecay'],
+                  bark: ['barkMult', 'barkDur', 'barkDecay'],
+                  lean: ['leanMult', 'leanDur', 'leanDecay'] }[f] || []
+      d.impulse = { name: f, mult: p[K[0]], dur: p[K[1]], decay: p[K[2]], t: 0 }
+      return
+    }
+    d.impulse = null
+    if (cmd === 'come_by' || cmd === 'away') {    // start the flank from current bearing
+      d.flankAngle = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
+      d.flankR = Math.hypot(d.pos.x - g.x, d.pos.y - g.y) // seed ring at the dog's radius
+    }
     // Reset the walk-on standoff only on a *reposition* command — so it stays
     // crept-in through a lie-down ↔ walk-on rhythm (otherwise each walk-on
     // re-entry kicks the dog back out to arm's length and kills the drive).
     if (cmd === 'come_by' || cmd === 'away' || cmd === 'that_ll_do')
       d.driveDist = this.p.R_drive
+    d.stallT = 0; d.driveT = 0 // fresh command → fresh stall watch + spool-up (E2)
+    d.fwdEMA = this.p.stallSpeed * 3 // seeded optimistic so spool-up can't false-trip
     d.command = cmd
   }
 
@@ -470,16 +531,91 @@ class FlockSim {
     this.spawn()
   }
 
+  // Scattered spawn (POC-v2 A5/A6): the herd starts as many small groups of
+  // clusterSizeMin..Max, seeded ≥ clusterMinGap apart (best-effort rejection
+  // sampling) across the left field, members jittered clusterSpread around
+  // their seed. A random wandererFrac of sheep drift; the rest graze in place.
   spawn() {
     const r = this.playRect()
     const p = this.p, n = p.sheepCount
     const x0 = p.spawnMinX, x1 = Math.min(p.spawnMaxX, p.fenceX - 60) // herd starts left
+    const sizes = []
+    for (let left = n; left > 0;) {
+      const lo = Math.min(p.clusterSizeMin, left), hi = Math.min(p.clusterSizeMax, left)
+      let s = lo + Math.floor(this.rng() * (hi - lo + 1))
+      if (left - s === 1) s = s < hi ? s + 1 : s - 1 // never strand a lone remainder
+      sizes.push(s); left -= s
+    }
+    const seeds = []
+    for (let g = 0; g < sizes.length; g++) {
+      let best = null, bestD = -1
+      for (let a = 0; a < 150; a++) {
+        const c = { x: x0 + this.rng() * (x1 - x0), y: r.y0 + 30 + this.rng() * (r.y1 - r.y0 - 60) }
+        const d = seeds.length ? Math.min(...seeds.map((q) => Math.hypot(q.x - c.x, q.y - c.y))) : Infinity
+        if (d >= p.clusterMinGap) { best = c; break }
+        if (d > bestD) { bestD = d; best = c } // fall back to the most-isolated try
+      }
+      seeds.push(best)
+    }
     this.sheep = []
-    for (let i = 0; i < n; i++) {
-      const boldness = Math.max(0, Math.min(1, this.gauss(0.3, 0.1)))
-      this.sheep.push({
-        pos: { x: x0 + this.rng() * (x1 - x0), y: r.y0 + this.rng() * (r.y1 - r.y0) },
-        vel: { x: 0, y: 0 },
+    for (let g = 0; g < sizes.length; g++) {
+      for (let m = 0; m < sizes[g]; m++) this.spawnSheep(seeds[g], g, p, r)
+    }
+    this.nextGroup = sizes.length // fresh ids for groups re-derived after pressure (B2)
+    this.groupCap = {} // per-group target size for re-derived groups (spawn groups default to clusterSizeMax)
+    this.crush = 0; this.crushTime = 0; this.injuries = 0
+    this.resetRun()
+  }
+
+  // B2: an alert sheep settles back to idle — join the nearest already-idle
+  // group within idleCohRadius that still has ROOM (each re-derived group draws
+  // a target size from clusterSizeMin..Max), else found a new group. A settled
+  // blob therefore holds many small interleaved groups; the crowd-dispersal
+  // drive (see update()) then pulls them apart into the loose scattered field.
+  enterIdle(i) {
+    const s = this.sheep[i], p = this.p
+    const size = {}
+    for (const b of this.sheep) if (b.idle && !b.wanderer && !b.down) size[b.group] = (size[b.group] || 0) + 1
+    let adopt = null, best = p.idleCohRadius
+    for (let j = 0; j < this.sheep.length; j++) {
+      if (j === i) continue
+      const b = this.sheep[j]
+      if (!b.idle || b.wanderer || b.down) continue
+      if ((size[b.group] || 0) >= (this.groupCap[b.group] ?? p.clusterSizeMax)) continue
+      const d = vec2.dist(s.pos, b.pos)
+      if (d < best) { best = d; adopt = b }
+    }
+    if (adopt) {
+      s.group = adopt.group
+    } else {
+      s.group = this.nextGroup++
+      this.groupCap[s.group] = p.clusterSizeMin +
+        Math.floor(this.rng() * (p.clusterSizeMax - p.clusterSizeMin + 1))
+    }
+    s.wanderer = this.rng() < p.wandererFrac
+    s.grazeTimer = this.rng() * p.grazeStepEvery
+    s.stepTime = 0
+    s.idle = true
+  }
+
+  spawnSheep(seed, group, p, r) {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+    const boldness = clamp(this.gauss(0.3, 0.1), 0, 1)
+    // uniform disc jitter — bounded (≤ clusterSpread), so adjacent groups can't
+    // chain into one cluster the way gaussian tails would
+    const jAng = this.rng() * Math.PI * 2, jRad = p.clusterSpread * Math.sqrt(this.rng())
+    this.sheep.push({
+      pos: {
+        x: clamp(seed.x + Math.cos(jAng) * jRad, r.x0, r.x1),
+        y: clamp(seed.y + Math.sin(jAng) * jRad, r.y0, r.y1),
+      },
+      vel: { x: 0, y: 0 },
+      group,                              // spawn-group id — idle cohesion is same-group only (A5)
+      wanderer: this.rng() < p.wandererFrac, // A3: the drifting minority
+      grazeTimer: this.rng() * p.grazeStepEvery, // until the next shuffle-step
+      stepTime: 0,                        // remaining duration of the current step
+      idle: true,                         // idle ⇄ alert state (B1/B2)
+      calmT: 0,                           // continuous zero-threat time while alert
         heading: this.rng() * Math.PI * 2, // wander heading (graze)
         facing: this.rng() * Math.PI * 2,  // stable render angle when near-still
         boldness,                          // per-sheep flightiness gate
@@ -492,10 +628,7 @@ class FlockSim {
         stragTime: 0,                      // time spent outside the main blob (s)
         through: false,                    // passed the gate → commits forward, never turns back
         throughDir: null,                  // locked into-pen heading once through
-      })
-    }
-    this.crush = 0; this.crushTime = 0; this.injuries = 0
-    this.resetRun()
+    })
   }
 
   // Neighbor query — single swappable function. Brute-force O(n²); returns
@@ -540,14 +673,32 @@ class FlockSim {
   // CoM → the group settles at a loose spacing instead of crushing to a pack.
   cohesion(i, nbrs) {
     const p = this.p
-    const k = Math.min(p.cohN, nbrs.length)
+    const a = this.sheep[i]
+    // Idle gating (POC-v2 A4/A5): an unpressured sheep only feels cohesion from
+    // its OWN group (any distance — a straggler slowly walks home instead of
+    // being orphaned), and a wandering one feels none. Groups therefore neither
+    // reach for each other nor glue when they brush past — cross-group merging
+    // would be irreversible and coalesce the field. Alert sheep keep full
+    // topological cohesion — herding is unchanged. idleCohRadius is the group-
+    // membership range for enterIdle()'s re-derivation, not a force cutoff.
+    // (Gated by the B1/B2 idle state, updated later this tick — 1-tick lag is fine.)
+    let cand = nbrs
+    if (a.idle) {
+      if (a.wanderer) return { x: 0, y: 0 }
+      // …and grazers don't chase their group's wanderer (A3: it wanders OFF —
+      // the group stays put rather than being towed behind its own CoM).
+      cand = nbrs.filter((n) => {
+        const b = this.sheep[n.j]
+        return b.group === a.group && !b.wanderer
+      })
+    }
+    const k = Math.min(p.cohN, cand.length)
     if (k === 0) return { x: 0, y: 0 }
     let cx = 0, cy = 0
     for (let t = 0; t < k; t++) {
-      const b = this.sheep[nbrs[t].j]
+      const b = this.sheep[cand[t].j]
       cx += b.pos.x; cy += b.pos.y
     }
-    const a = this.sheep[i]
     const to = { x: cx / k - a.pos.x, y: cy / k - a.pos.y }
     const d = vec2.len(to)
     if (d < 1e-6) return { x: 0, y: 0 }
@@ -556,8 +707,13 @@ class FlockSim {
   }
 
   // Alignment: toward the mean heading of neighbors within r_align (kept weak).
+  // Idle-gated (POC-v2 A1/A2): the output is a NORMALIZED heading, so for a
+  // standing group any micro-drift self-reinforces into a perpetual ~7 px/s
+  // glide — measured, not hypothetical. Unpressured sheep don't align;
+  // threatened sheep keep it (herding flow unchanged).
   alignment(i, nbrs) {
     const p = this.p
+    if (this.sheep[i].idle) return { x: 0, y: 0 }
     let vx = 0, vy = 0, c = 0
     for (const n of nbrs) {
       if (n.d >= p.r_align) break
@@ -574,39 +730,162 @@ class FlockSim {
     const p = this.p, d = this.dog, g = this.gcm
     const faceGCM = Math.atan2(g.y - d.pos.y, g.x - d.pos.x)
     d.intensity = 1                              // default; lie_down lowers it
+    d.impulseFactor = 1                          // default; a stand impulse raises it
 
     switch (d.command) {
-      case 'come_by':                            // orbit CW around the blob
-      case 'away': {                             // orbit CCW
+      // Flanking (POC-v3 C1–C5): not a fixed orbit — the flank point works
+      // around the FLOCK EDGE (sector-max radius + flankStandoff), clamped
+      // into the field and biased toward a nearby boundary so the dog slots
+      // between sheep and fence. come_by = clockwise, away = counter-clockwise
+      // (bird's-eye; canvas y-down makes +angle = CW).
+      case 'come_by':
+      case 'away': {
         const sign = d.command === 'come_by' ? 1 : -1
-        d.orbitAngle += sign * p.omega * dt
-        d.target = {
-          x: g.x + p.R_orbit * Math.cos(d.orbitAngle),
-          y: g.y + p.R_orbit * Math.sin(d.orbitAngle),
+        const act = this.sheep.filter((s) => !s.down && !s.through)
+        if (!act.length) { d.target = { x: d.owner.x, y: d.owner.y }; d.facing = faceGCM; break }
+        // advance the flank bearing — full pace when on station, slower while
+        // still running to it (or the point outruns the dog)
+        const near = vec2.dist(d.pos, d.target) < 60 ? 1 : 0.35
+        d.flankAngle += sign * p.flankAdvance * near * dt
+        // flock-edge radius in the flank bearing's sector (±45°)
+        let edge = 0, anyDist = 0
+        for (const s of act) {
+          const dist = vec2.dist(s.pos, g)
+          anyDist = Math.max(anyDist, dist)
+          const b = Math.atan2(s.pos.y - g.y, s.pos.x - g.x)
+          if (Math.abs(angleDiff(b, d.flankAngle)) < Math.PI / 4) edge = Math.max(edge, dist)
         }
-        d.facing = faceGCM                        // eye locked on herd → near-edge sweep
+        if (edge === 0) edge = anyDist * 0.5 // empty sector → fall back toward the overall edge
+        const rr = edge + p.flankStandoff
+        // smooth the ring radius — sector edges change discontinuously as the
+        // bearing sweeps, and a radius snap would drag the target through the
+        // flock (measured: 180 px gap collapsing to 15 px on a reversal)
+        d.flankR = d.flankR > 0 ? d.flankR + (rr - d.flankR) * Math.min(1, 3 * dt) : rr
+        let px = g.x + d.flankR * Math.cos(d.flankAngle)
+        let py = g.y + d.flankR * Math.sin(d.flankAngle)
+        // clearance floor: the flank point never sits closer than ~0.6×standoff
+        // to any sheep — extend the radius outward until clear
+        const clear = p.flankStandoff * 0.6
+        let minD = Infinity
+        for (const s of act) minD = Math.min(minD, Math.hypot(px - s.pos.x, py - s.pos.y))
+        if (minD < clear) {
+          d.flankR += clear - minD
+          px = g.x + d.flankR * Math.cos(d.flankAngle)
+          py = g.y + d.flankR * Math.sin(d.flankAngle)
+        }
+        // fence seek (C2): near a boundary, pull the flank point toward it so
+        // the dog passes between sheep and fence; then clamp into the field
+        const r = this.playRect(), m = 15
+        const reach = 2 * p.flankStandoff
+        if (px - r.x0 < reach || r.x1 - px < reach) {
+          const wallX = px - r.x0 < r.x1 - px ? r.x0 + m : r.x1 - m
+          px += (wallX - px) * p.fenceSeekBias
+        }
+        if (py - r.y0 < reach || r.y1 - py < reach) {
+          const wallY = py - r.y0 < r.y1 - py ? r.y0 + m : r.y1 - m
+          py += (wallY - py) * p.fenceSeekBias
+        }
+        d.target = {
+          x: Math.max(r.x0 + m, Math.min(r.x1 - m, px)),
+          y: Math.max(r.y0 + m, Math.min(r.y1 - m, py)),
+        }
+        // the eye (C3): held flankConeDeg off the line of travel, toward the
+        // flock side (sign of the flank direction); face the flock when slow
+        const speed = vec2.len(d.vel)
+        d.facing = speed > 20
+          ? Math.atan2(d.vel.y, d.vel.x) + sign * (p.flankConeDeg * Math.PI / 180)
+          : faceGCM
         break
       }
-      case 'walk_on': {                          // stand behind GCM, opposite the goal
-        const away = vec2.norm(vec2.sub(g, p.goal)) // GCM-side away from goal
-        d.driveDist = Math.max(p.R_driveMin, d.driveDist - p.driveShrink * dt)
-        d.target = { x: g.x + away.x * d.driveDist, y: g.y + away.y * d.driveDist }
+      case 'walk_on': {                          // trail behind GCM, opposite the goal
         d.facing = faceGCM                        // aimed forward drive
+        // Survey the sheep he is DRIVING (his front hemisphere) — stragglers
+        // beside/behind must not freeze him.
+        const fx = Math.cos(d.facing), fy = Math.sin(d.facing)
+        let nearest = Infinity, fwdSum = 0, fwdN = 0
+        d.driveT += dt
+        for (const s of this.sheep) {
+          if (s.down || s.through) continue       // penned sheep aren't "ahead"
+          const dx = s.pos.x - d.pos.x, dy = s.pos.y - d.pos.y
+          const dd = Math.hypot(dx, dy)
+          if (dd > 1e-6 && (dx * fx + dy * fy) / dd < 0.3) continue // not ahead
+          if (dd < nearest) nearest = dd
+          if (dd < p.R_flee) {                    // in the pressure arc
+            const toGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+            fwdSum += s.vel.x * toGoal.x + s.vel.y * toGoal.y
+            fwdN++
+          }
+        }
+        // E1 gap controller: CLOSE on the flock while the ahead-gap is ample,
+        // back off when it tightens — the dog presses but never catches.
+        // (Replaces driveShrink's blind creep with feedback on the actual gap.)
+        if (nearest > p.driveTrailGap + 15) d.driveDist = Math.max(p.R_driveMin, d.driveDist - 25 * dt)
+        else if (nearest < p.driveTrailGap) d.driveDist = Math.min(p.R_drive, d.driveDist + 40 * dt)
+        const away = vec2.norm(vec2.sub(g, p.goal)) // GCM-side away from goal
+        d.target = { x: g.x + away.x * d.driveDist, y: g.y + away.y * d.driveDist }
+        if (nearest < p.driveTrailGap) d.target = { x: d.pos.x, y: d.pos.y } // hard hold at the gap
+        // E2: the dog is AT his gap pressing a crowd whose smoothed mass
+        // motion has died (EMA of arc-mean goal-ward speed: jitter cancels in
+        // the mean, the EMA — seeded high on command — bridges spool-up lulls)
+        // → auto-convert to stand.
+        const fwdMean = fwdN ? fwdSum / fwdN : 0
+        d.fwdEMA += (fwdMean - d.fwdEMA) * Math.min(1, dt / 1.5)
+        if (d.driveT > 4 && fwdN >= 3 && nearest <= p.driveTrailGap + 20 &&
+            d.fwdEMA < p.stallSpeed) {
+          d.stallT += dt
+          if (d.stallT >= p.stallDwell) { d.command = 'stand'; d.stallT = 0 }
+        } else d.stallT = 0
         break
       }
-      case 'lie_down': {                         // stop, ease pressure, hold the eye
+      case 'lie_down':                           // stop; the posture profile in
+      case 'stand': {                            // flee() makes the cone a wall
         d.target = { x: d.pos.x, y: d.pos.y }
-        d.intensity = p.lieDownIntensity
+        d.intensity = p.lieDownIntensity          // HUD/ambient; cone strength via block params
         d.facing = faceGCM
+        // E3 impulse envelope: hold at mult for dur, decay linearly back to 1
+        if (d.command === 'stand' && d.impulse) {
+          const im = d.impulse
+          im.t += dt
+          if (im.t < im.dur) d.impulseFactor = im.mult
+          else if (im.t < im.dur + im.decay)
+            d.impulseFactor = im.mult + (1 - im.mult) * (im.t - im.dur) / im.decay
+          else {
+            d.impulse = null
+            // Smart return: resume the drive if the shove WORKED (crowd ahead
+            // is moving, or gone) — stay standing only while the jam persists.
+            let nearestAhead = Infinity, movingAhead = false
+            const nfx = Math.cos(d.facing), nfy = Math.sin(d.facing)
+            for (const s of this.sheep) {
+              if (s.down || s.through) continue
+              const dx = s.pos.x - d.pos.x, dy = s.pos.y - d.pos.y
+              const dd = Math.hypot(dx, dy)
+              if (dd > 1e-6 && (dx * nfx + dy * nfy) / dd >= 0.3) {
+                nearestAhead = Math.min(nearestAhead, dd)
+                if (dd < p.R_flee) {
+                  const toGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+                  if (s.vel.x * toGoal.x + s.vel.y * toGoal.y >= p.stallSpeed) movingAhead = true
+                }
+              }
+            }
+            if (nearestAhead > p.driveTrailGap + 30 || movingAhead) {
+              d.command = 'walk_on'
+              d.driveT = 0; d.stallT = 0; d.fwdEMA = p.stallSpeed * 3
+            }
+          }
+        }
         break
       }
       case 'that_ll_do':                         // return to owner, eye off the herd
       default: {
         d.target = { x: d.owner.x, y: d.owner.y }
         d.facing = Math.atan2(d.pos.y - g.y, d.pos.x - g.x) // disengage → flock relaxes
+        // A7: once HOME the dog stands down — no pressure at heel. En-route it
+        // still pressures sheep it passes (that's real; heel starts at arrival).
+        if (vec2.dist(d.pos, d.owner) < 12) d.intensity = p.heelIntensity
         break
       }
     }
+    d.atHeel = d.command === 'that_ll_do' && vec2.dist(d.pos, d.owner) < 12
 
     // arrive-seek: slow within arriveR so the orbit doesn't jitter / overshoot
     const to = vec2.sub(d.target, d.pos)
@@ -663,10 +942,27 @@ class FlockSim {
       a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
     }
     const dir = { x: to.x / dist, y: to.y / dist }            // flee away from dog
-    const g = smoothstep(p.R_flee, 0, dist)                   // 1 at contact → 0 at edge
     const cosT = Math.max(0, dir.x * Math.cos(d.facing) + dir.y * Math.sin(d.facing))
-    const eye = p.ambient + (1 - p.ambient) * Math.pow(cosT, p.coneK)
-    const T = g * eye * d.intensity
+    // Posture profile (POC-v3 D1/D3): a lying/standing dog is a WALL, not a
+    // pusher — fierce tight cone at short range (postureRange·R_flee), faint
+    // ambient flanks. Short reach keeps lie-down's gate RELIEF (a dog lying at
+    // driving distance exerts almost nothing) while blocking close approach.
+    const block = d.command === 'lie_down' ? p.lieDownBlock
+                : d.command === 'stand' ? p.standBlock : 0
+    let T
+    if (block > 0) {
+      const Rp = p.R_flee * p.postureRange
+      if (dist >= Rp) {
+        a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
+      }
+      const gp = smoothstep(Rp, 0, dist)
+      T = gp * (p.ambient * p.lieDownIntensity + Math.pow(cosT, p.postureConeK) * block) *
+          (d.impulseFactor || 1) // E3: a stand impulse scales the whole posture profile
+    } else {
+      const g = smoothstep(p.R_flee, 0, dist)                 // 1 at contact → 0 at edge
+      const eye = p.ambient + (1 - p.ambient) * Math.pow(cosT, p.coneK)
+      T = g * eye * d.intensity
+    }
     a.stress = T
     const hold = a.boldness * p.boldnessTheta
 
@@ -718,12 +1014,67 @@ class FlockSim {
     // is jammed against the pile at the gate. Feeds the crush metric.
     s.fwdPush = Math.max(0, fSep.x + fFlee.x)
 
-    // graze: smoothed random-walk heading → steer toward a low graze speed.
-    // Normalized by vMax so it's an O(1) force on the same footing as the boid
-    // forces (gentle: sheep barely move while grazing). grazeSpeed sets the pace.
-    s.heading += (this.rng() - 0.5) * 2 * p.wanderTurn * dt
+    // idle ⇄ alert state machine (POC-v2 B1/B2). Threat dissolves idle
+    // instantly; idle only resumes after calmDelay of continuous zero threat
+    // (hysteresis — no flicker at the threat boundary), re-deriving the
+    // sheep's group from whoever settled nearby.
+    if (s.stress > 0) {
+      s.idle = false
+      s.calmT = 0
+    } else if (!s.idle) {
+      s.calmT += dt
+      if (s.calmT >= p.calmDelay) this.enterIdle(i)
+    }
+    const idle = s.idle
+
+    // Idle drive (POC-v2 A1–A3, B2). Grazers stand still with occasional
+    // shuffle-steps — unless CROWDED (more than crowdTolerance strangers within
+    // idleCohRadius), in which case they drift away from the local crowd until
+    // the neighborhood thins: this is what re-scatters a released blob into
+    // loose groups, with no timers to go stale. Wanderers drift; alert sheep
+    // keep the original restless wander. The graze force steers toward
+    // `grazeTarget` speed (0 = active braking), normalized by vMax.
+    let grazeTarget
+    if (!idle) {
+      s.heading += (this.rng() - 0.5) * 2 * p.wanderTurn * dt
+      grazeTarget = p.grazeSpeed
+    } else if (s.wanderer) {
+      s.heading += (this.rng() - 0.5) * 2 * p.wanderTurn * 0.3 * dt // lazy drift, holds direction
+      grazeTarget = p.grazeSpeed
+    } else {
+      let cx = 0, cy = 0, crowd = 0
+      for (const n of nbrs) {
+        if (n.d >= p.idleCohRadius) break // sorted → the rest are farther
+        const b = this.sheep[n.j]
+        if (b.group !== s.group) { cx += b.pos.x; cy += b.pos.y; crowd++ }
+      }
+      if (crowd > p.crowdTolerance) { // B2: too many strangers → find some space
+        s.heading = Math.atan2(s.pos.y - cy / crowd, s.pos.x - cx / crowd)
+        grazeTarget = p.grazeSpeed
+      } else {
+        s.grazeTimer -= dt
+        if (s.grazeTimer <= 0) { // shuffle-step: new direction, brief move, re-settle
+          s.heading = this.rng() * Math.PI * 2
+          s.stepTime = p.grazeStepLen / Math.max(1, p.grazeSpeed)
+          s.grazeTimer = p.grazeStepEvery * (0.5 + this.rng())
+        }
+        if (s.stepTime > 0) { s.stepTime -= dt; grazeTarget = p.grazeSpeed } else grazeTarget = 0
+      }
+    }
     const gdir = { x: Math.cos(s.heading), y: Math.sin(s.heading) }
-    const fGrz = vec2.scale(vec2.sub(vec2.scale(gdir, p.grazeSpeed), s.vel), 1 / p.vMax)
+    const fGrz = vec2.scale(vec2.sub(vec2.scale(gdir, grazeTarget), s.vel), 1 / p.vMax)
+
+    // A8: soft keep-out around a stood-down dog — idle sheep drift away from it.
+    // Not the flee force: no stress, no panic, no speed change; idle motion only.
+    let fAvoid = { x: 0, y: 0 }
+    if (idle && this.dog.atHeel) {
+      const adx = s.pos.x - this.dog.pos.x, ady = s.pos.y - this.dog.pos.y
+      const ad = Math.hypot(adx, ady)
+      if (ad < p.dogAvoidRadius && ad > 1e-4) {
+        const m = 1 - ad / p.dogAvoidRadius        // 1 at contact → 0 at radius
+        fAvoid = { x: (adx / ad) * m, y: (ady / ad) * m }
+      }
+    }
 
     // accel = accelScale · (w_sep·F_sep + w_coh·F_coh + w_align·F_align + w_graze·F_graze)
     // All forces share one global scale → tuning stays intuitive.
@@ -733,13 +1084,16 @@ class FlockSim {
     accel = vec2.add(accel, vec2.scale(fCoh, p.w_coh))
     accel = vec2.add(accel, vec2.scale(fAli, p.w_align))
     accel = vec2.add(accel, vec2.scale(fGrz, p.w_graze))
+    accel = vec2.add(accel, vec2.scale(fAvoid, p.w_avoid))
     accel = vec2.add(accel, vec2.scale(fFlee, p.w_flee))
     accel = vec2.add(accel, vec2.scale(fFen, p.w_fence))
     accel = vec2.scale(accel, p.accelScale)
 
     // integrate: v ← clampLen((v + a·dt)·damping, vMax) ; p ← p + v·dt
-    // panicking sheep get a higher speed cap so they can bolt.
-    const vmax = s.panic ? p.vMax * p.panicMult : p.vMax
+    // panicking sheep get a higher speed cap so they can bolt; idle sheep are
+    // hard-capped low so the unpressured field stays calm (A1).
+    let vmax = s.panic ? p.vMax * p.panicMult : p.vMax
+    if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     const prev = { x: s.pos.x, y: s.pos.y }
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
@@ -962,7 +1316,7 @@ function render(fps) {
   // HUD readout
   const sc = sim.score()
   hud.textContent =
-    `fps ${fps.toFixed(0)}   cmd ${sim.dog.command}   intensity ${sim.dog.intensity.toFixed(2)}\n` +
+    `fps ${fps.toFixed(0)}   cmd ${sim.dog.command}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}   intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}\n` +
     `crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}   ` +
     `injuries ${sim.injuries}   penned ${sc.penned}/${sim.sheep.length}\n` +
     `time ${sc.raw.t.toFixed(0)}s   score ${sc.total.toFixed(0)}`
@@ -1197,21 +1551,30 @@ function drawDog(d) {
 //   §1 does all the steering. No sheep are ever touched by input.
 // ============================================================================
 const cmdButtons = Array.from(document.querySelectorAll('#controls button[data-cmd]'))
-function issue(cmd) {
-  sim.setCommand(cmd)
+// The strip shows the dog's ACTUAL state (locked Q5): §4's frame loop calls
+// updateStrip(sim.dog.command) every render, so auto-stand (E2) lights up.
+function updateStrip(cmd) {
   for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
 }
+function issue(cmd, flavor) {
+  sim.setCommand(cmd, flavor ? { impulse: flavor } : {})
+  updateStrip(sim.dog.command) // an E3 impulse keeps the dog standing
+}
+const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
 function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do') }
-for (const b of cmdButtons) b.addEventListener('click', () => issue(b.dataset.cmd))
+for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
 document.querySelector('[data-action="finish"]').addEventListener('click', () => sim.finishRun())
 document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
-const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', d: 'that_ll_do' }
+const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', a: 'stand', d: 'that_ll_do' }
 window.addEventListener('keydown', (ev) => {
   const k = ev.key.toLowerCase()
   if (k === 'f') return sim.finishRun()
   if (k === 'r') return restartRun()
   const cmd = HOTKEYS[k]
-  if (cmd) issue(cmd)
+  if (cmd) {
+    if (ev.altKey) ev.preventDefault() // keep Alt+W from focusing the browser menu
+    issue(cmd, flavorOf(ev))
+  }
 })
 // (initial button highlight is set in §4, once `sim` exists)
 
@@ -1382,6 +1745,7 @@ function frame(nowMs) {
     fpsFrames = 0
   }
 
+  updateStrip(sim.dog.command) // strip follows the dog's actual state (E2 auto-stand)
   render(fps)
   requestAnimationFrame(frame)
 }

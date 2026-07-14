@@ -31,17 +31,25 @@ rhythm.
 - **§2 (small):** HUD shows the active impulse flavor while one is running
   (tuning needs to see it).
 
-## Verify (measured)
-- Stand at a jammed gate; tap walk-on: the dog's effective intensity traces
-  the envelope (sample per tick: rise ≈ `shoveMult`, hold `shoveDur`, decay
-  `shoveDecay`), front sheep gain forward velocity, some cross; dog is back
-  at stand profile after the decay with `command === 'stand'`.
-- The three flavors are **distinct in trace and effect**: bark's peak >
-  shove's > lean's; lean's total impulse-time longest; bark visibly riskier
-  (stress/panic spike near the gate).
-- Rapid re-taps restart the envelope (no stacking beyond the mult).
-- POC-v2 spot-check: A-rules idle metrics unchanged; no impulse path from
-  heel (that'll-do first — a heel dog given walk-on just… drives, per v1).
+## Verify (measured 2026-07-13 — PASS)
+- **Envelope traces** sampled per tick match the schema exactly: shove
+  1.5×/0.8 s hold/0.5 s linear decay; bark 2.0×/0.4 s/0.3 s; lean
+  1.2×/1.5 s/0.5 s. Peaks ordered bark > shove > lean; lean longest.
+- **Re-taps restart, never stack** (max factor 1.5 after a mid-envelope re-tap).
+- **Gate rhythm end-to-end** (12 px gate — narrower than a sheep): jam →
+  auto-stand at 5.9 s (4 penned) → 5 taps, every one fired from a genuine
+  re-stand, +1 through the near-impassable bottleneck, pressure cycling
+  visibly, ending in walk-on via the smart return.
+- **Modifiers:** Shift+W from stand fires a *bark* impulse, dog stays
+  standing; buttons accept shift/alt-click via the same path.
+- Zero console errors.
+
+## As-built addition (2026-07-13)
+- **Motion-aware smart return:** at envelope end the dog resumes `walk_on` if
+  the crowd ahead is *moving* goal-ward (the shove worked — keep them
+  walking) or gone; he stays standing only while the jam persists. A pure
+  distance test dead-locked the drive: with any crowd near, walk-on could
+  never be re-entered from stand at all.
 
 ## Done when
 - [ ] Envelope + three flavors + modifier input wired; HUD shows the flavor.

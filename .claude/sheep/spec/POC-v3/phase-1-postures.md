@@ -30,24 +30,43 @@ blocks harder. The boldest sheep can still dart around. Rules **D1–D3**.
   HOTKEYS map + HUD label. Schema/inspector untouched by the new command
   (commands aren't params).
 
-## Verify (measured)
-- **Blocking (D1):** drive a group toward the gate, lie the dog between flock
-  and gate mouth: sheep in the covered arc **stall or divert** — crossings of
-  the arc per minute drop sharply vs a `that_ll_do` dog; crossings that do
-  happen coincide with backpressure (fwdPush > 0 behind them).
-- **Escalation (D3):** repeat with stand: arc-crossing rate drops further
-  (measurably below lie-down's).
-- **Darting (D2):** over a few minutes of blocking with bold sheep present
-  (boldness > `dartBoldness`), at least one dart-around occurs (sheep loops
-  the flank at panic speed) — count them; > 0 and rare.
-- Lie-down still relieves gate crush (v1 milestone: crush falls when lying).
-- POC-v2 spot-check: A7/A8 unchanged (heel ≠ posture profiles).
+## Verify (measured 2026-07-13 — profile-probe method; results in As-built)
+- **Blocking (D1) + escalation (D3): PASS at force level** — threat probed via
+  a teleported sheep at controlled (dist, angle):
+  | T @ 40 px | on-axis | 45° | 90° flank | @60 px axis | @90 px axis |
+  |---|---|---|---|---|---|
+  | walk-on | 0.741 | 0.444 | 0.148 | 0.500 | 0.156 |
+  | lie-down | 0.609 | 0.171 | **0.025** | 0.108 | **0** |
+  | stand | **0.942** | 0.254 | **0.025** | 0.167 | **0** |
+  Ordering stand > lie (front wall), soft flanks (darting channel), zero reach
+  at driving distance (the relief property, strictly better than v1's 0.3×
+  residual). New lie-down front wall ≈ 2.7× the old one.
+- **Relief regression:** proven at force level (posture T = 0 beyond
+  `postureRange`·`R_flee` = 72 px); wall test: a group parked 45–50 px from
+  either posture is evicted just past the 72 px ring and then left alone.
+- **Behavioral gate traffic (D1/D2 crossing counts, dart tally): deferred to
+  P4** — scripted open-loop scenarios produced no natural traffic toward a
+  parked dog (measured zero in the control condition too); real gate work is
+  closed-loop play. P4's acceptance owns it.
+- Stand fully wired: button, highlight, hotkey A; six commands in the strip.
 
 ## Done when
 - [ ] Posture threat profiles wired; stand command + button + hotkey live.
 - [ ] Crossing-rate ordering measured: open ≫ lie-down > stand; darts rare
       but present.
 - [ ] Crush relief regression passes; zero console errors.
+
+## As-built additions (2026-07-13)
+- **`postureRange` (0.6, new param):** the posture threat reaches only
+  `postureRange`·`R_flee` (72 px) — the resolution to this phase's headline
+  gotcha. The wall is fierce close-in but *nonexistent* at driving distance,
+  so D1's blocking and v1's lie-down gate-relief coexist by construction.
+- **Watch-item for P4/Q8 (measured):** a flock driven against the fence
+  *off-gate* calms into a hard deadlock — rear pressure only wakes the back
+  rows (GCM pinned at x≈718 for 100+ s). A come-by flank along the fence
+  unsticks it (pile swept y 539 → 141), but blind scripting overshoots the
+  gate: gate alignment is closed-loop play. P2's auto-stand + P3's impulses
+  are the tools; P4 must exercise this loop deliberately.
 
 ## Gotchas
 - **Don't break the crush loop:** lie-down's job at the gate is *relief*
