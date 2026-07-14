@@ -177,6 +177,7 @@
   <button data-cmd="away">Away <kbd>E</kbd></button>
   <button data-cmd="walk_on">Walk On <kbd>W</kbd></button>
   <button data-cmd="lie_down">Lie Down <kbd>S</kbd></button>
+  <button data-cmd="stand">Stand <kbd>A</kbd></button>
   <button data-cmd="that_ll_do">That'll Do <kbd>D</kbd></button>
   <span class="sep"></span>
   <button data-action="finish">Finish <kbd>F</kbd></button>
@@ -254,7 +255,11 @@ const SETTINGS = [
   { key: 'R_drive', category: 'Dog', label: 'drive standoff', type: 'float', default: 140, min: 80, max: 260, step: 5, unit: 'px', description: 'Walk-on standoff behind the flock.', exposed: true },
   { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'How fast walk-on closes that standoff over time.', exposed: true },
   { key: 'R_driveMin', category: 'Dog', label: 'drive standoff floor', type: 'float', default: 55, min: 40, max: 160, step: 5, unit: 'px', description: 'Closest walk-on gets before stopping (do not walk into the blob).', exposed: true },
-  { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Residual dog pressure while lying down.', exposed: true },
+  { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Ambient (out-of-cone) dog pressure while lying down / standing.', exposed: true },
+  { key: 'lieDownBlock', category: 'Dog', label: 'lie-down block', type: 'float', default: 1.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a lying dog — the covered arc reads as a wall (D1).', exposed: true },
+  { key: 'standBlock', category: 'Dog', label: 'stand block', type: 'float', default: 2.2, min: 0, max: 4, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a standing dog — firmer than lie-down (D3).', exposed: true },
+  { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'Cone exponent while lying/standing — a tight hard arc with soft flanks (darting space).', exposed: true },
+  { key: 'postureRange', category: 'Dog', label: 'posture range', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Posture threat reach as a fraction of R_flee — fierce close-in wall, faint at driving distance (keeps lie-down\'s gate relief).', exposed: true },
   { key: 'heelIntensity', category: 'Dog', label: 'heel intensity', type: 'float', default: 0, min: 0, max: 1, step: 0.05, unit: '—', description: 'Dog pressure while stood down at the owner\'s side — 0 = an idle dog exerts none (A7).', exposed: true },
   { key: 'goal', category: 'Dog', label: 'goal / pen center', type: 'point', default: { x: 970, y: 360 }, min: { x: 820, y: 20 }, max: { x: 1100, y: 700 }, step: 5, unit: 'px', description: 'Where the flock is being driven.', exposed: false },
 
@@ -276,6 +281,7 @@ const SETTINGS = [
   { key: 'panicMult', category: 'Boldness', label: 'panic multiplier', type: 'float', default: 1.6, min: 1, max: 2.5, step: 0.1, unit: '—', description: 'vMax multiplier while panicking.', exposed: true },
   { key: 'protestProb', category: 'Boldness', label: 'protest chance', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'Per-second chance a brave sheep protests just below threshold.', exposed: false },
   { key: 'protestDur', category: 'Boldness', label: 'protest duration', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: 's', description: 'How long a protest stamp lasts.', exposed: false },
+  { key: 'dartBoldness', category: 'Boldness', label: 'dart boldness', type: 'float', default: 0.8, min: 0.5, max: 1, step: 0.05, unit: '—', description: 'Boldness above which a sheep may dart around a lying/standing dog (D2 — the rare top tail).', exposed: true },
 
   // Scoring — subtractive: total = 100 − Σ weighted penalties; each axis
   // accumulates a normalized 0..1 fraction/s, so weights read as points/s of full badness.
@@ -770,9 +776,10 @@ class FlockSim {
         d.facing = faceGCM                        // aimed forward drive
         break
       }
-      case 'lie_down': {                         // stop, ease pressure, hold the eye
+      case 'lie_down':                           // stop; the posture profile in
+      case 'stand': {                            // flee() makes the cone a wall
         d.target = { x: d.pos.x, y: d.pos.y }
-        d.intensity = p.lieDownIntensity
+        d.intensity = p.lieDownIntensity          // HUD/ambient; cone strength via block params
         d.facing = faceGCM
         break
       }
@@ -843,10 +850,26 @@ class FlockSim {
       a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
     }
     const dir = { x: to.x / dist, y: to.y / dist }            // flee away from dog
-    const g = smoothstep(p.R_flee, 0, dist)                   // 1 at contact → 0 at edge
     const cosT = Math.max(0, dir.x * Math.cos(d.facing) + dir.y * Math.sin(d.facing))
-    const eye = p.ambient + (1 - p.ambient) * Math.pow(cosT, p.coneK)
-    const T = g * eye * d.intensity
+    // Posture profile (POC-v3 D1/D3): a lying/standing dog is a WALL, not a
+    // pusher — fierce tight cone at short range (postureRange·R_flee), faint
+    // ambient flanks. Short reach keeps lie-down's gate RELIEF (a dog lying at
+    // driving distance exerts almost nothing) while blocking close approach.
+    const block = d.command === 'lie_down' ? p.lieDownBlock
+                : d.command === 'stand' ? p.standBlock : 0
+    let T
+    if (block > 0) {
+      const Rp = p.R_flee * p.postureRange
+      if (dist >= Rp) {
+        a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
+      }
+      const gp = smoothstep(Rp, 0, dist)
+      T = gp * (p.ambient * p.lieDownIntensity + Math.pow(cosT, p.postureConeK) * block)
+    } else {
+      const g = smoothstep(p.R_flee, 0, dist)                 // 1 at contact → 0 at edge
+      const eye = p.ambient + (1 - p.ambient) * Math.pow(cosT, p.coneK)
+      T = g * eye * d.intensity
+    }
     a.stress = T
     const hold = a.boldness * p.boldnessTheta
 
@@ -1443,7 +1466,7 @@ function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do')
 for (const b of cmdButtons) b.addEventListener('click', () => issue(b.dataset.cmd))
 document.querySelector('[data-action="finish"]').addEventListener('click', () => sim.finishRun())
 document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
-const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', d: 'that_ll_do' }
+const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', a: 'stand', d: 'that_ll_do' }
 window.addEventListener('keydown', (ev) => {
   const k = ev.key.toLowerCase()
   if (k === 'f') return sim.finishRun()
