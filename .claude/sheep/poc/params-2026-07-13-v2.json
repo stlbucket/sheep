@@ -1,0 +1,18 @@
+{
+  "canvasW": 1120, "canvasH": 720, "fenceInset": 20, "L": 12,
+  "sheepCount": 80, "vMax": 90, "grazeSpeed": 15, "damping": 0.9, "wanderTurn": 1.5,
+  "clusterSizeMin": 2, "clusterSizeMax": 5, "clusterSpread": 24, "clusterMinGap": 120,
+  "wandererFrac": 0.12, "idleSpeedCap": 25, "grazeStepEvery": 4, "grazeStepLen": 12,
+  "idleCohRadius": 60, "dogAvoidRadius": 45, "w_avoid": 0.4, "calmDelay": 5, "crowdTolerance": 2,
+  "r_sep": 18, "minSep": 4, "cohN": 10, "cohScale": 100, "r_align": 36,
+  "w_sep": 1.5, "w_coh": 1, "w_align": 0.2, "w_graze": 0.3, "accelScale": 250,
+  "dogVMax": 135, "R_flee": 120, "w_flee": 2, "ambient": 0.2, "coneK": 2,
+  "R_orbit": 160, "omega": 1.2, "R_drive": 140, "driveShrink": 10, "R_driveMin": 55,
+  "lieDownIntensity": 0.3, "heelIntensity": 0, "goal": { "x": 970, "y": 360 },
+  "fenceX": 820, "gateY": 360, "gateWidth": 42, "w_fence": 1.5, "r_fence": 30,
+  "spawnMinX": 220, "spawnMaxX": 700, "crushRadius": 40, "crushThreshold": 1.5, "crushSustain": 0.8,
+  "boldnessTheta": 0.5, "panicThreshold": 0.6, "panicMult": 1.6, "protestProb": 0.6, "protestDur": 0.3,
+  "w_time": 0.1, "w_line": 0.4, "w_cohesion": 0.4, "w_calm": 0.6, "injuryWeight": 5,
+  "lineNorm": 150, "T_straggle": 3, "splitMinSize": 3, "clusterDist": 70,
+  "seed": 1337, "dt": 0.016666666666666666, "maxFrameDelta": 0.25
+}
