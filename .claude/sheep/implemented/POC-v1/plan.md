@@ -2,7 +2,7 @@
 
 Single-file JS/Canvas proof of concept for the sheepdog herding game. This file
 is the **runner**: point me at it and I execute the phases in order. Design
-rationale lives in [`../brainstorming/`](../brainstorming/README.md); locked
+rationale lives in [`../brainstorming/`](../../brainstorming/README.md); locked
 constants and the single-file anatomy live in [`README.md`](./README.md).
 
 ---
@@ -91,5 +91,5 @@ phase, or violate the Global Invariants below.
 3. Export `params` as JSON works.
 
 Then lift **§0 `params`** + **§1 SIM** into the Godot `FlockSim`
-([`../brainstorming/godot-prototype.md`](../brainstorming/godot-prototype.md));
+([`../brainstorming/godot-prototype.md`](../../brainstorming/godot-prototype.md));
 discard §2–§4.

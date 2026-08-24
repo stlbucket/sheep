@@ -47,7 +47,7 @@ as the owner adds them (e.g. `B#` under-pressure, `C#` gate behavior, …).
   **different places** across the field. *Group size 2–5 is the invariant;
   group count scales with `sheepCount` (~18–24 groups at 80). (Q1)*
   *(Group size 2–5 superseded 2026-07-13 by
-  [POC-v3 H1](../../spec/POC-v3/course-and-flock.md) — groups now vary
+  [POC-v3 H1](../POC-v3/course-and-flock.md) — groups now vary
   **1–n**, n a slider, default 10 / max 20; the scattered-loose-groups
   picture stands.)*
 - **A6.** Those groups start **spatially separated** (scattered across the play

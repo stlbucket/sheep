@@ -24,7 +24,7 @@ compacts the blob — and make the "eye" visible. Dog is manually driven for now
   - For P3, `facing = normalize(vel)` (dog looks where it moves); it heads toward
     a `target` set from the mouse (see §3).
   - **`flee` force** per sheep (see
-    [force-model §4](../brainstorming/force-model.md#4-flee--the-crux-predator-pressure-eye)):
+    [force-model §4](../../brainstorming/force-model.md#4-flee--the-crux-predator-pressure-eye)):
     for the dog within `R_flee`,
     `eyeFactor = ambient + (1−ambient)·max(0,cosθ)^coneK`,
     `T = falloff(dist)·eyeFactor·intensity`, add `dir·T` scaled by `w_flee` to the

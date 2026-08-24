@@ -14,7 +14,7 @@ Verify. Then tick P5 in `plan.md`, **STOP, and report**. Do not start Phase 6.
 Add the goal pen + narrow gate scenario and the **crush → injury** fault, and
 prove **lie down** relieves it. This is the payoff loop for the lie-down verb.
 **Milestone 5.** (See
-[failure-and-scoring → injury hook](../brainstorming/failure-and-scoring.md#the-star-of-the-show-injury-at-the-bottleneck--lie-down).)
+[failure-and-scoring → injury hook](../../brainstorming/failure-and-scoring.md#the-star-of-the-show-injury-at-the-bottleneck--lie-down).)
 
 ## Tasks
 - **§0 PARAMS:** add the field layout — vertical fence at `x 820` with a gate gap

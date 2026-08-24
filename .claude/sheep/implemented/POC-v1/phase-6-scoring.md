@@ -14,7 +14,7 @@ Verify. Then tick P6 in `plan.md`, **STOP, and report**. Do not start Phase 7.
 The four-axis subtractive scoring spine + a post-run card, so the **fast-vs-calm**
 tension is measurable and visible. Also surfaces **Milestone 6** (a feelable
 split). (See
-[failure-and-scoring](../brainstorming/failure-and-scoring.md#the-four-scoring-axes-and-the-tension-that-carries-the-game).)
+[failure-and-scoring](../../brainstorming/failure-and-scoring.md#the-four-scoring-axes-and-the-tension-that-carries-the-game).)
 
 ## Tasks
 - **§0 PARAMS:** add axis weights (`w_time`, `w_line`, `w_cohesion`, `w_calm`) and

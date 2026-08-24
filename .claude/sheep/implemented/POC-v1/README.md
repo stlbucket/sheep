@@ -2,7 +2,7 @@
 
 Execution planning for the throwaway JS PoC. This folder holds the *how we
 actually build it* work; the design rationale lives in
-[`../brainstorming/`](../brainstorming/README.md).
+[`../brainstorming/`](../../brainstorming/README.md).
 
 > **To build it:** point me at [`plan.md`](./plan.md) ("run plan.md") — it's the
 > runner. It executes one phase at a time from `phase-0-skeleton.md` …
@@ -10,7 +10,7 @@ actually build it* work; the design rationale lives in
 > This README holds the decisions + constants those phases consume.
 
 **Supersedes** the multi-file ES-module layout in
-[`../brainstorming/poc-plan.md`](../brainstorming/poc-plan.md): we're building a
+[`../brainstorming/poc-plan.md`](../../brainstorming/poc-plan.md): we're building a
 **single HTML file** instead. The 8-phase build order and the milestone/scoring
 acceptance from that doc still stand — only the file structure changes.
 
@@ -101,9 +101,9 @@ Each phase leaves the page runnable.
   state) + toggles; §3 reseed button; §0 **export `params` to JSON**. → the
   salvage artifact.
 
-Milestone definitions: [`../brainstorming/js-poc.md`](../brainstorming/js-poc.md#milestones--acceptance-for-the-core-is-fun).
-Scoring test: [`../brainstorming/failure-and-scoring.md`](../brainstorming/failure-and-scoring.md#poc-test--what-to-prove).
-Force math: [`../brainstorming/force-model.md`](../brainstorming/force-model.md).
+Milestone definitions: [`../brainstorming/js-poc.md`](../../brainstorming/js-poc.md#milestones--acceptance-for-the-core-is-fun).
+Scoring test: [`../brainstorming/failure-and-scoring.md`](../../brainstorming/failure-and-scoring.md#poc-test--what-to-prove).
+Force math: [`../brainstorming/force-model.md`](../../brainstorming/force-model.md).
 
 ---
 
@@ -115,7 +115,7 @@ Force math: [`../brainstorming/force-model.md`](../brainstorming/force-model.md)
 3. **Export `params`** as JSON works.
 
 Then: lift **§0 `params`** + **§1 SIM** into the Godot `FlockSim`
-([`../brainstorming/godot-prototype.md`](../brainstorming/godot-prototype.md));
+([`../brainstorming/godot-prototype.md`](../../brainstorming/godot-prototype.md));
 discard §2–§4.
 
 ---
@@ -143,7 +143,7 @@ discard §2–§4.
 
 Unit of length **L = 12 px** (one sheep body-length). These are *starting
 guesses*; the whole point of the PoC is to move the sliders. Derived from the
-[force-model tuning table](../brainstorming/force-model.md#tuning-table-starting-guesses--the-pocs-job-is-to-find-the-fun)
+[force-model tuning table](../../brainstorming/force-model.md#tuning-table-starting-guesses--the-pocs-job-is-to-find-the-fun)
 (body-lengths × 12).
 
 **Stage**

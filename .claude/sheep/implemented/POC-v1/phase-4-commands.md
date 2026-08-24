@@ -21,7 +21,7 @@ flock). **Milestones 3 & 4.**
   until P5). Bind `R_orbit`, `omega`, `R_drive`, `lieDownIntensity` to a "Dog"
   folder.
 - **§1 SIM — dog steering** (see
-  [force-model → Dog steering](../brainstorming/force-model.md#dog-steering-command--target--seek)):
+  [force-model → Dog steering](../../brainstorming/force-model.md#dog-steering-command--target--seek)):
   compute `GCM` (flock centroid) each tick, then per command set `target` +
   `facing` + `intensity`:
   - `come_by` / `away`: point on a circle radius `R_orbit` around `GCM`, angle

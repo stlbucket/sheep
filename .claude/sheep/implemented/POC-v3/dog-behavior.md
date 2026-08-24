@@ -55,7 +55,9 @@ threat cone model in [`../../brainstorming/threat-model.md`](../../brainstorming
   walk-on posture** and drives. Come-by/away ends in a drive, **NOT** an
   endless orbit; the command-strip highlight follows to walk-on (same
   actual-state convention as E2/Q5). *(Added 2026-07-13 from hands-on play,
-  after P0–P3.)*
+  after P0–P3. Handoff point amended 2026-07-14 by **C7** in
+  [`spec/POC-v4/dog-behavior.md`](../POC-v4/dog-behavior.md) — the
+  flank now carries ~90° past the balance point first.)*
 
 ### D. Stationary pressure — lie-down / stand
 
@@ -69,17 +71,21 @@ threat cone model in [`../../brainstorming/threat-model.md`](../../brainstorming
   **stronger** cone effect — the firmer version of the same posture.
   Blocking strength reads as: lie-down < stand. *(Q2: joins the strip as the
   6th command, own button + hotkey — lie-down and stand coexist as an
-  escalation pair.)*
+  escalation pair.)* ***Superseded 2026-08-22 by POC-v6 I1*** — stand was
+  replaced by *easy* (a slow forward drive); lie-down is the only posture.
+  See [`../POC-v6/dog-behavior.md`](../POC-v6/dog-behavior.md).
 
 ### E. Walk-on — the drive
 
 - **E1.** The dog **never catches up** to the sheep: while they move, he
   trails at a driving distance behind them.
 - **E2.** If the sheep **stop due to backpressure** (pile-up at the gate,
-  crowd ahead), the dog **naturally converts to a stand** — no player input;
+  crowd ahead), the dog **naturally converts to a stand** *(→ **easy** since
+  POC-v6, 2026-08-22)* — no player input;
   the **command-strip highlight follows** to stand (Q5): the strip shows the
   dog's actual state, and tapping walk-on from there is the E3 impulse.
-- **E3.** An **additional walk-on command while auto-standing** delivers a
+- **E3.** An **additional walk-on command while auto-standing** *(while in
+  **easy** since POC-v6)* delivers a
   **brief influence impulse** — a pulse of pressure — followed by a **rapid
   return to stand**. Pulsed walk-on is the gate-working rhythm. *(Q6: three
   impulse flavors — plain tap = **standard shove** (~1.5× for ~0.8 s, ~0.5 s

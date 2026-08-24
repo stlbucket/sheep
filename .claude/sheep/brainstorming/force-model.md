@@ -196,6 +196,106 @@ selects which dog the next command applies to.
 **The whole game in one line:**
 `player button → dog command → dog target → dog steering → dog position+facing → sheep flee → flock motion.`
 
+### Post-POC-v3 refinements (owner, hands-on, 2026-07-14) — **both implemented in POC-v4**
+
+Two observations against the shipped v3 dog — both now shipped as
+[POC-v4](../implemented/POC-v4/dog-behavior.md) rules **F1** (R1) and **C7**
+(R2), measured PASS at its P2 gate on 2026-08-21. They amend
+[`dog-behavior.md`](../implemented/POC-v3/dog-behavior.md):
+
+**R1 — the dog should start facing the sheep.** The dog spawns with
+`facing: 0` (due east) regardless of where the flock is. Everywhere else
+facing is *derived* (eye-on-flock by default —
+[`threat-model.md`](./threat-model.md)); spawn is the one hardcoded spot.
+The triangle and the eye-cone arc both render along `facing`, so the very
+first frame shows a dog staring at nothing. No pressure consequence — at
+spawn he idles at heel with `heelIntensity 0` (POC-v2) — this is pure
+legibility, but it is the player's first read of "the dog watches the
+sheep." Fix: initialize facing toward the flock GCM at spawn/reset. Should
+land as a spawn-state rule alongside C1–C6.
+
+**R2 — come-by/away should carry another ~90° before the walk-on handoff
+(C6 amendment).** v3's C6 converts flank → drive as soon as the dog is on
+station *opposite the target* — bearing from the GCM within
+`flankHandoffDeg` (default 30°) of the goal→GCM line extended. Hands-on,
+the flank reads as breaking off too soon; the owner wants the dog to keep
+flanking **another 90°** past today's handoff point before settling into
+the drive.
+
+Why the early handoff can feel wrong (candidate reasoning — verify hands-on):
+
+- The conversion window is a ±30° *cone*, so the dog can convert up to 30°
+  **short of** true balance; add GCM drift during the flank and he may never
+  visibly get "behind the sheep" before the strip flips to walk-on.
+- Converting exactly at balance means the last quarter of the flock edge was
+  never swept — outliers on that side are left for the drive to plow past
+  instead of being tucked in by the passing 45° eye (the Strömbom *collect*
+  is cut short).
+- A quarter-turn of overshoot ends the flank with the dog wrapping *past*
+  the pressure point and then trailing back in under the walk-on gap
+  governor (E1) — an approach from the side-rear rather than a hard
+  stop-and-push from dead astern.
+
+**As shipped (POC-v4 P0/P1):** R1 became **F1** — `faceFlock()` derives the
+dog's facing from the flock GCM at construction and after every reseed, and
+the at-heel branch of `that'll do` keeps watching the flock (its per-tick
+disengage facing would otherwise overwrite any spawn-only assignment); the
+heeled eye is pressure-free at `heelIntensity 0`, so A7 holds. R2 became
+**C7** — the `flankOvershootDeg` slider below, default 90°. One wrinkle worth
+knowing when tuning: the handoff fires at the **near edge** of the station's
+tolerance cone, so the effective carry ≈ `flankOvershootDeg −
+flankHandoffDeg` (≈ 60° at defaults).
+
+Mechanism sketch (as implemented): rotate the C6 handoff station by a new tunable
+`flankOvershootDeg` (slider, start **90°**; `0` restores v3) further in the
+flank direction — handoff fires when the dog's bearing from the GCM is
+within `flankHandoffDeg` of `goal→GCM extended + sign · flankOvershootDeg`.
+After conversion the walk-on trail governor walks him back behind the flock;
+whether his side-on pressure during that return transit shoves the flock
+off-line is exactly what hands-on tuning has to judge. Interpretation
+question parked in the [README](./README.md#open-design-questions-parked).
+
+### Post-POC-v5 refinements (owner, 2026-08-22) — **implemented in POC-v6**
+
+**R3 — the flank follows the herd perimeter, to the gate line.** *(R3a,
+Q38, 2026-08-22: the E1 governor's close / back-off rates are
+`driveCloseRate` 25 / `driveBackoffRate` 40 px/s — no magic numbers left in
+the drive — and easy scales both by `easySpeedFrac`, so the ⅓ pace holds
+from the gate line, where the dog is already on the ring and the governor,
+not `dogVMax`, paces him.)* The flank
+point no longer rides a sector-max circle: it is the convex hull of the
+working flock (now a §1 concept, `sim.hull`) offset outward by
+`flankStandoff` — **since the owner's same-day touch-up 3, by
+`perimeterMargin` (36 px): the dog runs the dotted outline itself,
+`flankStandoff` is superseded, the fence-seek reach is `fenceSeekReach`
+(72), and the `3·dt` ring-radius ease is gone (it cut 10–15 px inside a
+36 px line)** — sampled by bearing from the GCM (`perimeterRadius(θ, r)` —
+a bisection on distance-to-hull along the ray, which is monotone for a
+convex set). Everything else in the flank loop (bearing advance, linear-speed
+cap, fence-seek, field clamp, the 45° eye) is unchanged. The handoff is no
+longer a ± cone: once the flank point's progress past the **gate line**
+(`goal→GCM extended + sign · flankOvershootDeg`, default **0** now) lands in
+`[0, flankHandoffDeg]` the point **parks** there (follows the station
+forward, never backward; fence-seek off while parked), and the dog converts
+**on arrival** (< 25 px, after the 0.5 s arm delay). Measured: v4's ± cone
+fired at −29.6° (30° short) on every run; parked arrival lands at
++1.6…−13.5° of the live line with no laps.
+
+*Touch-up:* the fence-seek pull now fades in over the outer `fenceSeekRamp`
+(0.5) of its reach instead of switching on at the edge — the step had the
+flank target jumping 160 px in a tick; and once the point parks on the gate
+line the pull fades out over `parkFade` (0.5 s) instead of dropping at once
+(43 px snap → 2 px).
+
+**R4 — easy replaces stand.** `easy` is walk-on's trailing drive (same E1
+gap governor, same forward eye) with top speed `dogVMax × easySpeedFrac`
+(0.33). It is what the flank hands off to, what a stalled walk-on drops into
+(E2), and what the E3 impulse fires from — the impulse now scales the drive
+eye's `intensity` instead of a posture profile. Lie-down keeps the posture
+wall alone; `standBlock` is superseded. Rationale: the owner wants the dog
+between taps to be *inching forward*, not standing; "stand" as a firmer wall
+never earned a distinct read in play.
+
 ---
 
 ## Tuning table (starting guesses — the PoC's job is to find the fun)

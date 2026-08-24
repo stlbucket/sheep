@@ -44,7 +44,7 @@ overlays for reading the sim, a reseed control, and **export of the tuned
 ## Hand-off (after P7)
 Lift **§0 `params`** (the exported JSON) + the **§1 SIM** block into the Godot
 `FlockSim` per
-[`../brainstorming/godot-prototype.md`](../brainstorming/godot-prototype.md).
+[`../brainstorming/godot-prototype.md`](../../brainstorming/godot-prototype.md).
 Discard §2–§4. The PoC has done its job.
 
 ## Gotchas

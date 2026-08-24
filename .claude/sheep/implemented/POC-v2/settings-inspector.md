@@ -341,3 +341,56 @@ edit the file, reload, no HTML changes).
 | spawnMinX, spawnMaxX | gate-anchored spawn (F2) | v3 P6 |
 | clusterSizeMin | fixed at 1 (H1) | v3 P8 |
 | goal | DERIVED (pen center outside the gate; also `export:false`) | v3 P6/P4 |
+
+## Appendix A.2 — POC-v4 delta (2026-08-21)
+
+One new tunable; **nothing else in the schema changed** — the shipped
+`poc/params-2026-08-21-v4.json` differs from the v3 snapshot by this key
+alone.
+
+### New (Dog — flanking)
+| key | label | default | range | unit | notes |
+|---|---|---|---|---|---|
+| flankOvershootDeg | flank overshoot | 90 | 0–180·5 | ° | C7: how far past the balance point the flank carries before handing off to walk-on. **0 = POC-v3 behavior** (measured parity). Effective carry ≈ this − `flankHandoffDeg`, because the handoff fires at the tolerance cone's near edge |
+
+No tunable for **F1** (spawn facing the flock) — it is initialization only.
+See [`../POC-v4/dog-behavior.md`](../POC-v4/dog-behavior.md).
+
+## Appendix A.3 — POC-v6 delta (2026-08-22)
+
+Source: [`../POC-v6/dog-behavior.md`](../POC-v6/dog-behavior.md) (C8/C9, I1–I4)
+and its two same-day touch-ups. Live inventory is still the in-page ⓘ grid.
+
+### New (Dog)
+
+| key | label | default | range | unit | note |
+|---|---|---|---|---|---|
+| easySpeedFrac | easy speed | 0.33 | 0.1–0.8·0.01 | × dogVMax | I2 — easy's top speed as a fraction of walk-on's. Standoff lever `[0.4, 0.33, 0.25]` |
+| fenceSeekRamp | fence seek ramp | 0.5 | 0–1·0.05 | — | touch-up: C2's fence pull fades in over this fraction of its reach (2 × flank standoff); 0 = the old hard step. `substrate`, not levered |
+| parkFade | park fade | 0.5 | 0–2·0.05 | s | touch-up (Q37): a parked flank point's fence pull fades out over this long; 0 = instant. `substrate` |
+| perimeterMargin | perimeter margin | 36 | 12–96·2 | px | touch-up 3: the herd perimeter line's offset from the outermost sheep — drawn AND the flanking dog's track (C8). Was `debug.outlineLengths` (3 sheep-lengths). Standoff lever `[24, 36, 60]` |
+| fenceSeekReach | fence seek reach | 72 | 20–300·4 | px | touch-up 3: C2's pull reach, was hard-wired `2 × flankStandoff` (280). Standoff lever `[48, 72, 120]` |
+| driveCloseRate | drive close rate | 25 | 5–80·1 | px/s | Q38: E1 governor's close rate (was a magic 25 in §1); easy scales it by `easySpeedFrac`. `substrate` |
+| driveBackoffRate | drive back-off rate | 40 | 5–120·1 | px/s | Q38: E1 governor's back-off rate (was a magic 40); scaled in easy. `substrate` |
+
+### Changed (Dog)
+
+| key | was | now | note |
+|---|---|---|---|
+| flankOvershootDeg | 90 | **0** | C8: the flank ends at the gate line; the dial carries the station past it. Sweep lever row `[30, 90, 150]` → `[0, 0, 60]` |
+| flankHandoffDeg | ± tolerance cone | one-sided reach bound | the flank point parks once its progress past the line is within this; the dog converts on arrival (< 25 px). **Inert on a fresh flank** (the point parks on the crossing tick) — only decides park-now vs go-round for a command issued already past the line |
+| flankStandoff | beyond the flock EDGE (sector-max) | ~~beyond the **convex hull**~~ **SUPERSEDED** (touch-up 3) | hidden, `superseded`; key kept in the defaults file like `R_orbit`. The dog runs the outline itself (`perimeterMargin`) |
+
+### Removed
+
+| key | note |
+|---|---|
+| debug.outlineLengths | promoted to the sim param `perimeterMargin` (px) in touch-up 3 — the outline margin is gameplay now, not a render aid |
+| standBlock | stand retired (I1); lie-down is the only posture, `lieDownBlock` unchanged. Removed from schema, not-levered list and defaults file; the Presence lever lost its row. Old snapshot files still carry the key (typo-guard warning if loaded) |
+
+### Debug (not exported)
+
+| key | default | note |
+|---|---|---|
+| debug.dogTrack | on | highlights the outline (hull + `perimeterMargin`) in the dog's colour while he flanks — it IS his track since touch-up 3 |
+
