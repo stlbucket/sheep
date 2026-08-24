@@ -50,3 +50,7 @@ Plan: [plan.md](plan.md)
    (`#side-fullscreen`) above the button grid — still phone-only + API-gated.
 9. ⛶ label tracks state via `fullscreenchange` — "⛶ full-screen" ↔
    "⛶ exit full-screen" (covers Esc / system exits too).
+10. Phone view: full-width **herd-size slider** below the aux row — a mirror of
+    `params.sheepCount` (min/max/step read from the §0 SETTINGS entry); release
+    respawns via `HOOKS.respawn`, render() re-syncs it against the lil-gui side.
+11. All button labels lowercased on both views (kbd hint letters untouched).

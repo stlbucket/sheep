@@ -158,6 +158,7 @@
     border-radius: 3px;
     white-space: nowrap;
   }
+  #controls .herd { display: none; }   /* phone-only — media query below */
   #card {
     display: none;
     position: absolute;
@@ -313,6 +314,10 @@
     #controls .w2 { display: block; }
     #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 8px) / 3); }
     #controls .aux button { height: auto; font-size: 11px; white-space: nowrap; }
+    #controls .herd { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 11px; }
+    #controls .herd label { color: #7b8894; }
+    #controls .herd input { flex: 1 1 auto; min-width: 0; }
+    #controls .herd #herd-size-out { color: #9fb0c0; min-width: 3ch; text-align: right; }
     #controls button kbd { display: none; }
   }
 </style>
@@ -343,7 +348,7 @@
   </div>
   <div class="row">
     <button id="panels-btn" title="show / hide the levers section">panels <kbd>H</kbd></button>
-    <button data-action="reset" title="restart the run on the same course">Reset <kbd>R</kbd></button>
+    <button data-action="reset" title="restart the run on the same course">reset <kbd>R</kbd></button>
   </div>
   <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
   <div id="hud">boot…</div>
@@ -354,23 +359,28 @@
 <section id="side-dog">
   <div id="controls">
     <div class="pad">
-      <button data-cmd="come_by">Come <span class="w2">By</span> <kbd>←</kbd></button>
-      <button data-cmd="walk_on">Walk <span class="w2">On</span> <kbd>↑</kbd></button>
-      <button data-cmd="away">Away <kbd>→</kbd></button>
-      <button data-cmd="come_by_easy">Come <span class="w2">Easy</span> <kbd>⇧←</kbd></button>
-      <button data-cmd="easy">Easy <kbd>⇧↑</kbd></button>
-      <button data-cmd="away_easy">Away <span class="w2">Easy</span> <kbd>⇧→</kbd></button>
-      <button data-cmd="lie_down_left">Left <span class="w2">Down</span> <kbd>⌥←</kbd></button>
-      <button data-cmd="lie_down">Lie <span class="w2">Down</span> <kbd>↓</kbd></button>
-      <button data-cmd="lie_down_right">Right <span class="w2">Down</span> <kbd>⌥→</kbd></button>
+      <button data-cmd="come_by">come <span class="w2">by</span> <kbd>←</kbd></button>
+      <button data-cmd="walk_on">walk <span class="w2">on</span> <kbd>↑</kbd></button>
+      <button data-cmd="away">away <kbd>→</kbd></button>
+      <button data-cmd="come_by_easy">come <span class="w2">easy</span> <kbd>⇧←</kbd></button>
+      <button data-cmd="easy">easy <kbd>⇧↑</kbd></button>
+      <button data-cmd="away_easy">away <span class="w2">easy</span> <kbd>⇧→</kbd></button>
+      <button data-cmd="lie_down_left">left <span class="w2">down</span> <kbd>⌥←</kbd></button>
+      <button data-cmd="lie_down">lie <span class="w2">down</span> <kbd>↓</kbd></button>
+      <button data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
     </div>
     <div class="sep"></div>
-    <button data-cmd="that_ll_do">That'll <span class="w2">Do</span> <kbd>⏎</kbd></button>
+    <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
     <div class="sep"></div>
     <div class="aux">
-      <button id="reseed-btn" title="draw a new course">Reseed ↻</button>
+      <button id="reseed-btn" title="draw a new course">reseed ↻</button>
       <button id="pause-btn" title="freeze the sim — rendering, panels and capture stay live">pause <kbd>P</kbd></button>
       <button id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture ⎘</button>
+    </div>
+    <div class="herd">
+      <label for="herd-size">herd</label>
+      <input id="herd-size" type="range">
+      <span id="herd-size-out">—</span>
     </div>
   </div>
 </section>
@@ -2545,6 +2555,7 @@ function render(fps) {
     `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
     `time ${sc.raw.t.toFixed(0)}s  score ${sc.total.toFixed(0)}`
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
+  if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
 
   // post-run card on finish (win or Finish button)
@@ -3047,6 +3058,25 @@ if (document.documentElement.requestFullscreen) {
     fsBtn.textContent = document.fullscreenElement ? '⛶ exit full-screen' : '⛶ full-screen'
   })
 }
+
+// POC-v11 touch-up: phone herd-size slider — a MIRROR of params.sheepCount
+// (the §0 SETTINGS entry stays the single source of min/max/step); release
+// respawns via the same HOOKS.respawn path the lil-gui slider uses, and
+// render() re-syncs the mirror when the lil-gui side changes it instead.
+const herdInput = document.getElementById('herd-size')
+const herdOut = document.getElementById('herd-size-out')
+{
+  const s = SETTINGS.find((e) => e.key === 'sheepCount')
+  herdInput.min = s.min; herdInput.max = s.max; herdInput.step = s.step
+}
+herdInput.value = params.sheepCount
+herdOut.textContent = params.sheepCount
+herdInput.addEventListener('input', () => { herdOut.textContent = herdInput.value })
+herdInput.addEventListener('change', () => {
+  params.sheepCount = parseInt(herdInput.value, 10)
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === 'sheepCount') c.updateDisplay()
+  HOOKS.respawn()
+})
 
 // Pause (POC-v10 touch-up, owner 2026-08-24): P freezes sim stepping — §4
 // zeroes the accumulator while paused; rendering, panels, sliders and
