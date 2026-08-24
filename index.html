@@ -13,33 +13,43 @@
     color: #cdd6df;
     font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
-  body {
+  body { overflow: hidden; }      /* #app owns the viewport; the side column scrolls inside itself */
+  /* [throwaway] POC-v11 napkin layout (docs/napkins/layout.drawio): pasture
+     left; ONE right column — dog controls → debug controls → levers section. */
+  #app {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;      /* #stage places itself via the lane rule below */
-    justify-content: flex-start;  /* pasture sits near the top → room for the command pad below */
-    min-height: 100vh;
-    padding: 10px 16px 16px;
+    gap: 12px;
+    height: 100vh;
+    height: 100dvh;               /* phones: exclude browser chrome */
+    padding: 10px;
     box-sizing: border-box;
   }
-  /* [throwaway] panel lanes (implemented/POC-v5/panel-lanes.md): the fixed lil-gui columns
-     are 245 px wide; reserve a lane each side (symmetric → true center on wide
-     screens) and sit the stage right of the left lane when centering would
-     put it under the Levers panel. --canvas-w is written by resizeCanvas().
-     Body padding-left (16 px) is subtracted so the numbers are viewport-relative. */
   #stage {
-    --canvas-w: 1120px;
-    --lane: 261px;             /* 245 lil-gui root + 16 gutter */
-    --lane-l: var(--lane);
-    --lane-r: var(--lane);
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #side {
+    flex: 0 0 320px;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    margin-left: calc(var(--lane-l) - 16px + max(0px, (100vw - var(--lane-l) - var(--lane-r) - var(--canvas-w)) / 2));
+    gap: 10px;
   }
-  body.panels-hidden #stage { --lane-l: 0px; --lane-r: 0px; }
-  body.panels-hidden #panel-left-col, body.panels-hidden #panel-dog-col { display: none; }
+  #side section {
+    flex: 0 0 auto;
+    background: rgba(10, 13, 16, 0.55);
+    border: 1px solid #2c353d;
+    border-radius: 4px;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  /* panels (H) — POC-v11: hides just the levers section; the pad + debug box
+     stay (phones have no H key to bring a hidden column back). */
+  body.panels-hidden #side-levers { display: none; }
   #wrap {
     position: relative;
   }
@@ -49,24 +59,12 @@
     border: 1px solid #2c353d;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
   }
-  /* [throwaway] pasture header (implemented/POC-v5/pasture-header.md): seed control left,
-     run stats right, the canvas's width; the pasture drops by this strip only */
-  #header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    width: 1120px;             /* tracked to canvas.width in resizeCanvas() */
-    box-sizing: border-box;
-    padding: 6px 8px;
-    background: rgba(10, 13, 16, 0.55);
-    border: 1px solid #2c353d;
-    border-radius: 4px;
-  }
-  #header .seed { display: flex; flex-direction: column; gap: 6px; }
-  #header .seed .row { display: flex; align-items: center; gap: 8px; }
-  #header .seed label { color: #7b8894; }
-  #header .seed input {
+  /* [throwaway] POC-v11 debug box (napkin middle-right): the old pasture-header
+     grouping re-laid vertically — seed row, buttons, layout readout, HUD. */
+  #side-debug { display: flex; flex-direction: column; gap: 6px; }
+  #side-debug .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #side-debug label, #side-debug .row > span:first-child { color: #7b8894; }
+  #side-debug input {
     width: 84px;
     padding: 3px 6px;
     font: inherit;
@@ -75,8 +73,8 @@
     border: 1px solid #37424c;
     border-radius: 3px;
   }
-  #header .seed button {
-    padding: 3px 10px;
+  #side-debug button {
+    padding: 3px 8px;
     font: inherit;
     color: #cdd6df;
     background: #232b32;
@@ -84,49 +82,58 @@
     border-radius: 3px;
     cursor: pointer;
   }
-  #header .seed button:hover { background: #2c353d; }
-  #header .seed button kbd { margin-left: 4px; font: inherit; color: #7b8894; }
-  #header .seed .layout { color: #9fb0c0; }
+  #side-debug button:hover { background: #2c353d; }
+  #side-debug button kbd { margin-left: 4px; font: inherit; color: #7b8894; }
+  #side-debug .layout { color: #9fb0c0; }
   #hud {
-    text-align: right;
     white-space: pre;
+    font-size: 12px;
+    color: #9fb0c0;
+    border-top: 1px solid #232b32;
+    padding-top: 6px;
   }
-  /* [throwaway] command pad — layout from implemented/POC-v5/control-layout.drawio:
-       vertical axis = drive speed (Walk On / Easy / Lie Down),
-       horizontal axis = flank (Come By ↔ Away), That'll Do set apart lower-right,
-       run controls (Finish / Reset) as a separate group further right. */
+  /* [throwaway] command pad — POC-v10 3×3 (owner Q60 + same-day touch-up):
+       rows by gear — flanks on top (Come By / Walk On / Away), the gentle row
+       mid (Come Easy / Easy / Away Easy), the downs on the bottom (Left Down /
+       Lie Down / Right Down); a horizontal rule below the grid with That'll Do
+       centered under it. Finish removed; Reset + pause live in the header. */
   #controls {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     align-items: center;
   }
   #controls .pad {
+    width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, 104px) 28px 104px;
-    grid-template-rows: repeat(3, 34px);
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 32px);
     grid-template-areas:
-      ".      walk   .     .  ."
-      "comeby easy   away  .  ."
-      ".      lie    .     .  thatll";
-    gap: 8px 12px;
+      "comeby  walk  away"
+      "comebye easy  awaye"
+      "lieL    lie   lieR";
+    gap: 6px;
     align-items: center;
     justify-items: stretch;
   }
-  #controls .pad [data-cmd="walk_on"]    { grid-area: walk; }
-  #controls .pad [data-cmd="come_by"]    { grid-area: comeby; }
-  #controls .pad [data-cmd="easy"]       { grid-area: easy; }
-  #controls .pad [data-cmd="away"]       { grid-area: away; }
-  #controls .pad [data-cmd="lie_down"]   { grid-area: lie; }
-  #controls .pad [data-cmd="that_ll_do"] { grid-area: 2 / 5 / 4 / 6; align-self: center; }
-  #controls .run { display: flex; flex-direction: column; gap: 8px; }
+  #controls .pad [data-cmd="come_by"]        { grid-area: comeby; }
+  #controls .pad [data-cmd="walk_on"]        { grid-area: walk; }
+  #controls .pad [data-cmd="away"]           { grid-area: away; }
+  #controls .pad [data-cmd="come_by_easy"]   { grid-area: comebye; }
+  #controls .pad [data-cmd="easy"]           { grid-area: easy; }
+  #controls .pad [data-cmd="away_easy"]      { grid-area: awaye; }
+  #controls .pad [data-cmd="lie_down_left"]  { grid-area: lieL; }
+  #controls .pad [data-cmd="lie_down"]       { grid-area: lie; }
+  #controls .pad [data-cmd="lie_down_right"] { grid-area: lieR; }
   #controls button {
     font: inherit;
+    font-size: 12px;
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 17px;
-    padding: 6px 10px;
-    height: 34px;
+    border-radius: 16px;
+    padding: 4px 6px;
+    height: 32px;
     white-space: nowrap;
     cursor: pointer;
   }
@@ -138,10 +145,19 @@
   }
   #controls button kbd {
     opacity: 0.55;
-    font-size: 11px;
-    margin-left: 4px;
+    font-size: 10px;
+    margin-left: 3px;
   }
-  #controls .sep { width: 1px; height: 60px; background: #37424c; margin: 0 10px; }
+  #controls .sep { align-self: stretch; height: 1px; background: #37424c; margin: 2px 0; }
+  /* touch-up (owner): reseed / pause / capture in a small row below the pad */
+  #controls .aux { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  #controls .aux button {
+    height: auto;
+    padding: 3px 8px;
+    font-size: 12px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
   #card {
     display: none;
     position: absolute;
@@ -161,31 +177,12 @@
   #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
   #card .row span:last-child { color: #e08a8a; }
   #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
-  /* [throwaway] P9 (Q1) panel split: sheep-side left, dog-side right,
-     Course & Meta collapsed below the dog panel */
-  #panel-left-col {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-    max-height: 100vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-  /* POC-v5: the three raw-param panels live under the Advanced disclosure */
-  body.advanced-closed #panel-sheep, body.advanced-closed #panel-dog-col { display: none; }
+  /* [throwaway] POC-v11: every panel stacks inside the levers section (napkin
+     bottom-right box); the Advanced disclosure still gates the raw panels. */
+  #side-levers { padding: 0; border: none; background: none; display: flex; flex-direction: column; }
+  #side-levers .lil-gui.root { width: 100%; --width: 100%; }
+  body.advanced-closed #panel-sheep, body.advanced-closed #panel-dog, body.advanced-closed #panel-meta { display: none; }
   .lil-gui .lever-ends { font-size: 11px; color: #7b8894; white-space: normal; padding: 0 6px 4px; }
-  #panel-dog-col {
-    position: fixed;
-    top: 0;
-    right: 0;
-    z-index: 1000;
-    max-height: 100vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
   /* [throwaway] settings inspector: hover tooltip + per-category ⓘ grid */
   #tip {
     display: none;
@@ -261,6 +258,63 @@
     border: 1px solid #37424c;
     border-radius: 3px;
   }
+  /* [throwaway] POC-v11 phone landscape: phone-size = coarse pointer + short
+     viewport side ≤ 600 px. Portrait → block with a rotate prompt; landscape →
+     compact column + a ⛶ full-screen button (only where the API exists). */
+  #rotate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: #14181c;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    font-size: 15px;
+    color: #cdd6df;
+  }
+  #rotate-overlay .icon { font-size: 54px; animation: tip-over 1.4s ease-in-out infinite alternate; }
+  @keyframes tip-over { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+  #side-fullscreen { display: none; }   /* phone-only — media query below */
+  #fullscreen-btn {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+    #rotate-overlay { display: flex; }
+  }
+  @media (pointer: coarse) and (max-height: 600px) {
+    body.can-fullscreen #side-fullscreen { display: block; }
+    #app { padding: 6px; gap: 8px; }
+    /* touch-up (owner 2026-08-24): the phone sidebar is the command pad ONLY,
+       vertically centered; two-word labels break onto two lines (.w2 spans) and
+       EVERY button gets that 2-line size (kbd hints dropped — no keys). */
+    #side { flex: 0 0 240px; justify-content: center; }
+    #side-debug, #side-levers { display: none; }
+    #controls .pad { grid-template-rows: repeat(3, 36px); gap: 4px; }
+    #controls button {
+      font-size: 11px;
+      line-height: 1.2;
+      height: 36px;
+      padding: 2px 4px;
+      border-radius: 12px;
+      white-space: normal;
+    }
+    #controls .w2 { display: block; }
+    #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 8px) / 3); }
+    #controls .aux button { height: auto; font-size: 11px; white-space: nowrap; }
+    #controls button kbd { display: none; }
+  }
 </style>
 <!-- [throwaway] lil-gui UMD build (window.lil.GUI) — plain <script> can't import ESM -->
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
@@ -270,42 +324,64 @@
 <script src="sheep-defaults.json.js"></script>
 </head>
 <body class="advanced-closed">
-<div id="panel-left-col"><div id="panel-levers"></div><div id="panel-sheep"></div></div>
-<div id="panel-dog-col"><div id="panel-dog"></div><div id="panel-meta"></div></div>
+<div id="rotate-overlay">
+  <div class="icon">📱</div>
+  <div>rotate your phone —<br>the pasture plays in landscape</div>
+</div>
+<div id="app">
 <div id="stage">
-<div id="header">
-  <div class="seed">
-    <div class="row">
-      <label for="seed-input">seed</label>
-      <input id="seed-input" type="number" min="0" step="1" inputmode="numeric">
+  <div id="wrap">
+    <canvas id="field" width="1120" height="720"></canvas>
+    <div id="card"></div>
+  </div>
+</div>
+<div id="side">
+<section id="side-debug">
+  <div class="row">
+    <label for="seed-input">seed</label>
+    <input id="seed-input" type="number" min="0" step="1" inputmode="numeric">
+  </div>
+  <div class="row">
+    <button id="panels-btn" title="show / hide the levers section">panels <kbd>H</kbd></button>
+    <button data-action="reset" title="restart the run on the same course">Reset <kbd>R</kbd></button>
+  </div>
+  <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
+  <div id="hud">boot…</div>
+</section>
+<section id="side-fullscreen">
+  <button id="fullscreen-btn" title="toggle full-screen">⛶ full-screen</button>
+</section>
+<section id="side-dog">
+  <div id="controls">
+    <div class="pad">
+      <button data-cmd="come_by">Come <span class="w2">By</span> <kbd>←</kbd></button>
+      <button data-cmd="walk_on">Walk <span class="w2">On</span> <kbd>↑</kbd></button>
+      <button data-cmd="away">Away <kbd>→</kbd></button>
+      <button data-cmd="come_by_easy">Come <span class="w2">Easy</span> <kbd>⇧←</kbd></button>
+      <button data-cmd="easy">Easy <kbd>⇧↑</kbd></button>
+      <button data-cmd="away_easy">Away <span class="w2">Easy</span> <kbd>⇧→</kbd></button>
+      <button data-cmd="lie_down_left">Left <span class="w2">Down</span> <kbd>⌥←</kbd></button>
+      <button data-cmd="lie_down">Lie <span class="w2">Down</span> <kbd>↓</kbd></button>
+      <button data-cmd="lie_down_right">Right <span class="w2">Down</span> <kbd>⌥→</kbd></button>
+    </div>
+    <div class="sep"></div>
+    <button data-cmd="that_ll_do">That'll <span class="w2">Do</span> <kbd>⏎</kbd></button>
+    <div class="sep"></div>
+    <div class="aux">
       <button id="reseed-btn" title="draw a new course">Reseed ↻</button>
-      <button id="panels-btn" title="show / hide the settings panels">panels <kbd>H</kbd></button>
+      <button id="pause-btn" title="freeze the sim — rendering, panels and capture stay live">pause <kbd>P</kbd></button>
       <button id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture ⎘</button>
     </div>
-    <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
   </div>
-  <div id="hud">boot…</div>
-</div>
-<div id="wrap">
-  <canvas id="field" width="1120" height="720"></canvas>
-</div>
-<div id="controls">
-  <div class="pad">
-    <button data-cmd="walk_on">Walk On <kbd>W</kbd></button>
-    <button data-cmd="come_by">Come By <kbd>Q</kbd></button>
-    <button data-cmd="easy">Easy <kbd>A</kbd></button>
-    <button data-cmd="away">Away <kbd>E</kbd></button>
-    <button data-cmd="lie_down">Lie Down <kbd>S</kbd></button>
-    <button data-cmd="that_ll_do">That'll Do <kbd>D</kbd></button>
-  </div>
-  <span class="sep"></span>
-  <div class="run">
-    <button data-action="finish">Finish <kbd>F</kbd></button>
-    <button data-action="reset">Reset <kbd>R</kbd></button>
-  </div>
+</section>
+<section id="side-levers">
+  <div id="panel-levers"></div>
+  <div id="panel-sheep"></div>
+  <div id="panel-dog"></div>
+  <div id="panel-meta"></div>
+</section>
 </div>
 </div>
-<div id="card"></div>
 
 <script>
 'use strict'
@@ -367,7 +443,7 @@ const SETTINGS = [
   { key: 'w_flee', category: 'Flee / Eye', label: 'flee weight', type: 'float', default: 2.0, min: 0, max: 5, step: 0.1, unit: '—', description: 'Strength of the run-from-dog force.', exposed: true },
   { key: 'ambient', category: 'Flee / Eye', label: 'eye ambient floor', type: 'float', default: 0.2, min: 0, max: 1, step: 0.05, unit: '—', description: '1 = pure radius threat, 0 = pure gaze-cone threat.', exposed: true },
   { key: 'coneK', category: 'Flee / Eye', label: 'eye cone tightness', type: 'float', default: 2, min: 0.5, max: 8, step: 0.5, unit: '—', description: 'How focused the dog\'s "eye" cone is (cos^k).', exposed: true },
-  { key: 'driveConeExt', category: 'Flee / Eye', label: 'drive cone extension', type: 'float', default: 0.5, min: 0, max: 1.5, step: 0.05, unit: '× R_flee', description: 'Walk-on and easy push the EYE CONE (the directional term) out by this extra fraction of R_flee — 0.5 = 50 % further (owner 2026-08-22, POC-v7 E5). The ambient floor keeps R_flee; 0 = the v6 eye.', exposed: true },
+  { key: 'driveConeExt', category: 'Flee / Eye', label: 'drive cone extension', type: 'float', default: 0.5, min: 0, max: 1.5, step: 0.05, unit: '× R_flee', description: 'Walk-on pushes the EYE CONE (the directional term) out by this extra fraction of R_flee — 0.5 = 50 % further (owner 2026-08-22, POC-v7 E5). Easy got its own `easy cone extension` in POC-v9 (E6). The ambient floor keeps R_flee; 0 = the v6 eye.', exposed: true },
 
   // Dog
   { key: 'R_orbit', category: 'Dog', label: 'orbit radius', type: 'float', default: 160, min: 60, max: 300, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P0: flanking replaced the fixed orbit). Kept for reference.', exposed: false },
@@ -404,8 +480,14 @@ const SETTINGS = [
   { key: 'lieDownBlock', category: 'Dog', label: 'lie-down block', type: 'float', default: 1.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a lying dog — the covered arc reads as a wall (D1).', exposed: true },
   { key: 'walkOnSpeedFrac', category: 'Dog', label: 'walk-on speed', type: 'float', default: 1, min: 0.5, max: 1.6, step: 0.05, unit: '× vMax', description: 'Walk-on\'s top speed as a fraction of the SHEEP\'s vMax — the drive goes at the flock\'s own pace (owner 2026-08-22, POC-v7 E4; was dogVMax). Flanks and the recall still run at `dog max speed`.', exposed: true },
   { key: 'easySpeedFrac', category: 'Dog', label: 'easy speed', type: 'float', default: 0.5, min: 0.1, max: 0.8, step: 0.01, unit: '× vMax', description: 'Easy\'s top speed as a fraction of the SHEEP\'s vMax — half the flock\'s pace (owner 2026-08-22, POC-v7 I2 amended; was 0.33 × dogVMax). Same trailing target and gap governor as walk-on.', exposed: true },
-  { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'Cone exponent while lying down — a tight hard arc with soft flanks (darting space).', exposed: true },
+  { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'SUPERSEDED (POC-v9 D3: the lie-down beam\'s width is `lie-down cone angle`, in degrees, now). Kept for reference.', exposed: false },
   { key: 'postureRange', category: 'Dog', label: 'posture range', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Posture threat reach as a fraction of R_flee — fierce close-in wall, faint at driving distance (keeps lie-down\'s gate relief).', exposed: true },
+  { key: 'easyConeDeg', category: 'Dog', label: 'easy cone angle', type: 'float', default: 45, min: 10, max: 120, step: 1, unit: '°', description: 'EASY\'s intense-pressure cone FULL width, measured at the half-strength contour (the wedge §2 draws). POC-v9 E6 shipped the owner\'s 30°; retuned to 45° the same day (owner Q56): at 30° a stalled pile at the mouth never restarts (seed 42 penned 0/80 vs v8\'s 40), at 45° + the E3 tap rhythm it matches v8. Still half of walk-on\'s ~90°. Converted to a cos^k exponent in §1 (coneKFromDeg).', exposed: true },
+  { key: 'easyConeExt', category: 'Dog', label: 'easy cone extension', type: 'float', default: 0.3, min: 0, max: 1.5, step: 0.05, unit: '× R_flee', description: 'EASY\'s cone reach beyond the normal eye: R_flee × (1 + this). Owner 2026-08-24 (E6): +30 % from normal. Replaces `drive cone extension` for easy — walk-on keeps driveConeExt (+50 %). The ambient floor keeps R_flee.', exposed: true },
+  { key: 'lieConeDeg', category: 'Dog', label: 'lie-down cone angle', type: 'float', default: 40, min: 10, max: 120, step: 1, unit: '°', description: 'Lie-down\'s intense-pressure cone (the D1 block beam) FULL width at half strength. Owner 2026-08-24 (POC-v9 D3): 40° — was set by `posture cone tightness` (cos⁴ ≈ 65°), now superseded.', exposed: true },
+  { key: 'lieConeExt', category: 'Dog', label: 'lie-down cone extension', type: 'float', default: 0.15, min: 0, max: 1.5, step: 0.05, unit: '× R_flee', description: 'Lie-down\'s block-beam reach beyond the normal eye: R_flee × (1 + this). Owner 2026-08-24 (D3): +15 % from normal. The ambient FLANKS keep `posture range` × R_flee, so off-beam gate relief survives.', exposed: true },
+  { key: 'flankEasySpeedFrac', category: 'Dog', label: 'easy flank speed', type: 'float', default: 0.5, min: 0.1, max: 1, step: 0.05, unit: '× dogVMax', description: 'Come-easy / away-easy (POC-v10 C11, owner 2026-08-24): the gentle flank\'s top speed as a fraction of `dog max speed` — half by default. Same sweep geometry, corner-first start (C10), gate-line park (C8) and easy handoff (C9) as come-by/away; the flank-point advance cap scales with it so the point cannot outrun the slowed dog.', exposed: true },
+  { key: 'downConeOffsetDeg', category: 'Dog', label: 'down cone offset', type: 'float', default: 30, min: 0, max: 90, step: 5, unit: '°', description: 'Left-down / right-down (POC-v10 D4, owner 2026-08-24): how far the lie-down block beam swings to the dog\'s OWN left or right of his facing (bird\'s-eye, y-down canvas: left = facing − offset). Width, reach and the postureRange ambient flanks are plain lie-down\'s.', exposed: true },
   { key: 'heelIntensity', category: 'Dog', label: 'heel intensity', type: 'float', default: 0, min: 0, max: 1, step: 0.05, unit: '—', description: 'Dog pressure while stood down at the owner\'s side — 0 = an idle dog exerts none (A7).', exposed: true },
   { key: 'goal', category: 'Dog', label: 'goal / pen center', type: 'point', default: { x: 970, y: 360 }, min: { x: 0, y: 0 }, max: { x: 1120, y: 720 }, step: 5, unit: 'px', description: 'Where the flock is being driven. DERIVED since POC-v3 P6: set to the pen center outside the perimeter gate on every reseed (and excluded from param export — it is course state, not a tunable).', exposed: false, export: false },
 
@@ -452,6 +534,24 @@ const SETTINGS = [
   { key: 'protestDur', category: 'Boldness', label: 'protest duration', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: 's', description: 'How long a protest stamp lasts.', exposed: false },
   { key: 'dartBoldness', category: 'Boldness', label: 'dart boldness', type: 'float', default: 0.8, min: 0.5, max: 1, step: 0.05, unit: '—', description: 'Boldness above which a sheep may dart around a lying dog (D2 — the rare top tail).', exposed: true },
 
+  // Trot (POC-v9 flock-behavior T1–T3, owner 2026-08-24: a big pressured
+  // group moving one way can break into a following trot — leads first,
+  // the rest filing in behind; it dies back off once the dog is escaped)
+  { key: 'trotGroupMin', category: 'Trot', label: 'trot group size', type: 'int', default: 20, min: 5, max: 80, step: 1, unit: '—', description: 'T1: a moving pressured cluster must be LARGER than this (owner: "over 20") before the trot can trigger.', exposed: true },
+  { key: 'trotAlignMin', category: 'Trot', label: 'trot alignment', type: 'float', default: 0.5, min: 0, max: 1, step: 0.05, unit: '—', description: 'T1: velocity order parameter (|Σv| / Σ|v|) the cluster must exceed to read as "moving in the same direction". Loosened 0.7 → 0.5 by the owner (Q54, 2026-08-24): a somewhat ragged drive can still break into a trot.', exposed: true },
+  { key: 'trotMoveSpeed', category: 'Trot', label: 'trot move floor', type: 'float', default: 20, min: 5, max: 60, step: 1, unit: 'px/s', description: 'T1: mean cluster speed floor — a standing group cannot trot off.', exposed: true },
+  { key: 'trotTriggerProb', category: 'Trot', label: 'trot trigger chance', type: 'float', default: 0.2, min: 0, max: 1, step: 0.05, unit: '/s', description: 'T1: per-second chance an eligible group\'s LEAD sheep break into a trot (owner 2026-08-24: 20 %).', exposed: true },
+  { key: 'trotBoltProb', category: 'Trot', label: 'trot bolt chance', type: 'float', default: 0.05, min: 0, max: 1, step: 0.01, unit: '—', description: 'T2: chance, rolled once at trigger time, that the WHOLE group bolts into the trot at once instead of the leads only (owner: 5 %).', exposed: true },
+  { key: 'trotLeadCount', category: 'Trot', label: 'trot leads', type: 'int', default: 3, min: 1, max: 10, step: 1, unit: '—', description: 'T1: how many frontmost sheep (along the group\'s mean heading) lead the trot off.', exposed: true },
+  { key: 'trotFollowR', category: 'Trot', label: 'trot follow radius', type: 'float', default: 40, min: 10, max: 120, step: 2, unit: 'px', description: 'T2: a sheep this close to a trotting flock-mate is pulled into the trot behind IT — files into the column (one hop per tick, like the G3 gate column).', exposed: true },
+  { key: 'trotSpeedMult', category: 'Trot', label: 'trot pace', type: 'float', default: 1.15, min: 1, max: 2, step: 0.05, unit: '× vMax', description: 'Trot pace — above the walk cap, below panic (1.6): a trot, not a bolt. Eased 1.3 → 1.15 by the owner (2026-08-24: "a bit slower").', exposed: true },
+  { key: 'w_trot', category: 'Trot', label: 'trot weight', type: 'float', default: 2, min: 0, max: 4, step: 0.05, unit: '—', description: 'Strength of the trot drive (leads: along the locked column heading; followers: after their lead).', exposed: true },
+  { key: 'trotDecayMin', category: 'Trot', label: 'trot decay floor', type: 'float', default: 0.2, min: 0, max: 1, step: 0.01, unit: '/s', description: 'T3: per-second chance of dropping back to normal the moment the dog\'s pressure is escaped (owner: shipped at 5 %, raised to 20 % the same day)…', exposed: true },
+  { key: 'trotDecayMax', category: 'Trot', label: 'trot decay ceiling', type: 'float', default: 0.9, min: 0, max: 1, step: 0.05, unit: '/s', description: 'T3: …growing to this while the escape lasts (owner: 90 %). Any felt pressure resets the ramp.', exposed: true },
+  { key: 'trotDecayRamp', category: 'Trot', label: 'trot decay ramp', type: 'float', default: 5, min: 1, max: 20, step: 0.5, unit: 's', description: 'T3: seconds of pressure-free trotting over which the decay chance ramps floor → ceiling. (The owner gave 20 % → 90 %; the ramp TIME is parked — default 5 s.)', exposed: true },
+  { key: 'trotFenceStop', category: 'Trot', label: 'trot fence stop', type: 'float', default: 36, min: 0, max: 120, step: 2, unit: 'px', description: 'T3 (owner 2026-08-24): a trotting sheep APPROACHING a fence within this distance — default 3 body-lengths — drops the trot outright (100 %), pressure or not. The gate mouth is exempt, so a column may trot through the gate. 0 = off.', exposed: true },
+  { key: 'trotReverseDeg', category: 'Trot', label: 'trot reverse cone', type: 'float', default: 120, min: 30, max: 240, step: 5, unit: '°', description: 'T4 (owner 2026-08-24): full width of the forward cone in which a FELT dog (stress > 0) counts as "in front" of a trotting sheep — it reverses and trots the other way; a follower cuts loose and leads the turn itself. After the flip the dog is behind, so it cannot flip-flop.', exposed: true },
+
   // Scoring — subtractive: total = 100 − Σ weighted penalties; each axis
   // accumulates a normalized 0..1 fraction/s, so weights read as points/s of full badness.
   { key: 'w_time', category: 'Scoring', label: 'time penalty', type: 'float', default: 0.1, min: 0, max: 1, step: 0.01, unit: '—', description: 'Points lost per second of run time.', exposed: true },
@@ -471,6 +571,7 @@ const SETTINGS = [
   { key: 'debug.gcm', category: 'Debug', label: 'flock GCM', type: 'boolean', default: false, unit: '—', description: 'Draw the flock\'s center of mass.', exposed: true, export: false },
   { key: 'debug.dogTarget', category: 'Debug', label: 'dog target', type: 'boolean', default: false, unit: '—', description: 'Draw the dog\'s current steering target.', exposed: true, export: false },
   { key: 'debug.gateZone', category: 'Debug', label: 'gate approach zone', type: 'boolean', default: false, unit: '—', description: 'Draw the G1 commitment zone around the gate mouth.', exposed: true, export: false },
+  { key: 'debug.gateAttract', category: 'Debug', label: 'gate attraction area', type: 'boolean', default: true, unit: '—', description: 'POC-v9 V1: light-blue transparent overlay of the gate\'s draw area (G2 `gate attraction radius`; the inner disc is full pull, inside half the radius) — the gate\'s counterpart of the dog\'s presence overlay.', exposed: true, export: false },
   { key: 'debug.spawnHoles', category: 'Debug', label: 'spawn holes / focus', type: 'boolean', default: false, unit: '—', description: 'POC-v5: outline the whole-pasture archetype\'s empty patches (F6) and the weighted archetype\'s core disc (F7) as drawn at spawn.', exposed: true, export: false },
   { key: 'debug.state', category: 'Debug', label: 'collect / drive', type: 'boolean', default: false, unit: '—', description: 'Label the dog\'s current collect/drive state.', exposed: true, export: false },
   { key: 'debug.flockOutline', category: 'Debug', label: 'flock outline', type: 'boolean', default: true, unit: '—', description: 'Dotted outline around the working flock — the HERD PERIMETER LINE: its convex hull offset outward by `perimeter margin` (Dog). Since the 2026-08-22 touch-up this is the line the flanking dog tracks.', exposed: true, export: false },
@@ -529,7 +630,7 @@ const params = buildParams(SETTINGS)
 // roots. Sheep-side left · dog-side right · Course & Meta collapsed below the
 // dog panel. Data, not wiring — §1 never sees any of this.
 const PANELS = [
-  { id: 'panel-sheep', title: 'Sheep', categories: ['Sheep', 'Idle', 'Boids', 'Boldness'] },
+  { id: 'panel-sheep', title: 'Sheep', categories: ['Sheep', 'Idle', 'Boids', 'Boldness', 'Trot'] },
   { id: 'panel-dog', title: 'Dog', categories: ['Dog', 'Flee / Eye'] },
   { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Spawn', 'Scoring', 'Debug', 'Sim'], collapsed: true },
 ]
@@ -589,7 +690,7 @@ const LEVERS = [
   { key: 'dogPresence', domain: 'dog-behavior', label: 'Presence', blurb: 'How much threat he radiates at all.',
     ends: { 0: 'a dog the sheep barely mind', 1: 'a dog that empties the field' },
     params: { R_flee: [70, 120, 200], ambient: [0.05, 0.2, 0.45], coneK: [4, 2, 1.2], driveConeExt: [0.25, 0.5, 0.8], lieDownBlock: [0.8, 1.4, 2.2],
-      lieDownIntensity: [0.15, 0.3, 0.55], postureRange: [0.4, 0.6, 0.85], postureConeK: [6, 4, 2.5], dogAvoidRadius: [25, 45, 80] } },
+      lieDownIntensity: [0.15, 0.3, 0.55], postureRange: [0.4, 0.6, 0.85], dogAvoidRadius: [25, 45, 80] } },
   { key: 'dogStandoff', domain: 'dog-behavior', label: 'Standoff', blurb: 'How much room he gives the flock.',
     ends: { 0: 'works right on top of them, quick and darty', 1: 'works from a long way off, steady and unhurried' },
     params: { dogVMax: [150, 110, 95], walkOnSpeedFrac: [1.15, 1, 0.85], easySpeedFrac: [0.6, 0.5, 0.4], perimeterMargin: [24, 36, 60], fenceSeekReach: [48, 72, 120], R_drive: [95, 140, 220], R_driveMin: [42, 55, 90], driveTrailGap: [25, 40, 70] } },
@@ -638,11 +739,12 @@ const LEVER_DOMAINS = [
 // Everything a lever does NOT own, with the reason — the ownership assertion
 // requires levered ∪ not-levered === SETTINGS exactly (no key unclaimed).
 const LEVER_NOT_LEVERED = {
-  superseded: ['fenceX', 'gateY', 'spawnMinX', 'spawnMaxX', 'R_orbit', 'omega', 'driveShrink', 'flankStandoff'], // (standBlock was removed outright in POC-v6 — nothing referenced it)
+  superseded: ['fenceX', 'gateY', 'spawnMinX', 'spawnMaxX', 'R_orbit', 'omega', 'driveShrink', 'flankStandoff', 'postureConeK'], // (standBlock was removed outright in POC-v6 — nothing referenced it)
   derived: ['goal', 'clusterSizeMin', 'heelIntensity'], // heelIntensity fixed at 0 by rule A7
   substrate: ['L', 'damping', 'accelScale', 'dt', 'maxFrameDelta', 'fenceSeekRamp', 'parkFade', 'driveCloseRate', 'driveBackoffRate', 'flankCornerFrom'], // smoothing widths / rule thresholds, not feel dials (flankCornerFrom: owner Q46 — 0, always corner-first)
   draws: ['seed', 'randomSeedOnLoad', 'spawnLayout'], // a draw, not a dial (F4/F5)
   judging: ['injuryWeight', 'lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
+  parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
   // plus every `debug.*` render toggle
 }
 const SETTING_BY_KEY = Object.fromEntries(SETTINGS.map((e) => [e.key, e]))
@@ -792,6 +894,14 @@ function smoothstep(e0, e1, x) {
   return t * t * (3 - 2 * t)
 }
 
+// POC-v9 (E6/D3): a cone's FULL width in degrees — measured where the cos^k
+// falloff crosses HALF strength, the same contour §2's drawEye draws — to
+// the equivalent cos^k exponent: k = ln ½ / ln cos(width/2).
+function coneKFromDeg(deg) {
+  const c = Math.cos(Math.min(178, Math.max(1, deg)) / 2 * Math.PI / 180)
+  return Math.log(0.5) / Math.log(Math.max(1e-6, c))
+}
+
 // Distance from point p to segment a→b (for path-deviation scoring).
 function distToSeg(p, a, b) {
   const abx = b.x - a.x, aby = b.y - a.y
@@ -857,7 +967,9 @@ function distToHull(hull, pt) {
 }
 
 // The dog's command vocabulary (POC-v6: `easy` replaced `stand`). §3 issues
-// these; anything else is treated as a recall.
+// these; anything else is treated as a recall. POC-v10: the C11/D4 variants
+// are NOT new verbs — they ride setCommand's opts ({easy} on a flank,
+// {side} on lie_down) into the dog-state fields flankEasy / lieSide.
 const COMMANDS = new Set(['come_by', 'away', 'walk_on', 'easy', 'lie_down', 'that_ll_do'])
 
 // FlockSim — owns all sheep state + integration. Pure: receives `params` as data,
@@ -880,6 +992,7 @@ class FlockSim {
       owner: { ...home }, flankAngle: 0, flankR: 0, flankT: 0, flankParked: false, flankArmed: false, flankWaypoint: false, parkT: 0, handoff: null,
       driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
       impulse: null, impulseFactor: 1,
+      flankEasy: false, lieSide: 0, // POC-v10 variants: C11 gentle flank / D4 offset down
     }
     this.faceFlock()      // F1: never spawn staring at a fence
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
@@ -1054,6 +1167,10 @@ class FlockSim {
       return
     }
     d.impulse = null
+    // POC-v10 (owner 2026-08-24): the C11/D4 variants ride the entry opts —
+    // never new verbs. Every other command clears them.
+    d.flankEasy = (cmd === 'come_by' || cmd === 'away') && !!opts.easy
+    d.lieSide = cmd === 'lie_down' ? Math.sign(opts.side || 0) : 0
     if (cmd === 'come_by' || cmd === 'away') {    // start the flank from current bearing
       const sign = cmd === 'come_by' ? 1 : -1
       d.flankAngle = Math.atan2(d.pos.y - g.y, d.pos.x - g.x)
@@ -1381,6 +1498,10 @@ class FlockSim {
         gatePull: 0,                       // G2/G3: how hard the gate draws this sheep (last tick, 0–1)
         gatePullNext: 0,                   //   …this tick's value, committed at the end of step()
         gateLead: -1,                      // G3: index of the sheep it files in behind (−1 = drawn directly)
+        trot: false,                       // T1/T2 (POC-v9): trotting in a column this moment
+        trotLead: -1,                      //   follower files behind this sheep (−1 = a lead)
+        trotHeading: 0,                    //   lead's locked column heading (rad)
+        trotFreeT: 0,                      // T3: continuous pressure-free time while trotting (s)
     })
   }
 
@@ -1510,7 +1631,10 @@ class FlockSim {
         // reaches it; only then does the sweep advance.
         if (d.flankWaypoint && onPoint) d.flankWaypoint = false
         const near = d.flankWaypoint ? 0 : onPoint ? 1 : 0.35
-        const advCap = 0.9 * p.dogVMax / Math.max(1, d.flankR || 1)
+        // C11 (POC-v10): a gentle flank runs at flankEasySpeedFrac × dogVMax;
+        // the advance cap tracks the slowed dog so the point cannot lap him.
+        const flankV = d.flankEasy ? p.dogVMax * p.flankEasySpeedFrac : p.dogVMax
+        const advCap = 0.9 * flankV / Math.max(1, d.flankR || 1)
         if (!d.flankParked) d.flankAngle += sign * Math.min(p.flankAdvance, advCap) * near * dt
         // C8 (POC-v6): the flank point PARKS ON THE GATE LINE — since the
         // owner's 2026-08-22 amendment the GATE'S TANGENT to the perimeter on
@@ -1612,6 +1736,7 @@ class FlockSim {
         if (d.flankParked && d.flankT > 0.5 && vec2.dist(d.pos, d.target) < 25) {
           d.handoff = { x: d.pos.x, y: d.pos.y }
           d.command = 'easy'                      // C9: strip follows (state-driven)
+          d.flankEasy = false                     // C11: the gentle flank ends like any flank
           d.driveT = 0; d.stallT = 0; d.fwdEMA = p.stallSpeed * 3
           d.facing = faceGCM
           break
@@ -1723,6 +1848,7 @@ class FlockSim {
     // (half). Flanks and the recall keep dogVMax.
     const vmax = d.command === 'walk_on' ? p.vMax * p.walkOnSpeedFrac
                : d.command === 'easy'    ? p.vMax * p.easySpeedFrac
+               : d.flankEasy && (d.command === 'come_by' || d.command === 'away') ? p.dogVMax * p.flankEasySpeedFrac // C11 (POC-v10)
                : p.dogVMax
     const speed = dist < arriveR ? vmax * (dist / arriveR) : vmax
     d.vel = dist > 0.5 ? vec2.scale(vec2.norm(to), Math.min(speed, dist / dt))
@@ -1766,33 +1892,43 @@ class FlockSim {
     a.fleeFwd = 0; a.panic = false
     const to = { x: a.pos.x - d.pos.x, y: a.pos.y - d.pos.y } // dog → sheep
     const dist = vec2.len(to)
-    // E5 (POC-v7): while DRIVING (walk-on / easy) the eye cone reaches
-    // driveConeExt further — the ambient floor keeps R_flee.
-    const driving = d.command === 'walk_on' || d.command === 'easy'
-    const Rc = p.R_flee * (driving ? 1 + p.driveConeExt : 1)
-    if (dist >= Rc || dist < 1e-6) {
+    // E5 (POC-v7) / E6 (POC-v9): while DRIVING the eye cone reaches further —
+    // walk-on by driveConeExt (+50 %), easy by its own easyConeExt (+30 %,
+    // owner 2026-08-24) — and EASY's cone NARROWS to easyConeDeg (30° full
+    // width at half strength; walk-on keeps coneK ≈ 90°). The ambient floor
+    // keeps R_flee in every mode.
+    const easy = d.command === 'easy'
+    const driving = d.command === 'walk_on' || easy
+    const lying = d.command === 'lie_down'
+    const Rc = p.R_flee * (driving ? 1 + (easy ? p.easyConeExt : p.driveConeExt) : 1)
+    // D3 (POC-v9): lie-down's block BEAM reaches lieConeExt beyond the normal
+    // eye (+15 %) at lieConeDeg width (40°); the ambient FLANKS keep the short
+    // postureRange reach, so off-beam gate relief survives.
+    const Rp = p.R_flee * p.postureRange, Rb = p.R_flee * (1 + p.lieConeExt)
+    const reach = lying ? Math.max(Rp, Rb) : Rc
+    if (dist >= reach || dist < 1e-6) {
       a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
     }
     const dir = { x: to.x / dist, y: to.y / dist }            // flee away from dog
-    const cosT = Math.max(0, dir.x * Math.cos(d.facing) + dir.y * Math.sin(d.facing))
-    // Posture profile (POC-v3 D1): a lying dog is a WALL, not a pusher —
-    // fierce tight cone at short range (postureRange·R_flee), faint ambient
-    // flanks. Short reach keeps lie-down's gate RELIEF (a dog lying at driving
-    // distance exerts almost nothing) while blocking close approach. (Stand
-    // shared this profile until POC-v6 retired it for easy — lie-down only.)
-    const block = d.command === 'lie_down' ? p.lieDownBlock : 0
+    // D4 (POC-v10): an offset down swings the whole directional term — the eye
+    // axis is facing + lieSide × downConeOffsetDeg (lieSide is 0 off lie-down).
+    const eyeDir = d.facing + d.lieSide * p.downConeOffsetDeg * Math.PI / 180
+    const cosT = Math.max(0, dir.x * Math.cos(eyeDir) + dir.y * Math.sin(eyeDir))
+    // Posture profile (POC-v3 D1, reshaped POC-v9 D3): a lying dog is a WALL,
+    // not a pusher — a fierce NARROW beam (lieConeDeg wide, reaching Rb) with
+    // faint SHORT ambient flanks (postureRange — darting space, gate relief).
+    // (Stand shared this profile until POC-v6 retired it for easy.)
+    const block = lying ? p.lieDownBlock : 0
     let T
     if (block > 0) {
-      const Rp = p.R_flee * p.postureRange
-      if (dist >= Rp) {
-        a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
-      }
-      const gp = smoothstep(Rp, 0, dist)
-      T = gp * (p.ambient * p.lieDownIntensity + Math.pow(cosT, p.postureConeK) * block)
+      const gp = dist < Rp ? smoothstep(Rp, 0, dist) : 0      // flanks fade out at postureRange
+      const gb = smoothstep(Rb, 0, dist)                      // beam fades out at its extended reach
+      T = gp * p.ambient * p.lieDownIntensity + gb * Math.pow(cosT, coneKFromDeg(p.lieConeDeg)) * block
     } else {
       const gA = smoothstep(p.R_flee, 0, dist)                // ambient floor: 1 at contact → 0 at R_flee
       const gC = smoothstep(Rc, 0, dist)                      // eye cone: 1 at contact → 0 at the (extended) reach
-      const eye = p.ambient * gA + (1 - p.ambient) * gC * Math.pow(cosT, p.coneK) // = g·eye of v6 when Rc = R_flee
+      const kEye = easy ? coneKFromDeg(p.easyConeDeg) : p.coneK // E6: easy's tight cone
+      const eye = p.ambient * gA + (1 - p.ambient) * gC * Math.pow(cosT, kEye) // = g·eye of v6 when Rc = R_flee
       T = eye * d.intensity * (d.impulseFactor || 1)          // E3 from easy scales the drive eye (POC-v6 Q32)
     }
     a.stress = T
@@ -1916,7 +2052,7 @@ class FlockSim {
     // instantly; idle only resumes after calmDelay of continuous zero threat
     // (hysteresis — no flicker at the threat boundary), re-deriving the
     // sheep's group from whoever settled nearby.
-    if (s.stress > 0 || s.gatePullNext > 0) { // threat OR the gate's draw (G2) keeps a sheep alert
+    if (s.stress > 0 || s.gatePullNext > 0 || s.trot) { // threat, the gate's draw (G2) or a trot (T2) keeps a sheep alert
       s.idle = false
       s.calmT = 0
     } else if (!s.idle) {
@@ -1974,6 +2110,19 @@ class FlockSim {
       }
     }
 
+    // Trot drive (POC-v9 T2): a lead presses on along the locked column
+    // heading, a follower files after its lead — steered toward trot pace
+    // (trotSpeedMult × vMax), the same steer-to-velocity shape as graze.
+    let fTrot = { x: 0, y: 0 }
+    if (s.trot) {
+      let tdir
+      if (s.trotLead >= 0) {
+        const tto = vec2.sub(this.sheep[s.trotLead].pos, s.pos)
+        tdir = vec2.len(tto) > 1e-4 ? vec2.norm(tto) : { x: 0, y: 0 }
+      } else tdir = { x: Math.cos(s.trotHeading), y: Math.sin(s.trotHeading) }
+      fTrot = vec2.scale(vec2.sub(vec2.scale(tdir, p.vMax * p.trotSpeedMult), s.vel), 1 / p.vMax)
+    }
+
     // accel = accelScale · (w_sep·F_sep + w_coh·F_coh + w_align·F_align + w_graze·F_graze)
     // All forces share one global scale → tuning stays intuitive.
     // (P3 adds flee, P7 fence — summed here.)
@@ -1987,12 +2136,14 @@ class FlockSim {
     accel = vec2.add(accel, vec2.scale(fFen, p.w_fence))
     accel = vec2.add(accel, vec2.scale(fThrough, p.w_through))
     accel = vec2.add(accel, vec2.scale(fGate, p.w_gateAttract))
+    accel = vec2.add(accel, vec2.scale(fTrot, p.w_trot))
     accel = vec2.scale(accel, p.accelScale)
 
     // integrate: v ← clampLen((v + a·dt)·damping, vMax) ; p ← p + v·dt
     // panicking sheep get a higher speed cap so they can bolt; idle sheep are
     // hard-capped low so the unpressured field stays calm (A1).
     let vmax = s.panic ? p.vMax * p.panicMult : p.vMax
+    if (s.trot) vmax = Math.max(vmax, p.vMax * p.trotSpeedMult) // T2: a trot outruns the walk cap (still below panic)
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
@@ -2014,6 +2165,153 @@ class FlockSim {
 
     // stable facing: track heading only when actually moving (no flicker at rest)
     if (vec2.len(s.vel) > 2) s.facing = Math.atan2(s.vel.y, s.vel.x)
+  }
+
+  // Trot (POC-v9 flock-behavior T1–T3, owner 2026-08-24). T1: a cluster of
+  // MORE than trotGroupMin sheep, moving the same way (velocity order
+  // parameter ≥ trotAlignMin, mean speed ≥ trotMoveSpeed) under current dog
+  // pressure (some member stressed), has a trotTriggerProb per-second chance
+  // that its LEAD sheep — the trotLeadCount frontmost along the group heading
+  // — break into a trot. T2: flock-mates within trotFollowR of a trotting
+  // sheep are pulled in behind IT (one hop per tick, like the G3 gate column)
+  // — the flock files after the leads; at trigger time there is a
+  // trotBoltProb chance the WHOLE group bolts at once instead. T3: while the
+  // dog's pressure is felt the trot holds; once ESCAPED (stress 0) each
+  // trotting sheep's per-second chance of dropping back to normal ramps from
+  // trotDecayMin to trotDecayMax over trotDecayRamp seconds. All rolls are on
+  // the seeded stream; nothing rolls while no group is eligible and nobody
+  // trots, so pre-trot runs replay draw for draw.
+  updateTrot(dt) {
+    const p = this.p
+    const roll = (perSec) => this.rng() < 1 - Math.pow(1 - Math.min(1, perSec), dt)
+    // housekeeping: penned/injured sheep leave the trot; a follower whose
+    // lead dropped out carries on as a lead on its own current heading
+    for (const s of this.sheep)
+      if (s.trot && (s.down || s.through)) { s.trot = false; s.trotLead = -1; s.trotFreeT = 0 }
+    for (const s of this.sheep) {
+      if (!s.trot || s.trotLead < 0) continue
+      if (!this.sheep[s.trotLead].trot) {
+        s.trotLead = -1
+        s.trotHeading = vec2.len(s.vel) > 2 ? Math.atan2(s.vel.y, s.vel.x) : s.facing
+      }
+    }
+    const active = []
+    for (let i = 0; i < this.sheep.length; i++)
+      if (!this.sheep[i].down && !this.sheep[i].through) active.push(i)
+    // T1 trigger — over the same union-find clusters scoring uses
+    if (p.trotTriggerProb > 0 && active.length > p.trotGroupMin) {
+      const { labels } = this.clusterLabels(active)
+      const groups = new Map() // label → member indices
+      for (const i of active) {
+        const l = labels.get(i)
+        if (!groups.has(l)) groups.set(l, [])
+        groups.get(l).push(i)
+      }
+      for (const members of groups.values()) {
+        if (members.length <= p.trotGroupMin) continue          // "over 20" — strictly more
+        let vx = 0, vy = 0, sp = 0, pressured = false, going = false
+        for (const i of members) {
+          const s = this.sheep[i]
+          vx += s.vel.x; vy += s.vel.y; sp += vec2.len(s.vel)
+          if (s.stress > 0) pressured = true
+          if (s.trot) going = true
+        }
+        if (going || !pressured) continue                       // already going / no dog pressure
+        const mag = Math.hypot(vx, vy)
+        if (mag / members.length < p.trotMoveSpeed) continue    // not really moving
+        if (sp < 1e-6 || mag / sp < p.trotAlignMin) continue    // not one direction
+        if (!roll(p.trotTriggerProb)) continue
+        // triggered: the frontmost trotLeadCount along the group heading lead off
+        const h = Math.atan2(vy, vx), ux = Math.cos(h), uy = Math.sin(h)
+        const byFront = members.slice().sort((i, j) =>
+          (this.sheep[j].pos.x * ux + this.sheep[j].pos.y * uy) -
+          (this.sheep[i].pos.x * ux + this.sheep[i].pos.y * uy))
+        const bolt = this.rng() < p.trotBoltProb                // T2: the whole flock goes at once
+        const n = bolt ? byFront.length : Math.min(p.trotLeadCount, byFront.length)
+        for (let k = 0; k < n; k++) {
+          const s = this.sheep[byFront[k]]
+          s.trot = true; s.trotLead = -1; s.trotHeading = h; s.trotFreeT = 0
+        }
+      }
+    }
+    // T2 spread — a sheep close to a trotting one files in behind IT. Reads a
+    // snapshot of who already trots, so recruitment is index-order-free.
+    const wasTrot = []
+    for (const i of active) if (this.sheep[i].trot) wasTrot.push(i)
+    if (wasTrot.length && p.trotFollowR > 0) {
+      for (const i of active) {
+        const s = this.sheep[i]
+        if (s.trot) continue
+        let lead = -1, best = p.trotFollowR
+        for (const j of wasTrot) {
+          const dd = vec2.dist(s.pos, this.sheep[j].pos)
+          if (dd < best) { best = dd; lead = j }
+        }
+        if (lead >= 0) { s.trot = true; s.trotLead = lead; s.trotFreeT = 0 }
+      }
+    }
+    // T4 (owner 2026-08-24): a trotting sheep stays REACTIVE to the dog —
+    // when the dog is FELT (stress > 0) and stands IN FRONT of its line
+    // (within the trotReverseDeg forward cone of its trot direction), it
+    // reverses and trots the other way. A follower cuts loose and leads the
+    // turn itself; the rest of the column follows its leads round. After the
+    // flip the dog is behind, so there is no flip-flop.
+    if (p.trotReverseDeg > 0) {
+      const dg = this.dog
+      const cosLim = Math.cos(p.trotReverseDeg / 2 * Math.PI / 180)
+      for (const s of this.sheep) {
+        if (!s.trot || s.down || s.through || s.stress <= 0) continue
+        const h = s.trotLead >= 0
+          ? Math.atan2(this.sheep[s.trotLead].pos.y - s.pos.y, this.sheep[s.trotLead].pos.x - s.pos.x)
+          : s.trotHeading
+        const dx = dg.pos.x - s.pos.x, dy = dg.pos.y - s.pos.y
+        const dd = Math.hypot(dx, dy)
+        if (dd < 1e-6) continue
+        if ((dx * Math.cos(h) + dy * Math.sin(h)) / dd >= cosLim) {
+          s.trotHeading = h + Math.PI
+          s.trotLead = -1                      // it leads the turn itself
+        }
+      }
+    }
+    // T3 decay. FIRST the fence: a trotting sheep APPROACHING a wall within
+    // trotFenceStop (~3 body-lengths) drops the trot outright — 100 %,
+    // pressure or not (owner 2026-08-24); it never runs itself into the
+    // fence at a trot. The gate mouth is exempt (same aperture as
+    // fenceForce) so a column can still trot THROUGH the gate. Then the
+    // random decay — only once the dog's pressure is ESCAPED.
+    for (const s of this.sheep) {
+      if (!s.trot) continue
+      if (p.trotFenceStop > 0 && this.trotAtFence(s)) {
+        s.trot = false; s.trotLead = -1; s.trotFreeT = 0; continue
+      }
+      if (s.stress > 0) { s.trotFreeT = 0; continue }
+      s.trotFreeT += dt
+      const u = p.trotDecayRamp > 0 ? Math.min(1, s.trotFreeT / p.trotDecayRamp) : 1
+      if (roll(p.trotDecayMin + (p.trotDecayMax - p.trotDecayMin) * u)) {
+        s.trot = false; s.trotLead = -1; s.trotFreeT = 0
+      }
+    }
+  }
+
+  // T3 (owner 2026-08-24): is this trotting sheep APPROACHING a wall within
+  // trotFenceStop? Same wall + gate-aperture geometry as fenceForce; "approaching"
+  // = a real velocity component toward that wall (parallel running is fine).
+  trotAtFence(s) {
+    const p = this.p, r = this.playRect(), g = this.gate
+    const half = p.gateWidth / 2
+    const alongGate = Math.abs((s.pos.x - g.x) * g.tx + (s.pos.y - g.y) * g.ty)
+    const walls = [ // (vx, vy) points AT the wall
+      { d: s.pos.y - r.y0, vx: 0, vy: -1, gate: g.side === 0 },
+      { d: r.x1 - s.pos.x, vx: 1, vy: 0, gate: g.side === 1 },
+      { d: r.y1 - s.pos.y, vx: 0, vy: 1, gate: g.side === 2 },
+      { d: s.pos.x - r.x0, vx: -1, vy: 0, gate: g.side === 3 },
+    ]
+    for (const w of walls) {
+      if (w.d > p.trotFenceStop) continue
+      if (w.gate && alongGate < half) continue           // mouth → trot on through
+      if (s.vel.x * w.vx + s.vel.y * w.vy > 1) return true
+    }
+    return false
   }
 
   // Crush at the gate mouth: local density × forward pressure. Sustained crush
@@ -2141,6 +2439,7 @@ class FlockSim {
     this.gcm = this.computeGCM()       // flock centroid → dog steering
     this.computeHull()                 // herd perimeter (same set) → flank track (C8)
     this.stepDog(dt)                   // dog moves first → sheep react to it
+    this.updateTrot(dt)                // T1–T3 trot state (POC-v9) → integrate reads it
     for (let i = 0; i < this.sheep.length; i++) this.integrate(i, dt)
     for (const s of this.sheep) s.gatePull = s.gatePullNext // G3 column reads last tick's pull
     this.updateCrush(dt)               // gate crush → injury
@@ -2155,22 +2454,27 @@ class FlockSim {
 const canvas = document.getElementById('field')
 const ctx = canvas.getContext('2d')
 const hud = document.getElementById('hud')
-// pasture header (implemented/POC-v5/pasture-header.md): seed + layout readouts live above
-// the canvas; refreshed alongside the HUD each frame (input is left alone
-// while the owner is typing in it).
-const header = document.getElementById('header')
+// POC-v11: seed + layout readouts live in the debug box (right column);
+// refreshed alongside the HUD each frame (input is left alone while the
+// owner is typing in it).
 const stage = document.getElementById('stage')
 const seedInput = document.getElementById('seed-input')
 const layoutOut = document.getElementById('layout-out')
 // POC-v5 P5 (Q14): the canvas follows params.canvasW/H — §1 already reads the
-// bounds from params on every reseed (playRect). The header strip follows the
-// canvas width so it never hard-codes 1120.
+// bounds from params on every reseed (playRect).
 function resizeCanvas() {
   if (canvas.width !== params.canvasW) canvas.width = params.canvasW
   if (canvas.height !== params.canvasH) canvas.height = params.canvasH
-  header.style.width = canvas.width + 'px'
-  stage.style.setProperty('--canvas-w', canvas.width + 'px') // panel-lanes rule tracks the live width
+  fitCanvas()
 }
+// POC-v11 scale-to-fit (Q63): contain-fit the fixed-resolution canvas into
+// #stage — CSS size only; the sim keeps playing at params.canvasW/H.
+function fitCanvas() {
+  const scale = Math.min(stage.clientWidth / canvas.width, stage.clientHeight / canvas.height)
+  canvas.style.width = Math.round(canvas.width * scale) + 'px'
+  canvas.style.height = Math.round(canvas.height * scale) + 'px'
+}
+window.addEventListener('resize', fitCanvas)
 let cardShown = false
 
 function showCard(sc) {
@@ -2207,6 +2511,9 @@ function render(fps) {
   drawFence()
   drawCrush()
 
+  // gate attraction area (POC-v9 V1) — under the sheep, like the dog's presence
+  if (params.debug.gateAttract) drawGateAttract()
+
   // field markers (under everything): goal pen center + dog's owner/home
   drawGoal(params.goal)
   drawOwner(sim.dog.owner)
@@ -2232,11 +2539,11 @@ function render(fps) {
 
   // HUD readout
   const sc = sim.score()
-  hud.textContent =
-    `fps ${fps.toFixed(0)}   cmd ${sim.dog.command}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}   intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}\n` +
-    `crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}   ` +
-    `injuries ${sim.injuries}   penned ${sc.penned}/${sim.sheep.length}\n` +
-    `time ${sc.raw.t.toFixed(0)}s   score ${sc.total.toFixed(0)}`
+  hud.textContent = // POC-v11: 4 short lines — the debug box is ~300 px wide
+    `fps ${fps.toFixed(0)}  cmd ${sim.dog.command}${sim.dog.flankEasy ? '·easy' : ''}${sim.dog.lieSide ? (sim.dog.lieSide < 0 ? '·left' : '·right') : ''}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}\n` +
+    `intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
+    `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
+    `time ${sc.raw.t.toFixed(0)}s  score ${sc.total.toFixed(0)}`
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
 
@@ -2544,6 +2851,23 @@ function drawCrush() {
   ctx.restore()
 }
 
+// POC-v9 V1: the gate's DRAW area (G2 gateAttractR) as a light-blue
+// transparent overlay — the gate-side counterpart of the dog's presence
+// overlay (drawEye). Outer disc = where the pull fades in; inner disc =
+// full pull (the G2 smoothstep saturates inside half the radius).
+function drawGateAttract() {
+  const R = params.gateAttractR
+  if (R <= 0) return
+  const g = sim.gate
+  ctx.save()
+  ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(110,180,255,0.08)'; ctx.fill()
+  ctx.strokeStyle = 'rgba(110,180,255,0.22)'; ctx.lineWidth = 1; ctx.stroke()
+  ctx.beginPath(); ctx.arc(g.x, g.y, R * 0.5, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(110,180,255,0.10)'; ctx.fill()
+  ctx.restore()
+}
+
 function drawGoal(g) {
   ctx.save()
   ctx.strokeStyle = '#5fbf7a'
@@ -2594,25 +2918,34 @@ function drawSheep(s) {
   ctx.restore()
 }
 
-// The "eye": ambient threat circle (R_flee) + directional cone wedge. The wedge
-// half-angle is where the cos^coneK term drops to half — so it narrows as coneK
-// rises, and the circle's fill reflects the `ambient` floor. Tuning must see this.
+// The "eye": ambient threat circle + directional cone wedge, PER COMMAND since
+// POC-v9: walk-on reaches R_flee·(1+driveConeExt) at the coneK width (E5), easy
+// R_flee·(1+easyConeExt) at easyConeDeg (E6), lie-down R_flee·(1+lieConeExt) at
+// lieConeDeg with its short postureRange ambient flanks (D3). The wedge is the
+// half-strength contour of the falloff. Tuning must see this.
 function drawEye(d) {
   const { R_flee, coneK, ambient } = params
-  const driving = d.command === 'walk_on' || d.command === 'easy'
-  const Rc = R_flee * (driving ? 1 + params.driveConeExt : 1) // E5: the drive cone reaches further
+  const easy = d.command === 'easy', lying = d.command === 'lie_down'
+  const Rc = lying ? R_flee * (1 + params.lieConeExt)
+           : d.command === 'walk_on' ? R_flee * (1 + params.driveConeExt)
+           : easy ? R_flee * (1 + params.easyConeExt)
+           : R_flee
+  const Ra = lying ? R_flee * params.postureRange : R_flee   // ambient (flank) reach
   ctx.beginPath()
-  ctx.arc(d.pos.x, d.pos.y, R_flee, 0, Math.PI * 2)
+  ctx.arc(d.pos.x, d.pos.y, Ra, 0, Math.PI * 2)
   ctx.fillStyle = `rgba(220,80,80,${(0.04 + 0.12 * ambient).toFixed(3)})`
   ctx.fill()
   ctx.strokeStyle = 'rgba(220,80,80,0.25)'
   ctx.lineWidth = 1
   ctx.stroke()
 
-  const half = Math.acos(Math.pow(0.5, 1 / Math.max(coneK, 0.01)))
+  const half = easy ? params.easyConeDeg / 2 * Math.PI / 180
+             : lying ? params.lieConeDeg / 2 * Math.PI / 180
+             : Math.acos(Math.pow(0.5, 1 / Math.max(coneK, 0.01)))
   ctx.beginPath()
   ctx.moveTo(d.pos.x, d.pos.y)
-  ctx.arc(d.pos.x, d.pos.y, Rc, d.facing - half, d.facing + half)
+  const mid = d.facing + (d.lieSide || 0) * params.downConeOffsetDeg * Math.PI / 180 // D4: offset downs swing the wedge
+  ctx.arc(d.pos.x, d.pos.y, Rc, mid - half, mid + half)
   ctx.closePath()
   ctx.fillStyle = 'rgba(235,95,70,0.18)'
   ctx.fill()
@@ -2641,20 +2974,35 @@ function drawDog(d) {
 //   §1 does all the steering. No sheep are ever touched by input.
 // ============================================================================
 const cmdButtons = Array.from(document.querySelectorAll('#controls button[data-cmd]'))
+// POC-v10: the four variant buttons are §3-only names — resolved here to the
+// §1 verb + entry opts. §1's COMMANDS stays at the six verbs.
+const VARIANTS = {
+  come_by_easy:   ['come_by',  { easy: true }],
+  away_easy:      ['away',     { easy: true }],
+  lie_down_left:  ['lie_down', { side: -1 }],
+  lie_down_right: ['lie_down', { side: 1 }],
+}
 // The strip shows the dog's ACTUAL state (locked Q5): §4's frame loop calls
-// updateStrip(sim.dog.command) every render, so auto-easy (E2) lights up.
-function updateStrip(cmd) {
+// updateStrip() every render, so auto-easy (E2) lights up. displayCommand maps
+// dog state back to a variant button name (a gentle flank lights Come Easy).
+function displayCommand(d) {
+  if (d.flankEasy && (d.command === 'come_by' || d.command === 'away')) return d.command === 'come_by' ? 'come_by_easy' : 'away_easy'
+  if (d.command === 'lie_down' && d.lieSide) return d.lieSide < 0 ? 'lie_down_left' : 'lie_down_right'
+  return d.command
+}
+function updateStrip() {
+  const cmd = displayCommand(sim.dog)
   for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
 }
 function issue(cmd, flavor) {
-  sim.setCommand(cmd, flavor ? { impulse: flavor } : {})
-  updateStrip(sim.dog.command) // an E3 impulse keeps the dog in easy
+  const [verb, vopts] = VARIANTS[cmd] || [cmd, {}]
+  sim.setCommand(verb, flavor ? { ...vopts, impulse: flavor } : vopts)
+  updateStrip() // an E3 impulse keeps the dog in easy
 }
 const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
 function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do') }
 for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
-document.querySelector('[data-action="finish"]').addEventListener('click', () => sim.finishRun())
-document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
+document.querySelector('[data-action="reset"]').addEventListener('click', restartRun) // Reset lives in the header now (touch-up); Finish button removed — F still ends a run
 // pasture header (implemented/POC-v5/pasture-header.md) — the seed control above the canvas.
 // Both routes go through the same §3 actions the lil-gui `PRNG seed` field and
 // `Tools → Reseed` use; the lil-gui seed field is refreshed so they never disagree.
@@ -2676,10 +3024,40 @@ seedInput.addEventListener('change', () => {
 })
 seedInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') seedInput.blur() }) // blur → hotkeys work again
 document.getElementById('reseed-btn').addEventListener('click', newCourse)
-// panel lanes (implemented/POC-v5/panel-lanes.md): hide/show both lil-gui columns — view
-// state only, not persisted; the #stage lane rule re-centers via CSS.
+// panels (H) — POC-v11: hides just the levers section; the pad + debug box
+// stay (phones have no H key to bring a hidden column back). View state only.
 function togglePanels() { document.body.classList.toggle('panels-hidden') }
 document.getElementById('panels-btn').addEventListener('click', togglePanels)
+
+// POC-v11 phone full-screen (Q64): browsers only grant fullscreen on a user
+// gesture, so it's an explicit ⛶ button, shown by CSS only on phone-size
+// screens AND only when the API exists (iPhone Safari has none → no button).
+// After entering, try to lock landscape (Android honors it); ignore refusals.
+if (document.documentElement.requestFullscreen) {
+  document.body.classList.add('can-fullscreen')
+  const fsBtn = document.getElementById('fullscreen-btn')
+  fsBtn.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else document.documentElement.requestFullscreen()
+      .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
+      .catch(() => {})
+  })
+  // label tracks the actual state (covers Esc / system exits, not just the button)
+  document.addEventListener('fullscreenchange', () => {
+    fsBtn.textContent = document.fullscreenElement ? '⛶ exit full-screen' : '⛶ full-screen'
+  })
+}
+
+// Pause (POC-v10 touch-up, owner 2026-08-24): P freezes sim stepping — §4
+// zeroes the accumulator while paused; rendering, panels, sliders and
+// capture ⎘ stay live (a frozen scene can still be captured / inspected).
+let paused = false
+const pauseBtn = document.getElementById('pause-btn')
+function togglePause() {
+  paused = !paused
+  pauseBtn.innerHTML = paused ? 'resume <kbd>P</kbd>' : 'pause <kbd>P</kbd>'
+}
+pauseBtn.addEventListener('click', togglePause)
 
 // Capture ⎘ (owner 2026-08-22): a JSON snapshot of the live game state, copied
 // to the clipboard + console, so an edge case can be pasted into a chat and
@@ -2727,6 +3105,7 @@ function captureState() {
       nearestMarker: nearestMarker(d.pos), distOutsideHull: sim.hull.length ? r1(sim.distToHull(d.pos)) : null, // = perimeterMargin when he is ON the dotted line
       intensity: +d.intensity.toFixed(2),
       impulse: d.impulse ? d.impulse.name : null,
+      ...(d.flankEasy ? { flankEasy: true } : {}), ...(d.lieSide ? { lieSide: d.lieSide } : {}), // POC-v10 variants
       flank: flanking ? {
         dir: d.command === 'come_by' ? 'CW' : 'CCW', angleDeg: deg(d.flankAngle), radius: r1(d.flankR),
         stationDeg: station, parked: d.flankParked, t: +d.flankT.toFixed(2), parkT: +d.parkT.toFixed(2),
@@ -2736,7 +3115,7 @@ function captureState() {
       handoff: d.handoff ? pt(d.handoff) : null,
       owner: pt(d.owner),
     },
-    sheep: sim.sheep.map((s, i) => ({ i, ...pt(s.pos), g: s.group, state: s.through ? 'penned' : s.down ? 'down' : s.idle ? 'idle' : 'alert', ...(s.gatePull > 0 ? { gatePull: +s.gatePull.toFixed(2), lead: s.gateLead } : {}) })),
+    sheep: sim.sheep.map((s, i) => ({ i, ...pt(s.pos), g: s.group, state: s.through ? 'penned' : s.down ? 'down' : s.idle ? 'idle' : 'alert', ...(s.gatePull > 0 ? { gatePull: +s.gatePull.toFixed(2), lead: s.gateLead } : {}), ...(s.trot ? { trot: 1, trotLead: s.trotLead } : {}) })),
     run: { t: +sim.run.t.toFixed(1), crush: +sim.crush.toFixed(1), injuries: sim.injuries },
   }
   const text = JSON.stringify(out)
@@ -2749,17 +3128,32 @@ function captureState() {
   return out
 }
 document.getElementById('capture-btn').addEventListener('click', captureState)
-const HOTKEYS = { q: 'come_by', e: 'away', w: 'walk_on', s: 'lie_down', a: 'easy', d: 'that_ll_do' }
+// POC-v10 (owner Q57/Q58): arrows replaced the QWEASD letters. Plain arrow =
+// the four core verbs, ⇧ = the gentle variant (⇧↑ easy, ⇧←/⇧→ the gentle
+// flanks), ⌥ = the offset downs, ⏎ recalls; a missing chord falls back to
+// plain (⇧↓ = lie-down). Q61 (owner, same day): the E3 impulse flavors get
+// chords after all — ⌥↑ lean, ⇧⌥↑ bark (also still ⇧/⌥-click on Walk On);
+// a plain ↑ while in easy fires the E3 shove tap via setCommand.
+const HOTKEYS = {
+  ArrowLeft:  { plain: 'come_by', shift: 'come_by_easy', alt: 'lie_down_left' },
+  ArrowUp:    { plain: 'walk_on', shift: 'easy', alt: ['walk_on', 'lean'], altShift: ['walk_on', 'bark'] },
+  ArrowRight: { plain: 'away', shift: 'away_easy', alt: 'lie_down_right' },
+  ArrowDown:  { plain: 'lie_down' },
+  Enter:      { plain: 'that_ll_do' },
+}
 window.addEventListener('keydown', (ev) => {
   if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) return // typing a seed (or a lil-gui field), not commanding
   const k = ev.key.toLowerCase()
-  if (k === 'f') return sim.finishRun()
+  if (k === 'f') return sim.finishRun() // Finish button removed (touch-up) — the F hotkey still ends a run
   if (k === 'r') return restartRun()
   if (k === 'h') return togglePanels()
-  const cmd = HOTKEYS[k]
-  if (cmd) {
-    if (ev.altKey) ev.preventDefault() // keep Alt+W from focusing the browser menu
-    issue(cmd, flavorOf(ev))
+  if (k === 'p') return togglePause()
+  const m = HOTKEYS[ev.key]
+  if (m) {
+    ev.preventDefault() // arrows scroll the page; ⏎ would re-click a focused button
+    const pick = (ev.altKey && ev.shiftKey && m.altShift) || (ev.altKey && m.alt) || (ev.shiftKey && m.shift) || m.plain
+    const [cmd, flavor] = Array.isArray(pick) ? pick : [pick] // Q61: a chord can carry an impulse flavor
+    issue(cmd, flavor)
   }
 })
 // (initial button highlight is set in §4, once `sim` exists)
@@ -2968,10 +3362,7 @@ if (params.randomSeedOnLoad) {
 }
 const sim = new FlockSim(params)
 // (sheepCount's respawn side effect is wired declaratively — HOOKS.respawn in §0.)
-resizeCanvas() // header strip width = canvas width from the first frame
-// panel-lanes Q-F: a viewport too narrow for the canvas beside the Levers lane
-// opens with the panels hidden (H shows them) so a laptop starts centered.
-if (window.innerWidth < params.canvasW + 261) document.body.classList.add('panels-hidden')
+resizeCanvas() // canvas sized + contain-fit into the stage from the first frame
 
 issue(sim.dog.command) // reflect the initial command in the button strip
 
@@ -3012,11 +3403,15 @@ function frame(nowMs) {
   // clamp real elapsed → anti spiral-of-death
   if (delta > params.maxFrameDelta) delta = params.maxFrameDelta
 
-  // fixed-timestep stepping in dt slices (framerate-independent)
-  acc += delta
-  while (acc >= params.dt) {
-    sim.step(params.dt)
-    acc -= params.dt
+  // fixed-timestep stepping in dt slices (framerate-independent);
+  // paused (touch-up): drop the elapsed time so resume doesn't fast-forward
+  if (paused) acc = 0
+  else {
+    acc += delta
+    while (acc >= params.dt) {
+      sim.step(params.dt)
+      acc -= params.dt
+    }
   }
 
   // FPS meter (smoothed over ~0.25s windows)
@@ -3028,7 +3423,7 @@ function frame(nowMs) {
     fpsFrames = 0
   }
 
-  updateStrip(sim.dog.command) // strip follows the dog's actual state (E2 auto-easy)
+  updateStrip() // strip follows the dog's actual state (E2 auto-easy; v10 variants via displayCommand)
   render(fps)
   requestAnimationFrame(frame)
 }
