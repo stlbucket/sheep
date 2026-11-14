@@ -9,8 +9,10 @@
   that run in after a delay, set up outside the fence and lob shells into the
   field (direct hit kills, near miss stuns, wider miss panics). The assault's
   physics is lib/assault-sim.js — the ONLY code outside the sim that writes
-  sim state; §A in this file just draws it. Its four settings live in the
-  "Wolf assault" section.
+  sim state; §A in this file just draws it. Its settings live in the
+  "Wolf assault" section. The fence carries eight laser rifles (one post in
+  from each corner); BATTLE STATIONS (⌘⇧B / Ctrl⇧B / B, or the button) sends
+  the dog to the nearest one that bears on a wolf, to shoot back.
 
   3D VIEW of the sheep PoC (three.js). Same simulation, different renderer.
 
@@ -169,6 +171,10 @@
   #controls .herd label { color: #7b8894; }
   #controls .herd input { flex: 1 1 auto; min-width: 0; }
   #controls .herd #herd-size-out { color: #9fb0c0; min-width: 3ch; text-align: right; }
+  #controls .obst { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .obst label { color: #7b8894; }
+  #controls .obst input { flex: 1 1 auto; min-width: 0; }
+  #controls .obst #obst-freq-out { color: #9fb0c0; min-width: 9ch; text-align: right; white-space: nowrap; }
   #card {
     display: none;
     position: absolute;
@@ -189,11 +195,28 @@
   #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
   #card .row span:last-child { color: #e08a8a; }
   #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
+  #card .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  #card .actions button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  #card .actions button:hover { background: #2c353d; }
+  #card .actions button.primary { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #card .actions button.primary:hover { background: #38704a; }
+  #card .actions button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-left: 4px; }
   #side-levers { padding: 0; border: none; background: none; display: flex; flex-direction: column; }
   #side-levers .lil-gui.root { width: 100%; --width: 100%; }
   #side #side-assault { padding: 0; }
   #side-assault .lil-gui.root { width: 100%; --width: 100%; --name-width: 48%; }
-  #assault-status { padding: 6px 8px; font-size: 12px; color: #e0a98a; border-top: 1px solid #232b32; }
+  #assault-status { padding: 6px 8px; font-size: 12px; color: #e0a98a; border-top: 1px solid #232b32; white-space: pre-line; }
+  #controls > button[data-cmd="battle_stations"] { border-color: #6b4a3a; color: #f0c9b0; }
+  #controls > button[data-cmd="battle_stations"].active { background: #7a2f26; border-color: #b0503f; color: #ffece4; }
   #rotate-overlay {
     display: none;
     position: fixed;
@@ -243,6 +266,7 @@
     }
     #controls .w2 { display: block; }
     #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 8px) / 3); }
+    #controls > button[data-cmd="battle_stations"] { width: calc((100% - 8px) / 3 * 2); }
     #controls .aux button { height: auto; font-size: 11px; white-space: nowrap; }
     #controls .herd { font-size: 11px; }
     #controls button kbd, #cam-bar kbd, #cam-bar span, #cam-hint { display: none; }
@@ -315,6 +339,7 @@
     </div>
     <div class="sep"></div>
     <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
+    <button data-cmd="battle_stations" title="the dog runs to the nearest fence gun that bears on a wolf, rears up and shoots — ⌘⇧B, Ctrl⇧B or plain B">battle stations <kbd>⌘⇧B</kbd></button>
     <div class="sep"></div>
     <div class="aux">
       <button id="reseed-btn" title="draw a new course">reseed ↻</button>
@@ -324,6 +349,11 @@
       <label for="herd-size">herd</label>
       <input id="herd-size" type="range">
       <span id="herd-size-out">—</span>
+    </div>
+    <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+      <label for="obst-freq">obstacles</label>
+      <input id="obst-freq" type="range">
+      <span id="obst-freq-out">—</span>
     </div>
   </div>
 </section>
@@ -533,12 +563,13 @@ function hillHeight(x, y) {
 }
 
 // ---- the course: pasture, fence, gate, paddock, trees (rebuilt per course) --
-const FENCE_H = 10, POST_GAP = 30
+const FENCE_H = 10, POST_GAP = LASER.postGap   // the lib mounts its guns on these posts — one spacing, one place
 const postGeo = new THREE.BoxGeometry(2.2, FENCE_H + 1, 2.2).translate(0, (FENCE_H + 1) / 2, 0)
 const gatePostGeo = new THREE.BoxGeometry(3.2, 17, 3.2).translate(0, 8.5, 0)
 const flagGeo = new THREE.PlaneGeometry(7, 4).translate(3.5, 0, 0)
 const trunkGeo = new THREE.CylinderGeometry(2.2, 3.2, 22, 6).translate(0, 11, 0)
 const crownGeo = new THREE.IcosahedronGeometry(1, 1)
+const rockGeo = new THREE.DodecahedronGeometry(1, 0)
 const course = { group: new THREE.Group(), disposables: [], sig: '', gate: null, slots: [], nextSlot: 0, paddock: null, flags: [], bounds: null, dims: '' }
 scene.add(course.group)
 
@@ -673,6 +704,34 @@ function rebuildCourse() {
   })
   for (const im of [trunks, crowns]) { im.castShadow = true; im.frustumCulled = false; course.disposables.push(im) }
 
+  // obstacles inside the pasture (owner 2026-11-14): the sim's solid discs, dressed
+  // from obstacleItems() — a stand's trees, a rock's boulders (same seeds as the 2D page)
+  {
+    const stand = [], rocks = []
+    for (const o of sim.obstacles) for (const it of obstacleItems(o)) (o.kind === 'rocks' ? rocks : stand).push(it)
+    const oc = new THREE.Color()
+    if (stand.length) {
+      const oTrunks = add(new THREE.InstancedMesh(trunkGeo, MAT.trunk, stand.length))
+      const oCrowns = add(new THREE.InstancedMesh(crownGeo, MAT.crown, stand.length))
+      stand.forEach((t, i) => {
+        const size = t.r * 1.15, k = (0.8 + t.tone * 0.5) * size / 14
+        m.compose(new V3(t.x, 0, t.y), q.identity(), new V3(k * 0.7, k, k * 0.7)); oTrunks.setMatrixAt(i, m)
+        m.compose(new V3(t.x, 18 * k + size * 0.7, t.y), q.setFromAxisAngle(AX_Y, t.tone * 6), new V3(size, size * 1.25, size)); oCrowns.setMatrixAt(i, m)
+        oCrowns.setColorAt(i, oc.setHSL(0.27 + t.tone * 0.08, 0.45, 0.24 + t.tone * 0.1))
+      })
+      for (const im of [oTrunks, oCrowns]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+    }
+    if (rocks.length) {
+      const oRocks = add(new THREE.InstancedMesh(rockGeo, MAT.crown, rocks.length))
+      rocks.forEach((t, i) => {
+        const h = t.r * (0.55 + t.tone * 0.35)
+        m.compose(new V3(t.x, h * 0.35, t.y), q.setFromEuler(new THREE.Euler(t.tone * 0.5 - 0.25, t.tone * 6, 0.2 - t.tone * 0.4)), new V3(t.r, h, t.r)); oRocks.setMatrixAt(i, m)
+        oRocks.setColorAt(i, oc.setHSL(0.09, 0.06, 0.42 + t.tone * 0.16))
+      })
+      oRocks.castShadow = true; oRocks.receiveShadow = true; oRocks.frustumCulled = false; course.disposables.push(oRocks)
+    }
+  }
+
   // sun + shadow box follow the field
   const R = Math.hypot(p.canvasW, p.canvasH) / 2 + 260
   sun.position.set(cx - 650, 1000, cz + 520); sun.target.position.set(cx, 0, cz)
@@ -680,7 +739,7 @@ function rebuildCourse() {
   sun.shadow.camera.updateProjectionMatrix()
 
   // what the top camera frames: the fenced pasture plus the whole paddock
-  const bx = [r.x0 - 80, r.x1 + 80], by = [r.y0 - 80, r.y1 + 80] // wider than the plain 3D page: room for the mortar stations
+  const pad = BLAST.standoff + 40, bx = [r.x0 - pad, r.x1 + pad], by = [r.y0 - pad, r.y1 + pad] // wider than the plain 3D page: room for the mortar stations
   for (const c of [gw(-PW / 2, PD + 12), gw(PW / 2, PD + 12)]) { bx.push(c.x); by.push(c.y) }
   course.bounds = { x0: Math.min(...bx), x1: Math.max(...bx), y0: Math.min(...by), y1: Math.max(...by) }
   const dims = p.canvasW + 'x' + p.canvasH
@@ -816,7 +875,7 @@ function buildDog() {
     legs.push(leg)
   }
   root.scale.setScalar(1.25)
-  return { root, body, head, tail, legs, yaw: 0, headYaw: 0, phase: 0, lie: 0, stalk: 0, amp: 0 }
+  return { root, body, head, tail, legs, yaw: 0, headYaw: 0, phase: 0, lie: 0, stalk: 0, amp: 0, rear: 0 }
 }
 const dog = buildDog()
 scene.add(dog.root)
@@ -834,12 +893,18 @@ function updateDog(dt, time) {
   dog.stalk += ((d.command === 'easy' ? 1 : d.command === 'walk_on' ? 0.45 : 0) - dog.stalk) * ease(5, dt)
   dog.amp += (Math.min(1, speed / 60) - dog.amp) * ease(8, dt)
   dog.phase += speed * 0.32 * dt
-  dog.body.position.y = -2.6 * dog.lie - 0.9 * dog.stalk * (1 - dog.lie)
+  // §A battle stations: at the gun he rears up on his hind legs — the body tips back about the hips, forepaws out to the rifle
+  const manning = assault.battle && assault.battle.state === 'shoot'
+  dog.rear += ((manning ? 1 : 0) - dog.rear) * ease(6, dt)
+  const th = dog.rear * 1.1, HX = -2.9, HY = 4.3
+  dog.body.rotation.z = th
+  dog.body.position.x = HX - (HX * Math.cos(th) - HY * Math.sin(th))
+  dog.body.position.y = -2.6 * dog.lie - 0.9 * dog.stalk * (1 - dog.lie) + HY - (HX * Math.sin(th) + HY * Math.cos(th))
   dog.head.position.y = 7.0 - 0.9 * dog.stalk * (1 - dog.lie)
-  dog.head.rotation.set(0, -dog.headYaw, -0.18 * dog.stalk)
+  dog.head.rotation.set(0, -dog.headYaw, -0.18 * dog.stalk - th * 0.85)
   dog.legs.forEach((leg, k) => {
     const swing = Math.sin(dog.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * 0.75 * dog.amp
-    leg.rotation.z = lerp(swing, k < 2 ? 1.35 : 1.2, dog.lie)
+    leg.rotation.z = lerp(lerp(swing, k < 2 ? 1.35 : 1.2, dog.lie), k < 2 ? Math.PI / 2 - th : -th, dog.rear)
   })
   dog.tail.rotation.z = lerp(-0.93, -1.35, Math.min(1, speed / 80))
   dog.tail.rotation.x = d.atHeel ? Math.sin(time * 11) * 0.55 : 0 // a wag at heel
@@ -1009,7 +1074,7 @@ function updateOverlays() {
 //   ASSAULT_ENV to tell the lib where the camera's background, the hills and
 //   the paddock are, and to build / drop meshes as teams arrive and rounds fly.
 // ============================================================================
-const assaultView = { group: new THREE.Group(), teams: new Map(), shells: new Map(), fx: [], scorch: [] }  // team → { root, wolves, mortar, … } · shell → { mesh, ring }
+const assaultView = { group: new THREE.Group(), teams: new Map(), shells: new Map(), guns: new Map(), fx: [], scorch: [], note: '', noteUntil: 0 }  // team → { root, wolves, mortar, … } · shell → { mesh, ring } · gun → { root, swivel, yaw }
 scene.add(assaultView.group)
 
 {
@@ -1018,12 +1083,14 @@ scene.add(assaultView.group)
   gui.add(ASSAULT, 'teams', 0, 6, 1).name('two-wolf teams')
   gui.add(ASSAULT, 'rate', 1, 60, 1).name('rounds / min')
   gui.add(ASSAULT, 'accuracy', 0, 1, 0.05).name('accuracy')
+  gui.add(ASSAULT, 'dogAccuracy', 0, 1, 0.05).name('dog accuracy')
 }
 const assaultStatus = document.getElementById('assault-status')
 
 // ---- models (geometry + materials shared by every team) ----------------------
 const NOFOG = { fog: false }                                          // keeps the far-off specks readable against the hazy hills
 const WOLF = lam(0x70757c, NOFOG), WOLF_DARK = lam(0x474b51, NOFOG), WOLF_PALE = lam(0xbdbfc2, NOFOG), OLIVE = lam(0x4f5c36), STEEL = lam(0x2f3438)
+const GUNMETAL = lam(0x3d444b), GLOW = new THREE.MeshBasicMaterial({ color: 0xff5a3c })
 const AG = {
   torso: new THREE.CapsuleGeometry(2.1, 6.2, 4, 8).rotateZ(Math.PI / 2),
   ear: new THREE.ConeGeometry(0.6, 1.7, 4),
@@ -1063,7 +1130,7 @@ function buildWolf() {
     legs.push(leg)
   }
   root.scale.setScalar(1.45)
-  return { root, pivot, head, tail, legs, yaw: null, up: 0, phase: 0 }
+  return { root, pivot, head, tail, legs, yaw: null, up: 0, phase: 0, fall: 0 }
 }
 // run on all fours (up 0) or stand at the tube (up 1); `dip` bends the wolf toward the ground
 function poseWolf(w, x, y, yaw, speed, up, dip, dt, h = 0) {
@@ -1092,6 +1159,22 @@ function buildMortar() {
   return { root, tube }
 }
 
+// a laser rifle on a pintle: sits on a fence post, swivels about +y; the barrel runs along +x
+function buildGun() {
+  const root = new THREE.Group(), swivel = new THREE.Group()
+  const box = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(unitBox, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; swivel.add(m); return m }
+  const pin = new THREE.Mesh(unitBox, STEEL); pin.position.y = 0.9; pin.scale.set(0.8, 1.8, 0.8); root.add(pin)
+  swivel.position.y = 2.2; root.add(swivel)
+  box(GUNMETAL, -0.4, 0, 0, 5.2, 1.7, 1.4)     // receiver
+  box(STEEL, 5.2, 0.15, 0, 6.4, 0.75, 0.75)    // barrel
+  box(GLOW, 8.6, 0.15, 0, 0.7, 1.0, 1.0)       // emitter
+  box(STEEL, -4.4, -0.5, 0, 3.2, 1.3, 1.0)     // stock
+  box(OLIVE, 0.2, 1.3, 0, 2.8, 0.7, 0.7)       // sight
+  box(GLOW, -0.4, 0, 0.75, 2.2, 0.5, 0.12); box(GLOW, -0.4, 0, -0.75, 2.2, 0.5, 0.12) // power cells
+  return { root, swivel, yaw: 0 }
+}
+const GUN_Y = FENCE_H + 1                                              // the top of a fence post
+
 // ---- wiring: the lib says what happened, the view keeps its meshes in step -----
 function freeFx(o) { assaultView.group.remove(o); o.traverse((c) => { if (c.material) c.material.dispose() }) }
 ASSAULT_ENV.viewAngle = () => {                                       // teams come over the hills in the camera's background (the top view has none)
@@ -1107,6 +1190,13 @@ ASSAULT_ENV.onReset = () => {
   for (const fx of v.fx) freeFx(fx.root)
   for (const m of v.scorch) freeFx(m)
   v.teams.clear(); v.shells.clear(); v.fx.length = v.scorch.length = 0
+  for (const gv of v.guns.values()) v.group.remove(gv.root)            // the fence guns: one per assault.guns entry, on its post
+  v.guns.clear()
+  for (const gun of assault.guns) {
+    const gv = buildGun()
+    gv.root.position.set(gun.x, GUN_Y, gun.y); gv.yaw = gun.aim; gv.swivel.rotation.y = -gv.yaw
+    v.group.add(gv.root); v.guns.set(gun, gv)
+  }
 }
 ASSAULT_ENV.onTeamAdded = (T) => {
   const root = new THREE.Group(), wolves = [buildWolf(), buildWolf()], mortar = buildMortar()
@@ -1133,6 +1223,12 @@ ASSAULT_ENV.onLand = (sh) => {
   if (sv) { assaultView.group.remove(sv.mesh); freeFx(sv.ring); assaultView.shells.delete(sh) }
 }
 ASSAULT_ENV.onBlast = (x, y) => blastFx(x, y)
+ASSAULT_ENV.onLaser = (gun, shot) => {
+  const up = shot.T.state === 'setup' || shot.T.state === 'fire' || (shot.T.state === 'dead' && shot.T.built)   // was he standing at the tube?
+  const hit = shot.result !== 'near' && shot.result !== 'miss'
+  const h = hit ? Math.max(1, (up ? 15 : 9) + shot.dh * (up ? 1 : 0.6)) : 0.6   // a miss ploughs into the ground beside him
+  beamFx(gun, shot.x, h, shot.y, shot.result)
+}
 
 // ---- effects (render-rate, cosmetic) -------------------------------------------
 function fxMesh(geo, mat, root) { const m = new THREE.Mesh(geo, mat); root.add(m); return m }
@@ -1159,6 +1255,28 @@ function puffFx(x, h, y) {
   assaultView.group.add(root)
   assaultView.fx.push({ root, t: 0, dur: 0.9, update(u) { smoke.scale.setScalar(2 + 8 * u); smoke.position.y = 14 * u; smoke.material.opacity = 0.7 * (1 - u) } })
 }
+// the laser: a bolt from the muzzle to where it landed, and a flash there (bigger for a kill)
+function beamFx(gun, x, h, y, result) {
+  const a = assaultView, root = new THREE.Group()
+  const from = new V3(gun.x + Math.cos(gun.aim) * 9, GUN_Y + 2.4, gun.y + Math.sin(gun.aim) * 9), to = new V3(x, h, y)
+  const len = from.distanceTo(to), kill = result === 'head' || result === 'torso', hit = kill || result === 'hit'
+  const mat = () => new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, depthWrite: false, fog: false })
+  const beam = fxMesh(unitBox, mat(), root), core = fxMesh(unitBox, mat(), root)
+  core.material.color.set(0xfff0e0)
+  for (const m of [beam, core]) { m.position.copy(from).lerp(to, 0.5); m.quaternion.setFromUnitVectors(AX_X, tmp.pos.copy(to).sub(from).normalize()) }
+  const flash = fxMesh(ico0, mat(), root); flash.position.copy(to)
+  flash.material.color.set(kill ? 0xfff6c8 : hit ? 0xffb070 : 0xd8c8a0)
+  const muzzle = fxMesh(ico0, mat(), root); muzzle.position.copy(from)
+  a.group.add(root)
+  a.fx.push({ root, t: 0, dur: kill ? 0.7 : 0.45, update(u) {
+    const b = Math.max(0, 1 - u * 3)                                   // the bolt is gone in the first third
+    beam.scale.set(len, 1.5 * b + 0.01, 1.5 * b + 0.01); beam.material.opacity = 0.55 * b
+    core.scale.set(len, 0.5 * b + 0.01, 0.5 * b + 0.01); core.material.opacity = b
+    beam.visible = core.visible = b > 0
+    muzzle.scale.setScalar(1 + 2.5 * b); muzzle.material.opacity = b; muzzle.visible = b > 0
+    flash.scale.setScalar((kill ? 4 : hit ? 2.5 : 1.5) + (kill ? 14 : hit ? 6 : 5) * u); flash.material.opacity = 0.9 * (1 - u)
+  } })
+}
 const STAR_CAP = 64 * 3
 const starMesh = new THREE.InstancedMesh(AG.star, new THREE.MeshBasicMaterial({ color: 0xffe14d }), STAR_CAP)
 starMesh.frustumCulled = false; starMesh.count = 0
@@ -1171,7 +1289,7 @@ function assaultRender(dt, time) {
   for (const T of a.teams) {
     const tv = v.teams.get(T)
     if (!tv) continue
-    const running = T.state === 'run', setting = T.state === 'setup'
+    const fleeing = T.state === 'flee', running = T.state === 'run' || fleeing, setting = T.state === 'setup', away = T.state === 'away'
     const at = teamAt(T), cx = at.x, cy = at.y
     // side by side across the direction of travel, swinging onto the fence line over the last strides
     const k = smoothstep(120, 0, T.runLen - T.prog)
@@ -1180,18 +1298,37 @@ function assaultRender(dt, time) {
     tv.px += (wx - tv.px) * e; tv.py += (wy - tv.py) * e
     tv.drop *= Math.exp(-3 * dt); tv.kick *= Math.exp(-9 * dt)
     tv.wolves.forEach((w, i) => {
-      const o = i ? -11 : 11
-      const yaw = running ? Math.atan2(at.dy, at.dx)
+      const o = i ? -11 : 11, sw = T.wolves[i]
+      if (!sw.alive) {                                                // shot dead: he drops where he stood and stays there
+        w.fall += (1 - w.fall) * ease(7, dt)
+        w.root.visible = true
+        w.root.position.set(sw.x, 3.2 * w.fall, sw.y)
+        w.root.rotation.set(w.fall * Math.PI / 2 * (i ? -1 : 1), -(w.yaw || 0), 0)
+        w.up += (0 - w.up) * ease(7, dt)
+        w.pivot.rotation.z = w.up; w.head.rotation.z = -0.5 * w.fall
+        w.legs.forEach((leg, k) => { leg.rotation.z = (k < 2 ? 0.5 : -0.4) * w.fall })
+        return
+      }
+      w.root.visible = !away                                          // routed and over the hills: out of sight until they start back
+      const yaw = fleeing ? Math.atan2(-at.dy, -at.dx)                // running for it, back the way they came
+                : running ? Math.atan2(at.dy, at.dx)
                 : i ? Math.atan2(-T.ty * o, -T.tx * o)                // the loader faces the tube
                 : Math.atan2(T.iny, T.inx)                            // the gunner watches the fall of shot
       const dip = setting ? 0.6 + 0.4 * Math.sin(time * 9 + i * 2) : i ? tv.drop : 0
       const x = cx + tv.px * o, y = cy + tv.py * o
-      poseWolf(w, x, y, yaw, running ? Math.min(T.speed, 200) : 0, running ? 0 : 1, dip, dt, running ? hillHeight(x, y) : 0)
+      poseWolf(w, x, y, yaw, running ? Math.min(T.speed, 200) : 0, running || away ? 0 : 1, dip, dt, running ? hillHeight(x, y) : 0)
     })
-    const built = running ? 0 : setting ? 1 - T.timer / BLAST.setup : 1
+    const built = T.built ? 1 : setting ? 1 - T.timer / BLAST.setup : 0   // once up, the mortar stays put while its crew is routed
     tv.mortar.root.visible = built > 0.02
     tv.mortar.root.scale.setScalar(Math.max(0.02, built) * 1.2)
     tv.mortar.tube.position.y = -2.2 * tv.kick
+  }
+  // the fence guns: the manned one tracks the dog's target, the rest swing back to point straight out
+  for (const [gun, gv] of v.guns) {
+    const manned = a.battle && a.battle.gun === gun && a.battle.state === 'shoot'
+    if (!manned) gun.aim += angleDiff(Math.atan2(gun.ny, gun.nx), gun.aim) * ease(2, dt)
+    gv.yaw += angleDiff(gun.aim, gv.yaw) * ease(12, dt)
+    gv.swivel.rotation.y = -gv.yaw
   }
   for (const sh of a.shells) {
     const sv = v.shells.get(sh)
@@ -1222,12 +1359,19 @@ function assaultRender(dt, time) {
 
   const want = Math.round(ASSAULT.teams), firing = a.teams.filter((T) => T.state === 'fire').length
   const tally = `rounds ${a.rounds} · killed ${a.dead} · stunned ${a.stunned.size} · panicked ${a.panicked.size}`
-  const text = !want ? 'no wolves (0 teams)'
+  const routed = a.teams.filter((T) => T.state === 'flee' || T.state === 'away')
+  let text = !want ? 'no wolves (0 teams)'
     : !a.teams.length ? `wolves arrive in ${Math.max(0, Math.ceil(ASSAULT.delay - a.t))}s`
     : sim.run.finished ? `cease fire — ${tally}`
     : firing ? `${firing} mortar${firing > 1 ? 's' : ''} firing — ${tally}`
     : a.teams.some((T) => T.state === 'setup') ? 'wolves setting up the mortar…'
-    : 'wolves inbound!'
+    : a.teams.some((T) => T.state === 'run') ? 'wolves inbound!'
+    : routed.length ? `wolves driven off — back in ${Math.ceil(Math.min(...routed.map((T) => T.back)))}s`
+    : 'wolves wiped out 🐕'
+  if (firing && routed.length) text += `\n${routed.length} team${routed.length > 1 ? 's' : ''} driven off — back in ${Math.ceil(Math.min(...routed.map((T) => T.back)))}s`
+  if (a.shots || a.wolvesDead) text += `\nlaser shots ${a.shots} · wolves killed ${a.wolvesDead}`
+  if (a.battle) text += a.battle.state === 'run' ? '\nbattle stations — dog running to the gun' : '\nbattle stations — dog on the gun'
+  else if (time < v.noteUntil) text += '\n' + v.note
   if (assaultStatus.textContent !== text) assaultStatus.textContent = text
 }
 
@@ -1319,21 +1463,31 @@ function showCard(sc) {
     row('Line — off ideal path', sc.line) +
     row('Cohesion — splits / stragglers', sc.cohesion) +
     row(`Calm — stress${sc.raw.injuries ? ` · ${sc.raw.injuries} injured` : ''}`, sc.calm) +
-    `<div class="foot">penned ${sc.penned}/${sim.sheep.length}${lost ? ` · ${lost} lost to mortars` : ''} · press <b>R</b> to run again</div>`
+    `<div class="foot">penned ${sc.penned}/${sim.sheep.length}${lost ? ` · ${lost} lost to mortars` : ''}${assault.wolvesDead ? ` · ${assault.wolvesDead} ${assault.wolvesDead > 1 ? 'wolves' : 'wolf'} shot` : ''}</div>` +
+    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R still runs again">dismiss</button>` +
+    `<button data-card="again" class="primary" title="restart the run on the same course">play again <kbd>R</kbd></button></div>`
   el.style.display = 'block'
 }
 function hideCard() { document.getElementById('card').style.display = 'none'; cardShown = false }
+// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = R
+document.getElementById('card').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button[data-card]')
+  if (!b) return
+  if (b.dataset.card === 'again') restartRun()
+  else document.getElementById('card').style.display = 'none'
+})
 
 function updateHud(fps) {
   const sc = sim.score(), d = sim.dog
   hud.textContent =
-    `fps ${fps.toFixed(0)}  cmd ${d.command}${d.flankEasy ? '·easy' : ''}${d.lieSide ? (d.lieSide < 0 ? '·left' : '·right') : ''}${d.impulse ? ' ⚡' + d.impulse.name : ''}\n` +
+    `fps ${fps.toFixed(0)}  cmd ${assault.battle ? 'battle_stations' : d.command}${d.flankEasy ? '·easy' : ''}${d.lieSide ? (d.lieSide < 0 ? '·left' : '·right') : ''}${d.impulse ? ' ⚡' + d.impulse.name : ''}\n` +
     `intensity ${d.intensity.toFixed(2)}${d.impulseFactor > 1 ? ' ×' + d.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
     `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
     `time ${sc.raw.t.toFixed(0)}s  score ${sc.total.toFixed(0)}`
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
+  syncObstacleSlider()
   let sum = 0
   for (const s of sim.sheep) sum += s.stress
   const mean = sim.sheep.length ? sum / sim.sheep.length : 0
@@ -1367,6 +1521,7 @@ const VARIANTS = {
   lie_down_right: ['lie_down', { side: 1 }],
 }
 function displayCommand(d) {
+  if (assault.battle) return 'battle_stations'
   if (d.flankEasy && (d.command === 'come_by' || d.command === 'away')) return d.command === 'come_by' ? 'come_by_easy' : 'away_easy'
   if (d.command === 'lie_down' && d.lieSide) return d.lieSide < 0 ? 'lie_down_left' : 'lie_down_right'
   return d.command
@@ -1376,6 +1531,11 @@ function updateStrip() {
   for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
 }
 function issue(cmd, flavor) {
+  if (cmd === 'battle_stations') {            // §A: not a sim verb — the assault lib carries the dog to a gun
+    if (!assaultBattleStations(sim)) { assaultView.note = 'battle stations — no wolves in any gun’s sights'; assaultView.noteUntil = clock + 3 }
+    return updateStrip()
+  }
+  assaultStandDown()                          // any other command takes him off the gun
   const [verb, vopts] = VARIANTS[cmd] || [cmd, {}]
   sim.setCommand(verb, flavor ? { ...vopts, impulse: flavor } : vopts)
   updateStrip()
@@ -1456,6 +1616,8 @@ const HOTKEYS = {
 window.addEventListener('keydown', (ev) => {
   if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) return
   const k = ev.key.toLowerCase()
+  // battle stations: ⌘⇧B (Ctrl⇧B off the Mac). A browser may keep that chord for itself (bookmarks bar), so plain B works too
+  if (k === 'b' && !ev.altKey && ((ev.metaKey || ev.ctrlKey) ? ev.shiftKey : true)) { ev.preventDefault(); return issue('battle_stations') }
   if (!ev.metaKey && !ev.ctrlKey) {
     if (k === 'f') return sim.finishRun()
     if (k === 'r') return restartRun()

@@ -18,7 +18,7 @@ const HOOKS = { respawn: () => { resizeCanvas(); sim.reseed(params.seed) } } // 
 const PANELS = [
   { id: 'panel-sheep', title: 'Sheep', categories: ['Sheep', 'Idle', 'Boids', 'Boldness', 'Trot'] },
   { id: 'panel-dog', title: 'Dog', categories: ['Dog', 'Flee / Eye'] },
-  { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Spawn', 'Scoring', 'Debug', 'Sim'], collapsed: true },
+  { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Obstacles', 'Spawn', 'Scoring', 'Debug', 'Sim'], collapsed: true },
 ]
 
 // lil-gui panels (UMD build → window.lil.GUI) — fully generated from SETTINGS,
@@ -59,3 +59,40 @@ function buildGui(settings, params, hooks) {
   return { roots, meta: roots[roots.length - 1] }
 }
 const guis = buildGui(SETTINGS, params, HOOKS)
+
+// The `obstacles` slider beside the dog pad (every page). Owner Q65
+// (2026-11-14): it is an EXACT COUNT of obstacle groups, and courses are
+// RANDOM UNTIL IT IS TOUCHED — a page loads with `random count` on (each
+// course draws its own number, usually very few), and the slider then just
+// shows what this course drew ("2 · random"). Moving it writes
+// params.obstacleFreq, switches params.obstacleRandom off and re-lays the
+// course through HOOKS.respawn; from then on every course gets that many.
+// (Back to random: tick `random count` in Course & Meta → Obstacles.)
+// The SETTINGS entry stays the one source of min/max/step. Pages call
+// syncObstacleSlider() from their per-frame HUD update, which also picks up
+// changes made on the lil-gui / lever side.
+const obstInput = document.getElementById('obst-freq')
+const obstOut = document.getElementById('obst-freq-out')
+function syncObstacleSlider() {
+  if (!obstInput) return
+  const live = typeof sim !== 'undefined' && sim
+  const shown = String(params.obstacleRandom && live ? Math.min(sim.obstacleGroups, +obstInput.max) : params.obstacleFreq)
+  const dragging = document.activeElement === obstInput && obstInput.value !== shown
+  if (!dragging && obstInput.value !== shown) obstInput.value = shown
+  const txt = dragging ? obstInput.value : shown + (params.obstacleRandom ? ' · random' : '')
+  if (obstOut.textContent !== txt) obstOut.textContent = txt
+}
+if (obstInput) {
+  const s = SETTINGS.find((e) => e.key === 'obstacleFreq')
+  obstInput.min = s.min; obstInput.max = s.max; obstInput.step = s.step
+  obstInput.value = params.obstacleFreq
+  obstInput.addEventListener('input', () => { obstOut.textContent = obstInput.value })
+  obstInput.addEventListener('change', () => {
+    params.obstacleFreq = parseInt(obstInput.value, 10)
+    params.obstacleRandom = false
+    for (const r of guis.roots) for (const c of r.controllersRecursive()) if (c._setting && (c._setting.key === 'obstacleFreq' || c._setting.key === 'obstacleRandom')) c.updateDisplay()
+    HOOKS.respawn()
+    obstInput.blur()
+    syncObstacleSlider()
+  })
+}

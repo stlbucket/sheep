@@ -37,6 +37,14 @@ _Avoid_: suction, attraction (the code says `gateAttract`; the word is draw)
 The pasture's perimeter boundary. Sheep are repelled by it; the dog uses it as a
 wall to work sheep against.
 
+**Obstacle**:
+A solid thing standing in the pasture — a small stand of trees or a large rock. Nothing walks through one: a flock flows round it and readily parts in two, and the dog runs round it. How many a pasture carries is drawn per run, usually very few.
+_Avoid_: terrain, tree, prop, hole (a hole is an empty patch of the starting layout, not a thing)
+
+**Cover**:
+What an obstacle gives a sheep standing behind it: out of the dog's sight, so out of his threat, until he comes round.
+_Avoid_: occlusion, shadow, hiding
+
 ### The animals
 
 **Flock**:

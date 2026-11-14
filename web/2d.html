@@ -166,6 +166,10 @@
     white-space: nowrap;
   }
   #controls .herd { display: none; }   /* phone-only — media query below */
+  #controls .obst { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .obst label { color: #7b8894; }
+  #controls .obst input { flex: 1 1 auto; min-width: 0; }
+  #controls .obst #obst-freq-out { color: #9fb0c0; min-width: 9ch; text-align: right; white-space: nowrap; }
   #card {
     display: none;
     position: absolute;
@@ -392,6 +396,11 @@
       <input id="herd-size" type="range">
       <span id="herd-size-out">—</span>
     </div>
+    <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+      <label for="obst-freq">obstacles</label>
+      <input id="obst-freq" type="range">
+      <span id="obst-freq-out">—</span>
+    </div>
   </div>
 </section>
 <section id="side-levers">
@@ -471,6 +480,9 @@ function render(fps) {
   drawFence()
   drawCrush()
 
+  // obstacles — stands of trees / large rocks (solid; the flock parts round them)
+  drawObstacles()
+
   // gate attraction area (POC-v9 V1) — under the sheep, like the dog's presence
   if (params.debug.gateAttract) drawGateAttract()
 
@@ -507,6 +519,7 @@ function render(fps) {
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
+  syncObstacleSlider()
 
   // post-run card on finish (win or Finish button)
   if (sim.run.finished && !cardShown) { showCard(sc); cardShown = true }
@@ -750,6 +763,46 @@ function drawStressMeter() {
 
 // Perimeter fence (P6): four walls with the gate mouth open on sim.gate's
 // side, posts at the mouth, and the pen apron shaded just outside it.
+// Obstacles (owner 2026-11-14): each is a solid disc in §1; what fills it —
+// the crowns of a stand, the boulders of a rock — comes from obstacleItems()
+// (lib, seeded per obstacle), cached per course since it never changes.
+let obstacleArt = { of: null, list: [] }
+function drawObstacles() {
+  if (obstacleArt.of !== sim.obstacles) {
+    obstacleArt = { of: sim.obstacles, list: sim.obstacles.map((o) => ({ o, items: obstacleItems(o) })) }
+  }
+  for (const { o, items } of obstacleArt.list) {
+    // ground shadow / footprint = the collision circle
+    ctx.fillStyle = o.kind === 'rocks' ? 'rgba(0,0,0,0.28)' : 'rgba(10,22,10,0.45)'
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill()
+    for (const it of items) {
+      if (o.kind === 'rocks') {
+        const n = 7, rot = it.tone * 6
+        ctx.beginPath()
+        for (let k = 0; k < n; k++) { // a lumpy heptagon — the wobble is seeded by the tone, so it holds still
+          const a = rot + (k / n) * Math.PI * 2, rr = it.r * (0.82 + 0.18 * Math.sin(it.tone * 40 + k * 2.3))
+          const x = it.x + Math.cos(a) * rr, y = it.y + Math.sin(a) * rr
+          if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y)
+        }
+        ctx.closePath()
+        const v = Math.round(104 + it.tone * 34)
+        ctx.fillStyle = `rgb(${v},${v + 2},${v + 6})`; ctx.fill()
+        ctx.strokeStyle = '#4c5257'; ctx.lineWidth = 1.5; ctx.stroke()
+        ctx.fillStyle = 'rgba(255,255,255,0.10)' // lit top-left face
+        ctx.beginPath(); ctx.arc(it.x - it.r * 0.25, it.y - it.r * 0.25, it.r * 0.45, 0, Math.PI * 2); ctx.fill()
+      } else {
+        ctx.fillStyle = `rgb(${Math.round(34 + it.tone * 18)},${Math.round(86 + it.tone * 34)},${Math.round(40 + it.tone * 14)})`
+        ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2); ctx.fill()
+        ctx.strokeStyle = '#17331a'; ctx.lineWidth = 1; ctx.stroke()
+        ctx.fillStyle = 'rgba(190,230,150,0.16)' // sunlit side of the crown
+        ctx.beginPath(); ctx.arc(it.x - it.r * 0.3, it.y - it.r * 0.3, it.r * 0.5, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#4a3622'                // trunk, seen from above
+        ctx.beginPath(); ctx.arc(it.x, it.y, 1.8, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+  }
+}
+
 function drawFence() {
   const { gateWidth, fenceInset, canvasW, canvasH } = params
   const g = sim.gate, half = gateWidth / 2

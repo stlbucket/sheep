@@ -101,7 +101,7 @@ prototype.
   **Pasture · Gate**. See [`lever-model.md`](./lever-model.md). **Shipped
   2026-08-21 in [POC-v5](../implemented/POC-v5/README.md)** as the Levers
   panel (anchor 88/88 exact, lever layer measured inert at 0.5). *Still open
-  there:* terrain & line-of-sight (unmodelled), split-the-flock as a goal
+  there:* terrain & line-of-sight (first cut shipped 2026-11-14 as [POC-v12 obstacles](../implemented/POC-v12/obstacles.md) — solid stands / rocks that give cover; no lever owns them yet, Q67), split-the-flock as a goal
   type, and the per-lever `/sheep tune` calibration pass — every endpoint is
   still a proposal.
 - **Approach endpoints vs archetypes (parked 2026-08-21, POC-v5 Q27's

@@ -135,6 +135,24 @@ const SETTINGS = [
   { key: 'crushThreshold', category: 'Gate + Crush', label: 'crush threshold', type: 'float', default: 1.5, min: 0.5, max: 8, step: 0.1, unit: '—', description: 'Density×pressure above which sustained crush injures (calibrated P5).', exposed: true },
   { key: 'crushSustain', category: 'Gate + Crush', label: 'crush sustain', type: 'float', default: 0.8, min: 0, max: 3, step: 0.1, unit: 's', description: 'Seconds over threshold before an injury event fires.', exposed: false },
 
+  // Obstacles (owner 2026-11-14): stands of trees / large rocks in the field. Everything but the three force dials respawns.
+  { key: 'obstacleFreq', category: 'Obstacles', label: 'obstacle count', type: 'int', default: 2, min: 0, max: 60, step: 1, unit: 'groups', description: 'EXACTLY how many obstacle groups (a small stand of trees or a few large rocks) every course gets — used while `random count` is off (owner Q65, 2026-11-14). This is what the `obstacles` slider beside the dog pad sets; touching that slider also switches `random count` off. 0 = no obstacles (and a course identical to the pre-obstacle sim). Best-effort on a crowded field.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRandom', category: 'Obstacles', label: 'random count', type: 'boolean', default: true, unit: '—', description: 'On (how a page loads): each course DRAWS its obstacle-group count from 0..`random range top`, heavily skewed low. Off: every course gets exactly `obstacle count`. Moving the `obstacles` slider switches this off; tick it again to go back to random courses.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRangeMax', category: 'Obstacles', label: 'random range top', type: 'int', default: 24, min: 0, max: 60, step: 1, unit: 'groups', description: 'While `random count` is on: the top of the range a course draws its obstacle-group count from. The draw is heavily skewed — most courses land in the lowest 10 % of the range, a few in the middle, a very occasional outlier near the top.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleLowShare', category: 'Obstacles', label: 'low-end share', type: 'float', default: 0.85, min: 0, max: 1, step: 0.05, unit: '—', description: 'Fraction of courses whose obstacle count is drawn from the lowest 10 % of the range. The rest draw 10 % + 90 % · u³ of it — mostly low-middle, rarely near the top.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleGroupMax', category: 'Obstacles', label: 'max group size', type: 'int', default: 3, min: 1, max: 6, step: 1, unit: '—', description: 'Obstacles per group draw uniformly 1..this (the herd\'s spawn-group idea): the members of a group overlap into one clump — a bigger stand, a rock pile.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRadiusMin', category: 'Obstacles', label: 'radius min', type: 'float', default: 20, min: 8, max: 80, step: 1, unit: 'px', description: 'Smallest tree-stand radius. Rocks are `rock scale` of the drawn radius.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRadiusMax', category: 'Obstacles', label: 'radius max', type: 'float', default: 46, min: 8, max: 120, step: 1, unit: 'px', description: 'Largest tree-stand radius.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRockFrac', category: 'Obstacles', label: 'rock share', type: 'float', default: 0.4, min: 0, max: 1, step: 0.05, unit: '—', description: 'Chance a group is large rocks rather than a stand of trees.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleRockScale', category: 'Obstacles', label: 'rock scale', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'A rock\'s radius as a fraction of the stand radius drawn for it.', exposed: true, onChange: 'respawn' },
+  { key: 'obstacleMinGap', category: 'Obstacles', label: 'group min gap', type: 'float', default: 60, min: 20, max: 300, step: 5, unit: 'px', description: 'Minimum EDGE-TO-EDGE distance between obstacles of different groups, and from an obstacle to the fence (best-effort) — always leaves a lane the flock can use.', exposed: true, onChange: 'respawn' },
+  { key: 'w_obstacle', category: 'Obstacles', label: 'obstacle weight', type: 'float', default: 2, min: 0, max: 6, step: 0.1, unit: '—', description: 'Strength of a sheep\'s steering round an obstacle (sidestep + push-off). The obstacle itself is solid whatever this is.', exposed: true },
+  { key: 'obstacleLook', category: 'Obstacles', label: 'look-ahead', type: 'float', default: 70, min: 10, max: 200, step: 5, unit: 'px', description: 'How far short of an obstacle\'s edge a moving sheep starts to sidestep it — to whichever side of its centre it is already on, which is what parts a group in two.', exposed: true },
+  { key: 'r_obstacle', category: 'Obstacles', label: 'obstacle range', type: 'float', default: 22, min: 4, max: 80, step: 1, unit: 'px', description: 'Distance from an obstacle\'s edge at which it pushes sheep straight off (the fence-range idea), and the clearance a sheep aims to pass it by.', exposed: true },
+  { key: 'obstacleCover', category: 'Obstacles', label: 'cover', type: 'float', default: 1, min: 0, max: 1, step: 0.05, unit: '—', description: 'How much of the dog\'s pressure an obstacle takes off a sheep it stands between (line of sight dog → sheep crosses the stand / rock). 1 = a sheep behind cover does not feel him at all, so he has to come round; 0 = he works straight through obstacles. Fades in over the first `cover edge` px of overlap so a sheep at the rim does not flicker.', exposed: true },
+  { key: 'obstacleCoverEdge', category: 'Obstacles', label: 'cover edge', type: 'float', default: 8, min: 1, max: 40, step: 1, unit: 'px', description: 'How deep the dog → sheep sight line must cut into an obstacle before its cover is complete (soft rim).', exposed: true },
+  { key: 'obstacleSplit', category: 'Obstacles', label: 'split ease', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: 'How much of its cohesion a sheep drops while it is working round an obstacle. 1 = the two halves of a parted group ignore each other until they are past; 0 = cohesion fights the split and the group squeezes round one side.', exposed: true },
+
   // Spawn (POC-v5: layout archetypes — F5–F8). Everything here respawns.
   { key: 'spawnLayout', category: 'Spawn', label: 'spawn layout', type: 'enum', options: ['random', 'beside-gate', 'whole-pasture', 'weighted'], default: 'random', unit: '—', description: 'F5: which starting picture the flock is laid out in. `random` draws one of the three archetypes per course (equal thirds, seeded); the others force one — for tuning and verify. Forcing consumes no PRNG draw, so forced beside-gate reproduces POC-v4 courses exactly.', exposed: true, onChange: 'respawn' },
   { key: 'spawnGateClear', category: 'Spawn', label: 'gate clearance', type: 'float', default: 120, min: 0, max: 300, step: 5, unit: 'px', description: 'F8: no spawn-group seed within this distance (+ group spread, for member jitter) of the gate mouth, whatever the archetype — a run never starts with sheep in the mouth or already committed. 0 = off.', exposed: true, onChange: 'respawn' },
@@ -300,6 +318,9 @@ const LEVERS = [
       // POC-v5 spawn layouts (F6–F8): anchor-only profiles until a /sheep tune pass authors endpoints
       spawnGateClear: [120, 120, 120], holeCountMin: [2, 2, 2], holeCountMax: [5, 5, 5], holeRadiusMin: [70, 70, 70], holeRadiusMax: [180, 180, 180],
       holeLobes: [3, 3, 3], focusShare: [0.75, 0.75, 0.75], focusRadius: [150, 150, 150], focusGapScale: [0.5, 0.5, 0.5] } },
+  { key: 'pastureClutter', domain: 'pasture-builder', label: 'Clutter', blurb: 'How much stands in the way (owner Q67, 2026-11-14): how many stands / rocks, how big, and how tight the lanes between them. Moves both the exact count and the top of the random range, so it works in either mode.', respawn: true,
+    ends: { 0: 'bare grass, nothing to go round', 1: 'a wooded, rocky pasture with tight lanes' },
+    params: { obstacleFreq: [0, 2, 12], obstacleRangeMax: [0, 24, 60], obstacleGroupMax: [1, 3, 5], obstacleRadiusMin: [14, 20, 30], obstacleRadiusMax: [30, 46, 70], obstacleMinGap: [90, 60, 36] } },
   { key: 'pastureStrictness', domain: 'pasture-builder', label: 'Strictness', blurb: 'How harshly this course judges — how a fault is WEIGHED, not what a fault is (Judging stays raw).', respawn: false,
     ends: { 0: 'zen, nothing punished', 1: 'championship trial' },
     params: { w_time: [0.02, 0.1, 0.3], w_line: [0.08, 0.4, 1.2], w_cohesion: [0.08, 0.4, 1.2], w_calm: [0.12, 0.6, 1.8] } },
@@ -316,6 +337,7 @@ const LEVER_NOT_LEVERED = {
   draws: ['seed', 'randomSeedOnLoad', 'spawnLayout'], // a draw, not a dial (F4/F5)
   judging: ['injuryWeight', 'lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
   parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
+  obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge'], // owner 2026-11-14 — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
   // plus every `debug.*` render toggle
 }
 const SETTING_BY_KEY = Object.fromEntries(SETTINGS.map((e) => [e.key, e]))
@@ -537,6 +559,36 @@ function distToHull(hull, pt) {
   return inside ? 0 : best
 }
 
+// What an obstacle LOOKS like, derived from its own seed — the trees of a stand
+// or the boulders of a rock, as discs {x, y, r, tone} inside the obstacle's
+// collision circle. Pure data (no DOM), so all three pages draw the same
+// stand; the sim itself never reads it.
+function obstacleItems(o) {
+  const rnd = makePRNG(o.seed), items = []
+  if (o.kind === 'rocks') {
+    items.push({ x: o.x, y: o.y, r: o.r * 0.95, tone: rnd() })
+    const extra = Math.floor(rnd() * 3)
+    for (let k = 0; k < extra; k++) {
+      const a = rnd() * Math.PI * 2, r = o.r * (0.25 + rnd() * 0.2)
+      items.push({ x: o.x + Math.cos(a) * (o.r - r), y: o.y + Math.sin(a) * (o.r - r), r, tone: rnd() })
+    }
+    return items
+  }
+  const n = Math.max(2, Math.min(9, Math.round((o.r / 14) * (o.r / 14) * 0.9)))
+  for (let k = 0; k < n; k++) {
+    const r = Math.min(o.r * 0.75, 9 + rnd() * 6)
+    let best = null, bestD = -1
+    for (let t = 0; t < 8; t++) { // best-of-8: spread the crowns over the stand
+      const a = rnd() * Math.PI * 2, d = (o.r - r * 0.8) * Math.sqrt(rnd())
+      const c = { x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d }
+      const near = items.length ? Math.min(...items.map((q) => Math.hypot(q.x - c.x, q.y - c.y))) : Infinity
+      if (near > bestD) { bestD = near; best = c }
+    }
+    items.push({ x: best.x, y: best.y, r, tone: rnd() })
+  }
+  return items
+}
+
 // The dog's command vocabulary (POC-v6: `easy` replaced `stand`). §3 issues
 // these; anything else is treated as a recall. POC-v10: the C11/D4 variants
 // are NOT new verbs — they ride setCommand's opts ({easy} on a flank,
@@ -550,6 +602,7 @@ class FlockSim {
     this.p = params
     this.ticks = 0
     this.sheep = []
+    this.obstacles = []
     this.reseed(params.seed)
     // dog: a steering agent. `command` sets target/facing/intensity (P4); facing
     // is derived (eye on the flock's GCM), never manually steered. The home
@@ -564,6 +617,7 @@ class FlockSim {
       driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
       impulse: null, impulseFactor: 1,
       flankEasy: false, lieSide: 0, // POC-v10 variants: C11 gentle flank / D4 offset down
+      avoidSide: 0,                 // which way round the obstacle he is currently skirting (0 = clear)
     }
     this.faceFlock()      // F1: never spawn staring at a fence
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
@@ -797,8 +851,10 @@ class FlockSim {
   reseed(seed) {
     this.rng = makePRNG(seed >>> 0)
     this.placeGate()
+    this.placeObstacles(seed >>> 0)
     this.spawn()
     if (this.dog) {
+      this.dog.avoidSide = 0
       this.faceFlock()             // F1 — after spawn(): the NEW herd's GCM
       this.setCommand('that_ll_do') // a new course starts at heel — a bare reseed() used to
     }                               // inherit the previous drive (bit the v5 P6 harness)
@@ -836,6 +892,172 @@ class FlockSim {
       this.dog.pos = { ...this.home }
       this.dog.vel = { x: 0, y: 0 }
     }
+  }
+
+  // Obstacles (owner 2026-11-14): small stands of trees / large rocks in the
+  // field. Laid out the way the herd is — GROUPS of 1..obstacleGroupMax,
+  // group seeds rejection-sampled a minimum gap apart, members clumped round
+  // their seed (here overlapping, so a group reads as one bigger stand or a
+  // rock pile). Each obstacle is a solid disc {x, y, r, kind, group, seed}.
+  //
+  // How MANY groups: exactly obstacleFreq — or, with obstacleRandom on (the
+  // load default), a draw from 0..obstacleRangeMax, heavily skewed low:
+  // obstacleLowShare of courses land in the lowest 10 % of the range, the
+  // rest at 10 % + 90 % · u³ — mostly low-middle, a very occasional outlier.
+  //
+  // PRNG-stream discipline: obstacles draw from their OWN stream (derived
+  // from the seed), never `this.rng` — so the gate, home post and spawn side
+  // of a seed do not move with the obstacle settings, and a course with no
+  // obstacles replays the pre-obstacle course sheep for sheep.
+  placeObstacles(seed) {
+    const p = this.p, r = this.playRect(), gt = this.gate
+    const rnd = makePRNG((seed ^ 0x9e3779b9) >>> 0)
+    this.obstacles = []
+    let groups = Math.max(0, Math.round(p.obstacleFreq))  // exact count (Q65) …
+    if (p.obstacleRandom) {                                // … unless the course draws it
+      const top = Math.max(0, Math.round(p.obstacleRangeMax))
+      const low = rnd() < p.obstacleLowShare, u = rnd()
+      groups = Math.round(top * (low ? 0.1 * u : 0.1 + 0.9 * u * u * u))
+    }
+    this.obstacleGroups = groups
+    const rMin = Math.min(p.obstacleRadiusMin, p.obstacleRadiusMax), rMax = Math.max(p.obstacleRadiusMin, p.obstacleRadiusMax)
+    const gap = p.obstacleMinGap
+    const gateClear = Math.max(p.spawnGateClear, p.gateAttractR, 100)
+    // a disc may sit here: inside the fence with a lane to spare, off the gate
+    // mouth and its approach, off the handler's post, a gap from other groups
+    const fits = (c, group) => {
+      if (c.x - c.r < r.x0 + gap || c.x + c.r > r.x1 - gap || c.y - c.r < r.y0 + gap || c.y + c.r > r.y1 - gap) return false
+      if (Math.hypot(c.x - gt.x, c.y - gt.y) < gateClear + c.r) return false
+      if (Math.hypot(c.x - this.home.x, c.y - this.home.y) < 50 + c.r) return false
+      for (const o of this.obstacles) if (o.group !== group && Math.hypot(c.x - o.x, c.y - o.y) < c.r + o.r + gap) return false
+      return true
+    }
+    for (let g = 0; g < groups; g++) {
+      const kind = rnd() < p.obstacleRockFrac ? 'rocks' : 'trees'
+      const size = 1 + Math.floor(rnd() * Math.max(1, p.obstacleGroupMax))
+      const radius = () => (rMin + rnd() * (rMax - rMin)) * (kind === 'rocks' ? p.obstacleRockScale : 1)
+      const members = []
+      for (let m = 0; m < size; m++) {
+        let placed = null
+        for (let t = 0; t < (m === 0 ? 60 : 12) && !placed; t++) {
+          const rad = radius()
+          let c
+          if (m === 0) c = { x: r.x0 + rnd() * (r.x1 - r.x0), y: r.y0 + rnd() * (r.y1 - r.y0), r: rad }
+          else { // clumped onto an earlier member, overlapping it by 10–40 % of the smaller radius
+            const b = members[Math.floor(rnd() * members.length)], a = rnd() * Math.PI * 2
+            const d = b.r + rad - Math.min(b.r, rad) * (0.1 + rnd() * 0.3)
+            c = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d, r: rad }
+          }
+          if (fits(c, g)) placed = c
+        }
+        if (!placed) { if (m === 0) break; else continue } // best-effort: a crowded field just gets fewer
+        const o = { x: placed.x, y: placed.y, r: placed.r, kind, group: g, seed: Math.floor(rnd() * 4294967296) }
+        members.push(o); this.obstacles.push(o)
+      }
+    }
+  }
+
+  // Solid obstacles: move `pos` out of every disc (+pad) it is inside and,
+  // if a velocity is given, drop its into-the-obstacle component (the fence
+  // clamp's idea, on a circle). Two passes settle a point between two
+  // overlapping members of a clump. Returns true if anything moved.
+  pushOut(pos, pad, vel) {
+    let moved = false
+    for (let pass = 0; pass < 2; pass++) {
+      for (const o of this.obstacles) {
+        let dx = pos.x - o.x, dy = pos.y - o.y, d = Math.hypot(dx, dy)
+        const R = o.r + pad
+        if (d >= R) continue
+        if (d < 1e-6) { dx = 1; dy = 0; d = 1 }
+        const nx = dx / d, ny = dy / d
+        pos.x = o.x + nx * R; pos.y = o.y + ny * R
+        if (vel) { const vn = vel.x * nx + vel.y * ny; if (vn < 0) { vel.x -= nx * vn; vel.y -= ny * vn } }
+        moved = true
+      }
+    }
+    return moved
+  }
+
+  // A sheep's way round obstacles. Two parts, both unit-scale like the other
+  // forces: (1) within r_obstacle of an edge the obstacle pushes straight off
+  // (the fence's shape); (2) a MOVING sheep whose heading would carry it into
+  // an obstacle inside obstacleLook sidesteps — to whichever side of the
+  // obstacle's centre it already is, so the two halves of a group peel off
+  // opposite ways (a dead-centre sheep is sent by index parity). Returns the
+  // force plus `a` (0–1, how hard it is working round something), which
+  // integrate() uses to relax cohesion — that is what lets the group part.
+  obstacleForce(i) {
+    const s = this.sheep[i], p = this.p
+    let fx = 0, fy = 0, a = 0
+    if (!this.obstacles.length) return { x: 0, y: 0, a: 0 }
+    const sp = Math.hypot(s.vel.x, s.vel.y)
+    const hx = sp > 1 ? s.vel.x / sp : 0, hy = sp > 1 ? s.vel.y / sp : 0
+    for (const o of this.obstacles) {
+      const rx = o.x - s.pos.x, ry = o.y - s.pos.y
+      const d = Math.hypot(rx, ry), edge = d - o.r
+      if (edge > Math.max(p.obstacleLook, p.r_obstacle)) continue
+      if (edge < p.r_obstacle && d > 1e-4) {
+        const k = smoothstep(p.r_obstacle, 0, Math.max(0, edge))
+        fx -= (rx / d) * k; fy -= (ry / d) * k
+        if (k > a) a = k
+      }
+      if (sp <= 1 || edge > p.obstacleLook) continue
+      const along = rx * hx + ry * hy
+      if (along <= 0) continue                    // behind it / already past
+      const cross = hx * ry - hy * rx             // > 0: the centre lies to the +angle side of the heading
+      const reach = o.r + p.r_obstacle, lat = Math.abs(cross)
+      if (lat >= reach) continue                  // the heading already clears it
+      const side = cross > 1e-3 ? 1 : cross < -1e-3 ? -1 : (i % 2 ? 1 : -1)
+      const k = smoothstep(p.obstacleLook, 0, Math.max(0, edge)) * (1 - 0.5 * lat / reach)
+      fx += hy * side * k; fy -= hx * side * k    // perpendicular to the heading, away from the centre
+      if (k > a) a = k
+    }
+    return { x: fx, y: fy, a }
+  }
+
+  // How hidden `b` is from `a` (0 = clear sight, 1 = fully behind cover): the
+  // deepest cut the a→b sight line makes into any obstacle, eased in over
+  // obstacleCoverEdge px so a sheep at the rim of a stand does not flicker.
+  coverBetween(a, b) {
+    let cover = 0
+    for (const o of this.obstacles) {
+      const depth = o.r - distToSeg(o, a, b)
+      if (depth <= 0) continue
+      const c = smoothstep(0, this.p.obstacleCoverEdge, depth)
+      if (c > cover) { cover = c; if (cover >= 1) break }
+    }
+    return cover
+  }
+
+  // The dog's way round obstacles: bend the heading `dir` (unit) to the
+  // tangent of the nearest obstacle blocking the next `reach` px, re-testing
+  // so a clump of overlapping discs is skirted as one shape. The side he
+  // goes round is chosen once and HELD (dog.avoidSide) until the way is
+  // clear, so he never dithers in the notch between two members.
+  dogDetour(pos, dir, reach) {
+    const d = this.dog, pad = this.p.L
+    let side = d.avoidSide, out = dir, blocked = false
+    for (let pass = 0; pass < 4; pass++) {
+      let best = null, bestHit = Infinity
+      for (const o of this.obstacles) {
+        const rx = o.x - pos.x, ry = o.y - pos.y, R = o.r + pad
+        const along = rx * out.x + ry * out.y
+        if (along <= 0) continue
+        const cross = out.x * ry - out.y * rx
+        if (Math.abs(cross) >= R) continue
+        const hit = along - Math.sqrt(R * R - cross * cross) // distance to where the path enters the disc
+        if (hit > reach || hit >= bestHit) continue
+        bestHit = hit; best = { rx, ry, R, cross }
+      }
+      if (!best) break
+      blocked = true
+      if (!side) side = best.cross >= 0 ? -1 : 1
+      const dist = Math.hypot(best.rx, best.ry)
+      const ang = Math.atan2(best.ry, best.rx) + side * (Math.asin(Math.min(1, best.R / Math.max(dist, 1e-6))) + 0.04)
+      out = { x: Math.cos(ang), y: Math.sin(ang) }
+    }
+    d.avoidSide = blocked ? side : 0
+    return out
   }
 
   // Spawn pipeline (POC-v5 P1, F5–F8): `pickLayout` → one ARCHETYPE SAMPLER
@@ -961,7 +1183,10 @@ class FlockSim {
     // F8: shared clearance — no group seed within spawnGateClear (+ the member
     // jitter radius) of the gate mouth, any archetype. 0 disables.
     const clearR = p.spawnGateClear > 0 ? p.spawnGateClear + p.clusterSpread : 0
-    const clear = (c) => clearR === 0 || Math.hypot(c.x - gt.x, c.y - gt.y) >= clearR
+    const clearGate = (c) => clearR === 0 || Math.hypot(c.x - gt.x, c.y - gt.y) >= clearR
+    // …and no group seed inside (or a member-jitter short of) an obstacle. With
+    // no obstacles this rejects nothing, so the draws are the old ones exactly.
+    const clear = (c) => clearGate(c) && this.obstacles.every((o) => Math.hypot(c.x - o.x, c.y - o.y) >= o.r + p.clusterSpread * 0.5)
     // H1 (P8): group sizes draw uniformly 1..clusterSizeMax — singletons are
     // legal idle groups, so no lone-remainder guard. Group COUNT still derives
     // from sheepCount (draw until the herd is exhausted).
@@ -1041,11 +1266,13 @@ class FlockSim {
     // uniform disc jitter — bounded (≤ clusterSpread), so adjacent groups can't
     // chain into one cluster the way gaussian tails would
     const jAng = this.rng() * Math.PI * 2, jRad = p.clusterSpread * Math.sqrt(this.rng())
+    const pos = {
+      x: clamp(seed.x + Math.cos(jAng) * jRad, r.x0, r.x1),
+      y: clamp(seed.y + Math.sin(jAng) * jRad, r.y0, r.y1),
+    }
+    this.pushOut(pos, 3) // a member jittered into a stand / rock stands beside it instead
     this.sheep.push({
-      pos: {
-        x: clamp(seed.x + Math.cos(jAng) * jRad, r.x0, r.x1),
-        y: clamp(seed.y + Math.sin(jAng) * jRad, r.y0, r.y1),
-      },
+      pos,
       vel: { x: 0, y: 0 },
       group,                              // spawn-group id — idle cohesion is same-group only (A5)
       wanderer: this.rng() < p.wandererFrac, // A3: the drifting minority
@@ -1410,6 +1637,9 @@ class FlockSim {
     }
     d.atHeel = d.command === 'that_ll_do' && vec2.dist(d.pos, d.owner) < 12
 
+    // Obstacles: a target that falls inside a stand / rock moves to its edge,
+    // and the heading below bends round whatever blocks the way there.
+    if (this.obstacles.length) this.pushOut(d.target, p.L + 2)
     // arrive-seek: slow within arriveR so the orbit doesn't jitter / overshoot
     const to = vec2.sub(d.target, d.pos)
     const dist = vec2.len(to)
@@ -1422,9 +1652,11 @@ class FlockSim {
                : d.flankEasy && (d.command === 'come_by' || d.command === 'away') ? p.dogVMax * p.flankEasySpeedFrac // C11 (POC-v10)
                : p.dogVMax
     const speed = dist < arriveR ? vmax * (dist / arriveR) : vmax
-    d.vel = dist > 0.5 ? vec2.scale(vec2.norm(to), Math.min(speed, dist / dt))
+    const dir = dist > 0.5 && this.obstacles.length ? this.dogDetour(d.pos, vec2.norm(to), dist) : vec2.norm(to)
+    d.vel = dist > 0.5 ? vec2.scale(dir, Math.min(speed, dist / dt))
                        : { x: 0, y: 0 }
     d.pos = vec2.add(d.pos, vec2.scale(d.vel, dt))
+    if (this.obstacles.length) this.pushOut(d.pos, p.L * 0.5, d.vel) // solid for the dog too
     const r = this.playRect()             // the dog stays in the field (no pen exit)
     d.pos.x = Math.max(r.x0, Math.min(r.x1, d.pos.x))
     d.pos.y = Math.max(r.y0, Math.min(r.y1, d.pos.y))
@@ -1502,6 +1734,9 @@ class FlockSim {
       const eye = p.ambient * gA + (1 - p.ambient) * gC * Math.pow(cosT, kEye) // = g·eye of v6 when Rc = R_flee
       T = eye * d.intensity * (d.impulseFactor || 1)          // E3 from easy scales the drive eye (POC-v6 Q32)
     }
+    // Cover: a stand / rock between the dog and this sheep hides it from him —
+    // the pressure fades by how deep the sight line cuts into the obstacle.
+    if (T > 0 && p.obstacleCover > 0 && this.obstacles.length) T *= 1 - p.obstacleCover * this.coverBetween(d.pos, a.pos)
     a.stress = T
     const hold = a.boldness * p.boldnessTheta
 
@@ -1556,6 +1791,7 @@ class FlockSim {
     const fAli = this.alignment(i, nbrs)
     const fFlee = this.flee(i, dt)
     const fFen = this.fenceForce(s.pos)
+    const fObs = this.obstacleForce(i) // round the stands / rocks; .a relaxes cohesion below
     // Commitment funnel (P7 — G1): a WORKED sheep (not idle; the B1/B2
     // hysteresis keeps it alert ~calmDelay after pressure drops, which covers
     // the last body-lengths with no dog) inside gateApproachR with real
@@ -1699,12 +1935,13 @@ class FlockSim {
     // (P3 adds flee, P7 fence — summed here.)
     let accel = { x: 0, y: 0 }
     accel = vec2.add(accel, vec2.scale(fSep, p.w_sep))
-    accel = vec2.add(accel, vec2.scale(fCoh, p.w_coh))
+    accel = vec2.add(accel, vec2.scale(fCoh, p.w_coh * (1 - fObs.a * p.obstacleSplit))) // a sheep working round an obstacle lets go of the group → it parts in two
     accel = vec2.add(accel, vec2.scale(fAli, p.w_align))
     accel = vec2.add(accel, vec2.scale(fGrz, p.w_graze))
     accel = vec2.add(accel, vec2.scale(fAvoid, p.w_avoid))
     accel = vec2.add(accel, vec2.scale(fFlee, p.w_flee))
     accel = vec2.add(accel, vec2.scale(fFen, p.w_fence))
+    accel = vec2.add(accel, vec2.scale(fObs, p.w_obstacle))
     accel = vec2.add(accel, vec2.scale(fThrough, p.w_through))
     accel = vec2.add(accel, vec2.scale(fGate, p.w_gateAttract))
     accel = vec2.add(accel, vec2.scale(fTrot, p.w_trot))
@@ -1718,6 +1955,7 @@ class FlockSim {
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
+    if (this.obstacles.length) this.pushOut(s.pos, 2, s.vel) // obstacles are solid
 
     // hard boundary clamp + zero the outward velocity component — EXCEPT
     // outward through the gate mouth (P6): a sheep carried past the wall line

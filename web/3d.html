@@ -162,6 +162,10 @@
   #controls .herd label { color: #7b8894; }
   #controls .herd input { flex: 1 1 auto; min-width: 0; }
   #controls .herd #herd-size-out { color: #9fb0c0; min-width: 3ch; text-align: right; }
+  #controls .obst { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .obst label { color: #7b8894; }
+  #controls .obst input { flex: 1 1 auto; min-width: 0; }
+  #controls .obst #obst-freq-out { color: #9fb0c0; min-width: 9ch; text-align: right; white-space: nowrap; }
   #card {
     display: none;
     position: absolute;
@@ -314,6 +318,11 @@
       <label for="herd-size">herd</label>
       <input id="herd-size" type="range">
       <span id="herd-size-out">—</span>
+    </div>
+    <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+      <label for="obst-freq">obstacles</label>
+      <input id="obst-freq" type="range">
+      <span id="obst-freq-out">—</span>
     </div>
   </div>
 </section>
@@ -513,6 +522,7 @@ const gatePostGeo = new THREE.BoxGeometry(3.2, 17, 3.2).translate(0, 8.5, 0)
 const flagGeo = new THREE.PlaneGeometry(7, 4).translate(3.5, 0, 0)
 const trunkGeo = new THREE.CylinderGeometry(2.2, 3.2, 22, 6).translate(0, 11, 0)
 const crownGeo = new THREE.IcosahedronGeometry(1, 1)
+const rockGeo = new THREE.DodecahedronGeometry(1, 0)
 const course = { group: new THREE.Group(), disposables: [], sig: '', gate: null, slots: [], nextSlot: 0, paddock: null, flags: [], bounds: null, dims: '' }
 scene.add(course.group)
 
@@ -646,6 +656,34 @@ function rebuildCourse() {
     crowns.setColorAt(i, col.setHSL(0.27 + t.tone * 0.08, 0.42, 0.26 + t.tone * 0.1))
   })
   for (const im of [trunks, crowns]) { im.castShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+
+  // obstacles inside the pasture (owner 2026-11-14): the sim's solid discs, dressed
+  // from obstacleItems() — a stand's trees, a rock's boulders (same seeds as the 2D page)
+  {
+    const stand = [], rocks = []
+    for (const o of sim.obstacles) for (const it of obstacleItems(o)) (o.kind === 'rocks' ? rocks : stand).push(it)
+    const oc = new THREE.Color()
+    if (stand.length) {
+      const oTrunks = add(new THREE.InstancedMesh(trunkGeo, MAT.trunk, stand.length))
+      const oCrowns = add(new THREE.InstancedMesh(crownGeo, MAT.crown, stand.length))
+      stand.forEach((t, i) => {
+        const size = t.r * 1.15, k = (0.8 + t.tone * 0.5) * size / 14
+        m.compose(new V3(t.x, 0, t.y), q.identity(), new V3(k * 0.7, k, k * 0.7)); oTrunks.setMatrixAt(i, m)
+        m.compose(new V3(t.x, 18 * k + size * 0.7, t.y), q.setFromAxisAngle(AX_Y, t.tone * 6), new V3(size, size * 1.25, size)); oCrowns.setMatrixAt(i, m)
+        oCrowns.setColorAt(i, oc.setHSL(0.27 + t.tone * 0.08, 0.45, 0.24 + t.tone * 0.1))
+      })
+      for (const im of [oTrunks, oCrowns]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+    }
+    if (rocks.length) {
+      const oRocks = add(new THREE.InstancedMesh(rockGeo, MAT.crown, rocks.length))
+      rocks.forEach((t, i) => {
+        const h = t.r * (0.55 + t.tone * 0.35)
+        m.compose(new V3(t.x, h * 0.35, t.y), q.setFromEuler(new THREE.Euler(t.tone * 0.5 - 0.25, t.tone * 6, 0.2 - t.tone * 0.4)), new V3(t.r, h, t.r)); oRocks.setMatrixAt(i, m)
+        oRocks.setColorAt(i, oc.setHSL(0.09, 0.06, 0.42 + t.tone * 0.16))
+      })
+      oRocks.castShadow = true; oRocks.receiveShadow = true; oRocks.frustumCulled = false; course.disposables.push(oRocks)
+    }
+  }
 
   // sun + shadow box follow the field
   const R = Math.hypot(p.canvasW, p.canvasH) / 2 + 260
@@ -1077,6 +1115,7 @@ function updateHud(fps) {
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
+  syncObstacleSlider()
   let sum = 0
   for (const s of sim.sheep) sum += s.stress
   const mean = sim.sheep.length ? sum / sim.sheep.length : 0
