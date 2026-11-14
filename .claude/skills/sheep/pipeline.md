@@ -75,7 +75,9 @@ Execute the plan — this is the runner behavior `plan.md` describes.
    touch-ups). Find the **first unchecked phase** in the Progress tracker, or
    the explicitly requested phase.
 2. Follow that phase file exactly: implement its Tasks in
-   `.claude/sheep/poc/sheep-poc.html`, keeping every global invariant.
+   `web/` (sim → `web/lib/sheep-sim.js`, shared by every page; render / input
+   → the page concerned, `web/2d.html` by default), keeping every global
+   invariant.
 3. Run its **Verify** steps. Use [verify.md](verify.md) (real browser) for any
    check phrased as observable on-page behavior — don't just eyeball the code.
 4. On pass: tick the phase in the Progress tracker, **STOP, and report** what

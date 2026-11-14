@@ -1,6 +1,7 @@
 # /sheep verify — browser acceptance check of the PoC
 
-Drive `.claude/sheep/poc/sheep-poc.html` in a real browser and evaluate it
+Drive `web/2d.html` (or `web/3d.html` / `web/3d-assault.html` when the check is
+about those views) in a real browser and evaluate it
 against acceptance criteria. Prefer **measured** checks over screenshot
 eyeballing; use screenshots to confirm the qualitative read and to show the
 owner.
@@ -20,7 +21,7 @@ browser, and decide for each one how it will be measured.
 
 1. Load the browser tools first — they are deferred:
    `ToolSearch "select:mcp__MCP_DOCKER__browser_navigate,mcp__MCP_DOCKER__browser_evaluate,mcp__MCP_DOCKER__browser_take_screenshot,mcp__MCP_DOCKER__browser_console_messages,mcp__MCP_DOCKER__browser_click"`.
-2. Navigate to `file:///Users/…/.claude/sheep/poc/sheep-poc.html` (absolute
+2. Navigate to `file:///Users/…/web/2d.html` (absolute
    path). Note: lil-gui comes from a CDN, so no-internet = GUI missing; the
    sim itself must still run — a GUI-only failure is not a sim failure.
 3. Check `browser_console_messages` immediately: **zero console errors** is a
@@ -28,7 +29,8 @@ browser, and decide for each one how it will be measured.
 
 ## Measuring — read the sim, don't squint at pixels
 
-The PoC is one plain `<script>`, so sim state (`params`, the sheep array, dog,
+The PoC is plain `<script>`s sharing one global scope (`web/lib/sheep-sim.js`
++ the page's own), so sim state (`params`, the sheep array, dog,
 score) is reachable from `browser_evaluate` — check what the top-level names
 actually are in §1/§4 first. Turn each criterion into a number:
 
