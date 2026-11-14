@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sheep PoC</title>
+<!--
+  HOME — pick a version. Every page here runs the same herding physics
+  (lib/sheep-sim.js); they differ only in how it is drawn and what is added:
+
+    2d.html          the original canvas page, with levers + debug tools
+    3d.html          the same sim seen through three.js
+    3d-assault.html  3d.html + the wolf-mortar teams (lib/assault-sim.js)
+
+  Plain links, no script — works from file:// by double-click.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: #14181c;
+    color: #cdd6df;
+    font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 16px;
+  }
+  header { text-align: center; margin-bottom: 36px; }
+  h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; color: #e6edf3; }
+  header p { margin: 0; color: #7b8894; font-size: 13px; text-wrap: balance; }
+  .versions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 960px; }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    background: #101418;
+    border: 1px solid #232b32;
+    border-radius: 8px;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .card:hover, .card:focus-visible { border-color: #7fd79a; transform: translateY(-2px); outline: none; }
+  .card .icon { font-size: 34px; line-height: 1; }
+  .card h2 { margin: 4px 0 0; font-size: 17px; font-weight: 600; color: #e6edf3; }
+  .card p { margin: 0; font-size: 13px; color: #9fb0c0; flex: 1 1 auto; }
+  .card .tags { font-size: 11px; color: #7b8894; }
+  .card .go { margin-top: 6px; font-size: 13px; color: #7fd79a; }
+  .card.assault:hover, .card.assault:focus-visible { border-color: #e0a98a; }
+  .card.assault .go { color: #e0a98a; }
+  footer { margin-top: 32px; font-size: 12px; color: #7b8894; text-align: center; }
+  kbd { padding: 0 4px; border: 1px solid #3a4650; border-radius: 3px; font: inherit; font-size: 11px; color: #9fb0c0; }
+  @media (max-width: 720px) {
+    body { padding: 28px 16px; }
+    .versions { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐑 Sheep PoC</h1>
+  <p>Work the dog, gather the flock, pen it through the gate. Pick a version.</p>
+</header>
+
+<main class="versions">
+  <a class="card" href="2d.html">
+    <div class="icon">🗺️</div>
+    <h2>2D</h2>
+    <p>The original top-down field. Every debug overlay, the tuning levers and the state-capture tool live here.</p>
+    <div class="tags">canvas · levers · capture ⎘</div>
+    <div class="go">play 2D →</div>
+  </a>
+  <a class="card" href="3d.html">
+    <div class="icon">🏞️</div>
+    <h2>3D</h2>
+    <p>The same simulation in a three.js pasture, with orbit, top, handler and dog cameras.</p>
+    <div class="tags">three.js · 4 cameras</div>
+    <div class="go">play 3D →</div>
+  </a>
+  <a class="card assault" href="3d-assault.html">
+    <div class="icon">🐺</div>
+    <h2>3D · Assault</h2>
+    <p>The 3D pasture under fire: two-wolf mortar teams come over the hills and shell the flock while you pen it.</p>
+    <div class="tags">three.js · wolf mortars</div>
+    <div class="go">play Assault →</div>
+  </a>
+</main>
+
+<footer>
+  same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do
+</footer>
+</body>
+</html>
