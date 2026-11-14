@@ -189,6 +189,21 @@
   #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
   #card .row span:last-child { color: #e08a8a; }
   #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
+  #card .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  #card .actions button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  #card .actions button:hover { background: #2c353d; }
+  #card .actions button.primary { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #card .actions button.primary:hover { background: #38704a; }
+  #card .actions button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-left: 4px; }
   /* [throwaway] POC-v11: every panel stacks inside the levers section (napkin
      bottom-right box); the Advanced disclosure still gates the raw panels. */
   #side-levers { padding: 0; border: none; background: none; display: flex; flex-direction: column; }
@@ -456,10 +471,19 @@ function showCard(sc) {
     row('Line — off ideal path', sc.line) +
     row('Cohesion — splits / stragglers', sc.cohesion) +
     row(`Calm — stress${sc.raw.injuries ? ` · ${sc.raw.injuries} injured` : ''}`, sc.calm) +
-    `<div class="foot">penned ${sc.penned}/${sim.sheep.length} · press <b>R</b> to run again</div>`
+    `<div class="foot">penned ${sc.penned}/${sim.sheep.length}</div>` +
+    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R replays this same course">dismiss</button>` +
+    `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles (R replays this same course instead)">play again</button></div>`
   el.style.display = 'block'
 }
 function hideCard() { document.getElementById('card').style.display = 'none'; cardShown = false }
+// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = a fresh random course (the reseed ↻ button)
+document.getElementById('card').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button[data-card]')
+  if (!b) return
+  if (b.dataset.card === 'again') newCourse()
+  else document.getElementById('card').style.display = 'none'
+})
 
 function render(fps) {
   const { canvasW, canvasH, fenceInset } = params

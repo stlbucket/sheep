@@ -1464,16 +1464,16 @@ function showCard(sc) {
     row('Cohesion — splits / stragglers', sc.cohesion) +
     row(`Calm — stress${sc.raw.injuries ? ` · ${sc.raw.injuries} injured` : ''}`, sc.calm) +
     `<div class="foot">penned ${sc.penned}/${sim.sheep.length}${lost ? ` · ${lost} lost to mortars` : ''}${assault.wolvesDead ? ` · ${assault.wolvesDead} ${assault.wolvesDead > 1 ? 'wolves' : 'wolf'} shot` : ''}</div>` +
-    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R still runs again">dismiss</button>` +
-    `<button data-card="again" class="primary" title="restart the run on the same course">play again <kbd>R</kbd></button></div>`
+    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R replays this same course">dismiss</button>` +
+    `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles (R replays this same course instead)">play again</button></div>`
   el.style.display = 'block'
 }
 function hideCard() { document.getElementById('card').style.display = 'none'; cardShown = false }
-// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = R
+// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = a fresh random course (the reseed ↻ button)
 document.getElementById('card').addEventListener('click', (ev) => {
   const b = ev.target.closest('button[data-card]')
   if (!b) return
-  if (b.dataset.card === 'again') restartRun()
+  if (b.dataset.card === 'again') newCourse()
   else document.getElementById('card').style.display = 'none'
 })
 
