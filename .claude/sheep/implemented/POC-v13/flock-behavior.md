@@ -12,6 +12,8 @@ Status: **implemented** 2026-11-16. Extends [POC-v9 flock-behavior](../POC-v9/fl
 | **G5** | While a trotting line's **leaders are heading gate-ward**, the gate's draw area **grows a cone** from the mouth along the axis toward them, and shrinks back when there are none. The cone never grows past the leaders, and **grazing sheep never feel it**. A trot lead that the gate is drawing bends its line into the mouth. |
 
 | **T8** | A trot only starts in a group the dog is **actually working**: a real share of it must be properly pressed, not one sheep on the faint edge of his eye. Only sheep of **that group** file in behind, and a **grazing sheep is never swept in** — a group across the field does not trot off because the dog walked on somewhere else. Applies to T1 and T5. |
+| **T9** | **Gaits.** An alert sheep **walks** at up to 60 px/s. Every ordinary trot is a **slow trot** at up to 80 px/s; only a whole-group bolt (T2) runs at the full trot pace, and a panic sprint is faster still. The dog's walk-on matches the sheep's walk. |
+| **T10** | The slow trot **develops under a drive**: once the dog has been on walk-on / easy for a few seconds, the **front-and-centre** sheep of the group he is driving may break into it, and the others of that group follow. Without a sustained walk-on only the T5 turn starts a trot. |
 
 T3's fence stop is unchanged and still drops the trot outright (now also starting the T6 rest).
 
@@ -20,7 +22,10 @@ T3's fence stop is unchanged and still drops the trot outright (now also startin
 | Key | Label | Default | Rule |
 |---|---|---|---|
 | `trotPressMin` | trot pressure level | 0.1 | T8 |
-| `trotPressFrac` | trot pressed share | 0.25 | T8 |
+| `trotPressFrac` | trot pressed share | 0.15 | T8 |
+| `walkSpeed` | walk speed | 60 px/s | T9 |
+| `trotSlowSpeed` | slow trot speed | 80 px/s | T9 |
+| `trotDriveDelay` | trot drive delay | 3 s | T10 |
 | `trotTurnWindow` | trot turn window | 1.5 s | T5 |
 | `trotTurnProb` | trot turn chance | 0.9 /s | T5 |
 | `trotMaxDur` | trot time limit | 4 s | T6 |
@@ -39,7 +44,8 @@ Setting `trotTurnWindow`, `trotMaxDur`, `trotRest`, `trotWindDown` and `gateCone
 | `trotGroupMin` | 20 → 12 | "a sizable group" — a collected dozen can stream off |
 | `trotLeadCount` | 3 → 5 | a broader front to the stream |
 | `trotFollowR` | 40 → 56 | stragglers follow from further back |
-| `trotSpeedMult` | 1.15 → 1.05 | "a slow trot" |
+| `trotSpeedMult` | 1.15 → 1.05 | now the FULL trot pace (94.5 px/s), reached only by a T2 bolt; ordinary trots use `trotSlowSpeed` |
+| `trotMoveSpeed` | 20 → 10 | a group under a steady walk-on averages about 8 px/s, so the old floor almost never let T10 fire |
 | `trotDecayMin` | 0.2 → 0.35 | fades sooner once clear of the dog |
 | `trotDecayRamp` | 5 → 3 s | same |
 | `calmDelay` | 5 → 3 s | back to grazing sooner (Restlessness anchor `[12, 3, 1.5]`) |
@@ -49,7 +55,7 @@ Setting `trotTurnWindow`, `trotMaxDur`, `trotRest`, `trotWindDown` and `gateCone
 | `perimeterMargin` | 36 → 44 | owner 2026-11-16: sheep too stressed with the dog near, "back him off a few pixels"; mean stress of pressed sheep during flanks 0.210 → 0.175 over 8 seeds (Standoff anchor `[24, 44, 64]`) |
 | `gateAttractR` | 80 → 100 | "a little further" (Gate anchor `[140, 100, 60]`) |
 
-Left alone, though proposed: `trotAlignMin`, `trotMoveSpeed`, `trotTriggerProb`. T5 does the job at the turn, and loosening the general T1 trigger as well would have made trots more common everywhere, against T6's intent.
+Left alone, though proposed: `trotAlignMin`, `trotTriggerProb`. T5 does the job at the turn, and loosening the general T1 trigger as well would have made trots more common everywhere, against T6's intent.
 
 ## Acceptance log — 2026-11-16
 
@@ -63,6 +69,15 @@ Headless against `web/lib/sheep-sim.js` (plain node `vm`, shipped defaults), 8 s
 | G5 — cone grows with gate-ward leaders | n/a | grew in 6 seeds, to the 220 px cap in 2 | PASS |
 | Lever assertion | — | `anchor 100/100 exact · 184 schema keys · OK` | PASS |
 | Pages — `2d`, `3d`, `3d-assault` load from `file://` in headless Chrome, sim stepped | — | zero console errors or warnings; cone overlay seen in 3D | PASS |
+
+Second pass the same day (gaits, T9/T10), 16 seeds × 60 s, come-by → walk-on → away → walk-on:
+
+| Check | Result |
+|---|---|
+| T9 — top speed seen: walk / slow trot / dog on walk-on | 60.0 / 80.0 / 60.0 px/s — PASS |
+| T10 — earliest fresh trot after walk-on began | 5.5 s (delay 3 s), none before the delay — PASS |
+| T10 — runs in which a walk-on trot developed | 10 of 16 (2 of 16 at the first-pass `trotPressFrac` 0.25 / `trotMoveSpeed` 20) — PASS |
+| T8 re-check — trot starts more than 220 px from the dog | 41 of 1238, furthest 311 px; all followers inside the triggered group, which strings out under a drive — noted, not a failure |
 
 History: the first build the same day had no T8. The owner saw groups across the field start trotting when the dog walked on and reverted it; T8 is the fix, and the numbers above are from the rebuilt version.
 
