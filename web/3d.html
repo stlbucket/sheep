@@ -281,7 +281,7 @@
   <canvas id="scene"></canvas>
   <div id="cam-bar">
     <span>camera <kbd>C</kbd></span>
-    <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom">orbit <kbd>1</kbd></button>
+    <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view">orbit <kbd>1</kbd></button>
     <button data-cam="top" title="straight down — matches the 2D page">top <kbd>2</kbd></button>
     <button data-cam="handler" title="over the handler's shoulder, by the gate">handler <kbd>3</kbd></button>
     <button data-cam="dog" title="behind the dog, looking down his eye">dog <kbd>4</kbd></button>
@@ -920,6 +920,8 @@ const eyeWedge = decalMesh(new THREE.CircleGeometry(1, 40, -0.5, 1).rotateX(-Mat
 eyeWedge.userData.key = -1
 const attractOuter = decalMesh(unitDisc, 0x6eb4ff, 0.10, 0.5, 2)
 const attractInner = decalMesh(unitDisc, 0x6eb4ff, 0.12, 0.54, 3)
+const attractCone = decalMesh(new THREE.CircleGeometry(1, 40, -0.5, 1).rotateX(-Math.PI / 2), 0x6eb4ff, 0.14, 0.52, 3) // POC-v13 G5
+attractCone.userData.key = -1
 const crushDisc = decalMesh(unitDisc, 0xffb428, 0.2, 0.58, 3)
 const goalRing = decalMesh(new THREE.RingGeometry(14, 16, 48).rotateX(-Math.PI / 2), 0x5fbf7a, 0.9, 0.66, 6)
 const goalDot = decalMesh(unitDisc, 0x5fbf7a, 0.9, 0.66, 6); goalDot.scale.set(4, 1, 4)
@@ -1018,6 +1020,18 @@ function updateOverlays() {
   attractOuter.visible = attractInner.visible = dbg.gateAttract && p.gateAttractR > 0
   attractOuter.position.set(g.x, 0.5, g.y); attractOuter.scale.set(p.gateAttractR, 1, p.gateAttractR)
   attractInner.position.set(g.x, 0.54, g.y); attractInner.scale.set(p.gateAttractR / 2, 1, p.gateAttractR / 2)
+  // POC-v13 G5: the cone the draw has grown toward a trotting line's leaders
+  const gc = sim.gateCone
+  attractCone.visible = attractOuter.visible && !!gc && gc.len > 0
+  if (attractCone.visible) {
+    const chalf = p.gateConeDeg / 2 * Math.PI / 180, ckey = Math.round(chalf * 500), cR = p.gateAttractR + gc.len
+    if (ckey !== attractCone.userData.key) {
+      attractCone.geometry.dispose()
+      attractCone.geometry = new THREE.CircleGeometry(1, 40, -chalf, 2 * chalf).rotateX(-Math.PI / 2)
+      attractCone.userData.key = ckey
+    }
+    attractCone.position.set(g.x, 0.52, g.y); attractCone.scale.set(cR, 1, cR); attractCone.rotation.y = -gc.ang
+  }
   const t = p.crushThreshold > 0 ? sim.crush / p.crushThreshold : 0
   crushDisc.visible = t >= 0.05
   if (crushDisc.visible) {
@@ -1035,7 +1049,7 @@ function updateOverlays() {
 //   dog     behind the dog, down his eye
 const CAMS = ['orbit', 'top', 'handler', 'dog']
 const CAM_HINTS = {
-  orbit: 'drag to orbit · right-drag to pan · wheel to zoom',
+  orbit: 'drag to orbit · right-drag to pan · wheel to zoom · 1 again to re-centre',
   top: 'straight down — north up, same as the 2D page',
   handler: 'from the handler’s post by the gate',
   dog: 'behind the dog, down his eye',
@@ -1056,6 +1070,7 @@ function homeOrbit() { // a raised view from the south: north at the top, east o
 }
 function setCam(mode) {
   if (!CAMS.includes(mode)) return
+  if (mode === 'orbit' && camState.mode === 'orbit') homeOrbit() // orbit again while in orbit → back to the starting view
   camState.mode = mode
   camState.snap = true
   controls.enabled = mode === 'orbit'

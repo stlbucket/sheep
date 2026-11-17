@@ -903,6 +903,14 @@ function drawGateAttract() {
   ctx.strokeStyle = 'rgba(110,180,255,0.22)'; ctx.lineWidth = 1; ctx.stroke()
   ctx.beginPath(); ctx.arc(g.x, g.y, R * 0.5, 0, Math.PI * 2)
   ctx.fillStyle = 'rgba(110,180,255,0.10)'; ctx.fill()
+  // POC-v13 G5: the cone the draw has grown toward a trotting line's leaders
+  const c = sim.gateCone
+  if (c && c.len > 0) {
+    const half = params.gateConeDeg / 2 * Math.PI / 180
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.arc(g.x, g.y, R + c.len, c.ang - half, c.ang + half); ctx.closePath()
+    ctx.fillStyle = 'rgba(110,180,255,0.10)'; ctx.fill()
+    ctx.strokeStyle = 'rgba(110,180,255,0.30)'; ctx.stroke()
+  }
   ctx.restore()
 }
 

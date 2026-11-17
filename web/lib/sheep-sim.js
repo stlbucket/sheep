@@ -29,6 +29,7 @@ const SETTINGS = [
   // Sheep
   { key: 'sheepCount', category: 'Sheep', label: 'herd size', type: 'int', default: 80, min: 1, max: 150, step: 1, unit: '—', description: 'Number of sheep; changing it respawns the herd.', exposed: true, onChange: 'respawn' },
   { key: 'vMax', category: 'Sheep', label: 'max speed', type: 'float', default: 90, min: 20, max: 240, step: 5, unit: 'px/s', description: 'Top sheep speed.', exposed: true },
+  { key: 'walkSpeed', category: 'Sheep', label: 'walk speed', type: 'float', default: 60, min: 20, max: 240, step: 5, unit: 'px/s', description: 'Top speed of an alert sheep that is neither trotting nor panicking — the WALK (owner 2026-11-16: 60). Never above `max speed`, which stays the base for the trot and panic paces. The dog\'s walk-on and easy speeds are fractions of this, so he still walks at sheep pace.', exposed: true },
   { key: 'grazeSpeed', category: 'Sheep', label: 'graze speed', type: 'float', default: 15, min: 0, max: 60, step: 1, unit: 'px/s', description: 'Gentle wander cruising speed when undisturbed.', exposed: true },
   { key: 'damping', category: 'Sheep', label: 'damping', type: 'float', default: 0.9, min: 0.5, max: 0.99, step: 0.01, unit: '—', description: 'Velocity retained per tick (drag).', exposed: true },
   { key: 'wanderTurn', category: 'Sheep', label: 'wander turn rate', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: 'rad/s', description: 'How fast graze heading random-walks.', exposed: false },
@@ -45,7 +46,7 @@ const SETTINGS = [
   { key: 'idleCohRadius', category: 'Idle', label: 'idle cohesion radius', type: 'float', default: 60, min: 20, max: 160, step: 5, unit: 'px', description: 'Group-membership range: used to re-derive idle groups after pressure (idle cohesion itself is same-group only).', exposed: true },
   { key: 'dogAvoidRadius', category: 'Idle', label: 'dog avoid radius', type: 'float', default: 45, min: 0, max: 120, step: 5, unit: 'px', description: 'Idle sheep drift away from a stood-down dog inside this range — a soft keep-out, not flight (A8).', exposed: true },
   { key: 'w_avoid', category: 'Idle', label: 'dog avoid weight', type: 'float', default: 0.4, min: 0, max: 2, step: 0.05, unit: '—', description: 'Strength of the idle keep-out drift around a stood-down dog.', exposed: true },
-  { key: 'calmDelay', category: 'Idle', label: 'calm delay', type: 'float', default: 5, min: 0, max: 20, step: 0.5, unit: 's', description: 'Continuous zero-threat time before an alert sheep settles back to idle (B1/B2 hysteresis).', exposed: true },
+  { key: 'calmDelay', category: 'Idle', label: 'calm delay', type: 'float', default: 3, min: 0, max: 20, step: 0.5, unit: 's', description: 'Continuous zero-threat time before an alert sheep settles back to idle (B1/B2 hysteresis).', exposed: true },
   { key: 'crowdTolerance', category: 'Idle', label: 'crowd tolerance', type: 'int', default: 2, min: 0, max: 10, step: 1, unit: '—', description: 'Idle sheep drift off when more than this many strangers stand within the idle cohesion radius — paces the B2 re-scatter.', exposed: true },
 
   // Boids
@@ -56,7 +57,7 @@ const SETTINGS = [
   { key: 'r_align', category: 'Boids', label: 'alignment radius', type: 'float', default: 36, min: 6, max: 120, step: 1, unit: 'px', description: 'Range over which sheep match heading.', exposed: true },
   { key: 'w_sep', category: 'Boids', label: 'separation weight', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of the push-apart force.', exposed: true },
   { key: 'w_coh', category: 'Boids', label: 'cohesion weight', type: 'float', default: 1.0, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of the pull-together force.', exposed: true },
-  { key: 'w_align', category: 'Boids', label: 'alignment weight', type: 'float', default: 0.2, min: 0, max: 2, step: 0.05, unit: '—', description: 'Strength of heading-matching (weak — sheep are not starlings).', exposed: true },
+  { key: 'w_align', category: 'Boids', label: 'alignment weight', type: 'float', default: 0.3, min: 0, max: 2, step: 0.05, unit: '—', description: 'Strength of heading-matching (weak — sheep are not starlings).', exposed: true },
   { key: 'w_graze', category: 'Boids', label: 'graze weight', type: 'float', default: 0.3, min: 0, max: 2, step: 0.05, unit: '—', description: 'Strength of the idle wander force.', exposed: true },
   { key: 'accelScale', category: 'Boids', label: 'accel scale', type: 'float', default: 250, min: 0, max: 800, step: 10, unit: 'px/s²', description: 'Global responsiveness: accel per unit steering force.', exposed: true },
 
@@ -72,7 +73,7 @@ const SETTINGS = [
   { key: 'R_orbit', category: 'Dog', label: 'orbit radius', type: 'float', default: 160, min: 60, max: 300, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P0: flanking replaced the fixed orbit). Kept for reference.', exposed: false },
   { key: 'omega', category: 'Dog', label: 'orbit speed', type: 'float', default: 1.2, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'SUPERSEDED (POC-v3 P0: flanking replaced the fixed orbit). Kept for reference.', exposed: false },
   { key: 'flankStandoff', category: 'Dog', label: 'flank standoff', type: 'float', default: 140, min: 60, max: 300, step: 5, unit: 'px', description: 'SUPERSEDED (owner touch-up 2026-08-22: the flanking dog tracks the herd perimeter line itself — `perimeter margin` — not a wide offset of it; the fence-seek reach it also set is `fence seek reach` now). Kept for reference.', exposed: false },
-  { key: 'perimeterMargin', category: 'Dog', label: 'perimeter margin', type: 'float', default: 36, min: 12, max: 96, step: 2, unit: 'px', description: 'How far the HERD PERIMETER LINE sits outside the outermost sheep (the convex hull offset by this; 36 px = 3 sheep-lengths). It is both the dotted outline drawn round the flock and the line the flanking dog tracks (C8 — owner 2026-08-22: "track along the current herd boundary"). Was the Debug-only `outline margin` until then.', exposed: true },
+  { key: 'perimeterMargin', category: 'Dog', label: 'perimeter margin', type: 'float', default: 44, min: 12, max: 96, step: 2, unit: 'px', description: 'How far the HERD PERIMETER LINE sits outside the outermost sheep (the convex hull offset by this; shipped at 36 px = 3 sheep-lengths; 44 since the owner note of 2026-11-16 "back the dog off a few pixels"). It is both the dotted outline drawn round the flock and the line the flanking dog tracks (C8 — owner 2026-08-22: "track along the current herd boundary"). Was the Debug-only `outline margin` until then.', exposed: true },
   { key: 'fenceSeekReach', category: 'Dog', label: 'fence seek reach', type: 'float', default: 72, min: 20, max: 300, step: 4, unit: 'px', description: 'Within this distance of a field boundary the flank point is pulled toward it so the dog slots between sheep and fence (C2). Was hard-wired to 2 × flank standoff (= 280) until the 2026-08-22 touch-up; now 2 × perimeter margin — at 280 the pull dragged the point off the boundary line (measured 72 px median at seed 1337).', exposed: true },
   { key: 'flankConeDeg', category: 'Dog', label: 'flank eye angle', type: 'float', default: 45, min: 20, max: 70, step: 1, unit: '—', description: 'Degrees the flanking dog\'s eye is held off his line of travel, toward the flock (C3).', exposed: true },
   { key: 'flankAdvance', category: 'Dog', label: 'flank advance rate', type: 'float', default: 1.0, min: 0.2, max: 3, step: 0.1, unit: 'rad/s', description: 'How fast the flank point works around the flock edge.', exposed: true },
@@ -123,10 +124,14 @@ const SETTINGS = [
   { key: 'spawnDepth', category: 'Gate + Crush', label: 'spawn depth', type: 'float', default: 140, min: 60, max: 300, step: 10, unit: 'px', description: 'beside-gate archetype only: how far the spawn region reaches into the field from the fence (F2).', exposed: true, onChange: 'respawn' },
   { key: 'gateApproachR', category: 'Gate + Crush', label: 'gate approach radius', type: 'float', default: 60, min: 20, max: 160, step: 5, unit: 'px', description: 'Commitment zone around the gate mouth: a non-idle sheep inside it moving gateward commits and carries on through (G1).', exposed: true },
   { key: 'w_through', category: 'Gate + Crush', label: 'through bias', type: 'float', default: 2.0, min: 0, max: 5, step: 0.1, unit: '—', description: 'Strength of the gateward commitment bias — must beat the gate posts\' repulsion and crowd back-push (G1).', exposed: true },
-  { key: 'gateAttractR', category: 'Gate + Crush', label: 'gate attraction radius', type: 'float', default: 80, min: 0, max: 240, step: 5, unit: 'px', description: 'Within this distance of the mouth a sheep is DRAWN toward the gate (POC-v7 G2). Default ⅔ of `flee radius` (80 = ⅔ × 120, owner 2026-08-22). Sheep in close proximity to a drawn sheep are drawn after it (G3) — the column. 0 = off.', exposed: true },
+  { key: 'gateAttractR', category: 'Gate + Crush', label: 'gate attraction radius', type: 'float', default: 100, min: 0, max: 240, step: 5, unit: 'px', description: 'Within this distance of the mouth a sheep is DRAWN toward the gate (POC-v7 G2). Shipped at ⅔ of `flee radius` (80, owner 2026-08-22); widened to 100 by the owner 2026-11-16 ("a little further"). Sheep in close proximity to a drawn sheep are drawn after it (G3) — the column. 0 = off.', exposed: true },
   { key: 'w_gateAttract', category: 'Gate + Crush', label: 'gate attraction weight', type: 'float', default: 1.2, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of the gate draw (G2/G3). Sits under `flee weight` so the dog can still pull a sheep off the mouth.', exposed: true },
   { key: 'gateFollowR', category: 'Gate + Crush', label: 'gate follow radius', type: 'float', default: 30, min: 10, max: 80, step: 2, unit: 'px', description: '"Close proximity" for the column (G3): a sheep this near one being drawn to the gate is drawn after IT — files in behind rather than heading for the mouth on its own line.', exposed: true },
   { key: 'gateFollowDecay', category: 'Gate + Crush', label: 'gate follow decay', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'Pull kept per hop down the column (G3): the 2nd sheep feels 0.6, the 3rd 0.36 … so the draw dies out a few body-lengths back instead of dragging the whole flock.', exposed: true },
+  // POC-v13 (owner 2026-11-16) — G5: the draw area grows a cone toward a trotting line's leaders.
+  { key: 'gateConeGrow', category: 'Gate + Crush', label: 'gate cone growth', type: 'float', default: 60, min: 0, max: 300, step: 5, unit: 'px/s', description: 'G5: while trot leaders are heading gate-ward, the gate\'s draw area grows a cone along the axis from the mouth toward them at this rate; it shrinks back at the same rate once there are none. It never grows past the leaders. 0 = off.', exposed: true },
+  { key: 'gateConeDeg', category: 'Gate + Crush', label: 'gate cone width', type: 'float', default: 50, min: 10, max: 180, step: 5, unit: '°', description: 'G5: full width of the cone. Full extra reach inside the middle half, feathering to none at the edge.', exposed: true },
+  { key: 'gateConeMax', category: 'Gate + Crush', label: 'gate cone reach', type: 'float', default: 220, min: 0, max: 600, step: 10, unit: 'px', description: 'G5: the most the cone adds to `gate attraction radius` along its axis. Only non-grazing sheep feel the extra reach.', exposed: true },
   { key: 'w_fence', category: 'Gate + Crush', label: 'fence weight', type: 'float', default: 1.5, min: 0, max: 4, step: 0.1, unit: '—', description: 'Strength of fence repulsion (perimeter walls, gapped at the gate mouth).', exposed: true },
   { key: 'r_fence', category: 'Gate + Crush', label: 'fence range', type: 'float', default: 30, min: 10, max: 80, step: 1, unit: 'px', description: 'Distance at which the fence pushes sheep.', exposed: true },
   { key: 'spawnMinX', category: 'Gate + Crush', label: 'spawn region min x', type: 'int', default: 220, min: 20, max: 800, step: 5, unit: 'px', description: 'SUPERSEDED (POC-v3 P6: spawn is anchored near the gate). Kept for reference.', exposed: false },
@@ -169,8 +174,8 @@ const SETTINGS = [
   { key: 'boldMean', category: 'Boldness', label: 'boldness mean', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Center of the per-sheep boldness draw (gaussian, clamped 0–1). Was a magic number until POC-v3 P4.', exposed: true, onChange: 'respawn' },
   { key: 'boldSd', category: 'Boldness', label: 'boldness spread', type: 'float', default: 0.22, min: 0, max: 0.5, step: 0.01, unit: '—', description: 'Spread of the boldness draw. Default 0.22 puts ~0–2 sheep per 80 above the dart threshold (D2\'s top tail); the old hard-coded 0.1 made boldness > 0.8 a 5σ event — darts could never happen.', exposed: true, onChange: 'respawn' },
   { key: 'boldnessTheta', category: 'Boldness', label: 'boldness hold', type: 'float', default: 0.5, min: 0, max: 1.5, step: 0.05, unit: '—', description: 'Sheep ignores the dog while threat < boldness·θ.', exposed: true },
-  { key: 'panicThreshold', category: 'Boldness', label: 'panic threshold', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Threat above this triggers a panic sprint (enables bolting).', exposed: true },
-  { key: 'panicMult', category: 'Boldness', label: 'panic multiplier', type: 'float', default: 1.6, min: 1, max: 2.5, step: 0.1, unit: '—', description: 'vMax multiplier while panicking.', exposed: true },
+  { key: 'panicThreshold', category: 'Boldness', label: 'panic threshold', type: 'float', default: 0.7, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Threat above this triggers a panic sprint (enables bolting).', exposed: true },
+  { key: 'panicMult', category: 'Boldness', label: 'panic multiplier', type: 'float', default: 1.4, min: 1, max: 2.5, step: 0.1, unit: '—', description: 'vMax multiplier while panicking.', exposed: true },
   { key: 'protestProb', category: 'Boldness', label: 'protest chance', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'Per-second chance a brave sheep protests just below threshold.', exposed: false },
   { key: 'protestDur', category: 'Boldness', label: 'protest duration', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: 's', description: 'How long a protest stamp lasts.', exposed: false },
   { key: 'dartBoldness', category: 'Boldness', label: 'dart boldness', type: 'float', default: 0.8, min: 0.5, max: 1, step: 0.05, unit: '—', description: 'Boldness above which a sheep may dart around a lying dog (D2 — the rare top tail).', exposed: true },
@@ -178,20 +183,30 @@ const SETTINGS = [
   // Trot (POC-v9 flock-behavior T1–T3, owner 2026-08-24: a big pressured
   // group moving one way can break into a following trot — leads first,
   // the rest filing in behind; it dies back off once the dog is escaped)
-  { key: 'trotGroupMin', category: 'Trot', label: 'trot group size', type: 'int', default: 20, min: 5, max: 80, step: 1, unit: '—', description: 'T1: a moving pressured cluster must be LARGER than this (owner: "over 20") before the trot can trigger.', exposed: true },
+  { key: 'trotGroupMin', category: 'Trot', label: 'trot group size', type: 'int', default: 12, min: 5, max: 80, step: 1, unit: '—', description: 'T1: a moving pressured cluster must be LARGER than this (owner: "over 20") before the trot can trigger.', exposed: true },
   { key: 'trotAlignMin', category: 'Trot', label: 'trot alignment', type: 'float', default: 0.5, min: 0, max: 1, step: 0.05, unit: '—', description: 'T1: velocity order parameter (|Σv| / Σ|v|) the cluster must exceed to read as "moving in the same direction". Loosened 0.7 → 0.5 by the owner (Q54, 2026-08-24): a somewhat ragged drive can still break into a trot.', exposed: true },
   { key: 'trotMoveSpeed', category: 'Trot', label: 'trot move floor', type: 'float', default: 20, min: 5, max: 60, step: 1, unit: 'px/s', description: 'T1: mean cluster speed floor — a standing group cannot trot off.', exposed: true },
   { key: 'trotTriggerProb', category: 'Trot', label: 'trot trigger chance', type: 'float', default: 0.2, min: 0, max: 1, step: 0.05, unit: '/s', description: 'T1: per-second chance an eligible group\'s LEAD sheep break into a trot (owner 2026-08-24: 20 %).', exposed: true },
   { key: 'trotBoltProb', category: 'Trot', label: 'trot bolt chance', type: 'float', default: 0.05, min: 0, max: 1, step: 0.01, unit: '—', description: 'T2: chance, rolled once at trigger time, that the WHOLE group bolts into the trot at once instead of the leads only (owner: 5 %).', exposed: true },
-  { key: 'trotLeadCount', category: 'Trot', label: 'trot leads', type: 'int', default: 3, min: 1, max: 10, step: 1, unit: '—', description: 'T1: how many frontmost sheep (along the group\'s mean heading) lead the trot off.', exposed: true },
-  { key: 'trotFollowR', category: 'Trot', label: 'trot follow radius', type: 'float', default: 40, min: 10, max: 120, step: 2, unit: 'px', description: 'T2: a sheep this close to a trotting flock-mate is pulled into the trot behind IT — files into the column (one hop per tick, like the G3 gate column).', exposed: true },
-  { key: 'trotSpeedMult', category: 'Trot', label: 'trot pace', type: 'float', default: 1.15, min: 1, max: 2, step: 0.05, unit: '× vMax', description: 'Trot pace — above the walk cap, below panic (1.6): a trot, not a bolt. Eased 1.3 → 1.15 by the owner (2026-08-24: "a bit slower").', exposed: true },
+  { key: 'trotLeadCount', category: 'Trot', label: 'trot leads', type: 'int', default: 5, min: 1, max: 10, step: 1, unit: '—', description: 'T1: how many frontmost sheep (along the group\'s mean heading) lead the trot off.', exposed: true },
+  { key: 'trotFollowR', category: 'Trot', label: 'trot follow radius', type: 'float', default: 56, min: 10, max: 120, step: 2, unit: 'px', description: 'T2: a sheep this close to a trotting flock-mate is pulled into the trot behind IT — files into the column (one hop per tick, like the G3 gate column).', exposed: true },
+  { key: 'trotSpeedMult', category: 'Trot', label: 'trot pace', type: 'float', default: 1.05, min: 1, max: 2, step: 0.05, unit: '× vMax', description: 'FULL trot pace (× `max speed`) — since POC-v13 only a whole-group bolt (T2) runs at it; every other trot is the `slow trot speed`. Below panic (1.4).', exposed: true },
   { key: 'w_trot', category: 'Trot', label: 'trot weight', type: 'float', default: 2, min: 0, max: 4, step: 0.05, unit: '—', description: 'Strength of the trot drive (leads: along the locked column heading; followers: after their lead).', exposed: true },
-  { key: 'trotDecayMin', category: 'Trot', label: 'trot decay floor', type: 'float', default: 0.2, min: 0, max: 1, step: 0.01, unit: '/s', description: 'T3: per-second chance of dropping back to normal the moment the dog\'s pressure is escaped (owner: shipped at 5 %, raised to 20 % the same day)…', exposed: true },
+  { key: 'trotDecayMin', category: 'Trot', label: 'trot decay floor', type: 'float', default: 0.35, min: 0, max: 1, step: 0.01, unit: '/s', description: 'T3: per-second chance of dropping back to normal the moment the dog\'s pressure is escaped (owner: shipped at 5 %, raised to 20 % the same day)…', exposed: true },
   { key: 'trotDecayMax', category: 'Trot', label: 'trot decay ceiling', type: 'float', default: 0.9, min: 0, max: 1, step: 0.05, unit: '/s', description: 'T3: …growing to this while the escape lasts (owner: 90 %). Any felt pressure resets the ramp.', exposed: true },
-  { key: 'trotDecayRamp', category: 'Trot', label: 'trot decay ramp', type: 'float', default: 5, min: 1, max: 20, step: 0.5, unit: 's', description: 'T3: seconds of pressure-free trotting over which the decay chance ramps floor → ceiling. (The owner gave 20 % → 90 %; the ramp TIME is parked — default 5 s.)', exposed: true },
+  { key: 'trotDecayRamp', category: 'Trot', label: 'trot decay ramp', type: 'float', default: 3, min: 1, max: 20, step: 0.5, unit: 's', description: 'T3: seconds of pressure-free trotting over which the decay chance ramps floor → ceiling. (The owner gave 20 % → 90 %; the ramp TIME is parked — default 5 s.)', exposed: true },
   { key: 'trotFenceStop', category: 'Trot', label: 'trot fence stop', type: 'float', default: 36, min: 0, max: 120, step: 2, unit: 'px', description: 'T3 (owner 2026-08-24): a trotting sheep APPROACHING a fence within this distance — default 3 body-lengths — drops the trot outright (100 %), pressure or not. The gate mouth is exempt, so a column may trot through the gate. 0 = off.', exposed: true },
   { key: 'trotReverseDeg', category: 'Trot', label: 'trot reverse cone', type: 'float', default: 120, min: 30, max: 240, step: 5, unit: '°', description: 'T4 (owner 2026-08-24): full width of the forward cone in which a FELT dog (stress > 0) counts as "in front" of a trotting sheep — it reverses and trots the other way; a follower cuts loose and leads the turn itself. After the flip the dog is behind, so it cannot flip-flop.', exposed: true },
+  // POC-v13 (owner 2026-11-16) — T5 turn trigger, T6 trot time limit + rest, T7 wind-down.
+  { key: 'trotSlowSpeed', category: 'Trot', label: 'slow trot speed', type: 'float', default: 80, min: 20, max: 240, step: 5, unit: 'px/s', description: 'The SLOW TROT (owner 2026-11-16: 80) — the pace of every ordinary trot: the one that develops under a walk-on (T1/T9) and the one at the dog\'s turn (T5). Never below `walk speed` nor above the full `trot pace`, which only a whole-group bolt (T2) reaches.', exposed: true },
+  { key: 'trotDriveDelay', category: 'Trot', label: 'trot drive delay', type: 'float', default: 3, min: 0, max: 15, step: 0.5, unit: 's', description: 'T9 (owner 2026-11-16): the dog must have been on walk-on / easy this long before a driven group\'s leaders can break into the slow trot ("a walk on for a few seconds"). The T5 turn trigger does not wait for it.', exposed: true },
+  { key: 'trotPressMin', category: 'Trot', label: 'trot pressure level', type: 'float', default: 0.1, min: 0, max: 1, step: 0.01, unit: '—', description: 'T1/T5: how much dog threat a sheep must feel to count as PRESSED for starting a trot. Above the faint fringe of his eye, so a group he is merely near cannot trot off.', exposed: true },
+  { key: 'trotPressFrac', category: 'Trot', label: 'trot pressed share', type: 'float', default: 0.25, min: 0, max: 1, step: 0.05, unit: '—', description: 'T1/T5: share of a group that must be pressed (see `trot pressure level`) before it can break into a trot — the dog has to be working THIS group, not brushing one sheep of it.', exposed: true },
+  { key: 'trotTurnWindow', category: 'Trot', label: 'trot turn window', type: 'float', default: 1.5, min: 0, max: 5, step: 0.1, unit: 's', description: 'T5: for this long after the dog ends or reverses a live flank sweep (stops, lies down, turns back, goes to walk-on / easy), a collected group he is pressing can break into a trot AWAY from him — standing or not. 0 = off.', exposed: true },
+  { key: 'trotTurnProb', category: 'Trot', label: 'trot turn chance', type: 'float', default: 0.9, min: 0, max: 1, step: 0.05, unit: '/s', description: 'T5: per-second chance, during the turn window, that a pressed group larger than `trot group size` streams off at a trot. Skips the move-floor and alignment tests — a bunched, standing group qualifies.', exposed: true },
+  { key: 'trotMaxDur', category: 'Trot', label: 'trot time limit', type: 'float', default: 4, min: 0, max: 20, step: 0.5, unit: 's', description: 'T6: a sheep trots at most this long, pressure or not, then eases down to a walk (T7). At the default pace 4 s is about a third of the field. 0 = no limit (the v9 behavior).', exposed: true },
+  { key: 'trotRest', category: 'Trot', label: 'trot rest', type: 'float', default: 6, min: 0, max: 30, step: 0.5, unit: 's', description: 'T6: after dropping out of a trot (time limit, decay or fence) a sheep cannot be recruited or lead again for this long — stops a tight column re-recruiting its own drop-outs.', exposed: true },
+  { key: 'trotWindDown', category: 'Trot', label: 'trot wind-down', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'T7: an unpressured sheep leaving the trot keeps walking on its line while its pace eases from trot to a stand over this long; `calm delay` later it is grazing. Felt pressure or a fence cancels it. 0 = drops straight out.', exposed: true },
 
   // Scoring — subtractive: total = 100 − Σ weighted penalties; each axis
   // accumulates a normalized 0..1 fraction/s, so weights read as points/s of full badness.
@@ -282,7 +297,7 @@ const LEVERS = [
       lieDownIntensity: [0.15, 0.3, 0.55], postureRange: [0.4, 0.6, 0.85], dogAvoidRadius: [25, 45, 80] } },
   { key: 'dogStandoff', domain: 'dog-behavior', label: 'Standoff', blurb: 'How much room he gives the flock.',
     ends: { 0: 'works right on top of them, quick and darty', 1: 'works from a long way off, steady and unhurried' },
-    params: { dogVMax: [150, 110, 95], walkOnSpeedFrac: [1.15, 1, 0.85], easySpeedFrac: [0.6, 0.5, 0.4], perimeterMargin: [24, 36, 60], fenceSeekReach: [48, 72, 120], R_drive: [95, 140, 220], R_driveMin: [42, 55, 90], driveTrailGap: [25, 40, 70] } },
+    params: { dogVMax: [150, 110, 95], walkOnSpeedFrac: [1.15, 1, 0.85], easySpeedFrac: [0.6, 0.5, 0.4], perimeterMargin: [24, 44, 64], fenceSeekReach: [48, 72, 120], R_drive: [95, 140, 220], R_driveMin: [42, 55, 90], driveTrailGap: [25, 40, 70] } },
   { key: 'dogSweep', domain: 'dog-behavior', label: 'Sweep', blurb: 'The shape of his flank.',
     ends: { 0: 'tight and economical', 1: 'a big, deliberate, wide sweep' },
     params: { flankConeDeg: [30, 45, 62], flankAdvance: [1.8, 1, 0.5], flankOvershootDeg: [0, 0, 60], flankHandoffDeg: [45, 30, 15], fenceSeekBias: [0.25, 0.6, 0.9] } },
@@ -293,14 +308,14 @@ const LEVERS = [
   // ---- sheep-behavior ----
   { key: 'sheepNerve', domain: 'sheep-behavior', label: 'Nerve', blurb: 'How readily they react to threat they can feel.',
     ends: { 0: 'stoic, hard to move', 1: 'hair-trigger' },
-    params: { boldMean: [0.55, 0.3, 0.12], boldnessTheta: [0.85, 0.5, 0.25], panicThreshold: [0.85, 0.6, 0.38], panicMult: [1.3, 1.6, 2], w_flee: [1.1, 2, 3.2], w_avoid: [0.15, 0.4, 0.8], vMax: [70, 90, 115] } },
+    params: { boldMean: [0.55, 0.3, 0.12], boldnessTheta: [0.85, 0.5, 0.25], panicThreshold: [0.9, 0.7, 0.4], panicMult: [1.2, 1.4, 2], w_flee: [1.1, 2, 3.2], w_avoid: [0.15, 0.4, 0.8], vMax: [70, 90, 115] } },
   { key: 'sheepCohesion', domain: 'sheep-behavior', label: 'Cohesion', blurb: 'Jelly stiffness. Above ~0.75 expect rule A4 (no global blob) to break — a different game, not a defect.',
     ends: { 0: 'loose scatter with no flock body', 1: 'one tight blob that moves as a unit' },
-    params: { w_coh: [0.4, 1, 2], cohN: [5, 10, 16], cohScale: [55, 100, 140], w_sep: [2.2, 1.5, 1], r_sep: [26, 18, 12], minSep: [6, 4, 3], w_align: [0.08, 0.2, 0.45], r_align: [22, 36, 55] } },
+    params: { w_coh: [0.4, 1, 2], cohN: [5, 10, 16], cohScale: [55, 100, 140], w_sep: [2.2, 1.5, 1], r_sep: [26, 18, 12], minSep: [6, 4, 3], w_align: [0.08, 0.3, 0.5], r_align: [22, 36, 55] } },
   { key: 'sheepRestlessness', domain: 'sheep-behavior', label: 'Restlessness', blurb: 'How fast a gathered flock comes undone — the time-pressure lever (B2).',
     ends: { 0: 'statues; a gather stays gathered', 1: 'never settles; every gather dissolves behind you' },
     params: { grazeSpeed: [6, 15, 30], idleSpeedCap: [10, 25, 45], grazeStepEvery: [9, 4, 1.5], grazeStepLen: [5, 12, 24], wandererFrac: [0.03, 0.12, 0.3],
-      calmDelay: [12, 5, 2], crowdTolerance: [6, 2, 0], w_graze: [0.12, 0.3, 0.6], wanderTurn: [0.6, 1.5, 3], idleCohRadius: [90, 60, 40] } },
+      calmDelay: [12, 3, 1.5], crowdTolerance: [6, 2, 0], w_graze: [0.12, 0.3, 0.6], wanderTurn: [0.6, 1.5, 3], idleCohRadius: [90, 60, 40] } },
   { key: 'sheepCharacter', domain: 'sheep-behavior', label: 'Character', blurb: 'How much individuals differ from the average.',
     ends: { 0: 'eighty identical sheep', 1: 'a flock full of individuals, oddballs guaranteed' },
     params: { boldSd: [0.04, 0.22, 0.38], dartBoldness: [0.95, 0.8, 0.62], protestProb: [0.2, 0.6, 0.95], protestDur: [0.12, 0.3, 0.55] } },
@@ -311,7 +326,7 @@ const LEVERS = [
   { key: 'pastureGate', domain: 'pasture-builder', label: 'Gate', blurb: 'How punishing the mouth is.', respawn: true,
     ends: { 0: 'a barn door', 1: 'a needle' },
     params: { gateWidth: [60, 42, 24], gateCornerMargin: [160, 80, 45], gateApproachR: [100, 60, 30], w_through: [3.2, 2, 1.1], crushRadius: [30, 40, 55],
-      gateAttractR: [110, 80, 50], w_gateAttract: [1.8, 1.2, 0.7], gateFollowR: [40, 30, 22], gateFollowDecay: [0.75, 0.6, 0.45] } },
+      gateAttractR: [140, 100, 60], w_gateAttract: [1.8, 1.2, 0.7], gateFollowR: [40, 30, 22], gateFollowDecay: [0.75, 0.6, 0.45] } },
   { key: 'pastureApproach', domain: 'pasture-builder', label: 'Approach', blurb: 'How far the course makes you work. Owns the POC-v5 spawn-archetype params at their anchor (Q27) — it does not bias WHICH archetype is drawn.', respawn: true,
     ends: { 0: 'spawn on the gate\'s doorstep in tidy lumps', 1: 'spawn far along the fence, scattered wide' },
     params: { spawnGateOffset: [90, 200, 420], spawnDepth: [80, 140, 250], clusterSpread: [12, 24, 45], clusterMinGap: [60, 120, 240], clusterSizeMax: [16, 10, 4],
@@ -336,7 +351,8 @@ const LEVER_NOT_LEVERED = {
   substrate: ['L', 'damping', 'accelScale', 'dt', 'maxFrameDelta', 'fenceSeekRamp', 'parkFade', 'driveCloseRate', 'driveBackoffRate', 'flankCornerFrom'], // smoothing widths / rule thresholds, not feel dials (flankCornerFrom: owner Q46 — 0, always corner-first)
   draws: ['seed', 'randomSeedOnLoad', 'spawnLayout'], // a draw, not a dial (F4/F5)
   judging: ['injuryWeight', 'lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
-  parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
+  parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg',
+    'walkSpeed', 'trotSlowSpeed', 'trotDriveDelay', 'trotPressMin', 'trotPressFrac', 'trotTurnWindow', 'trotTurnProb', 'trotMaxDur', 'trotRest', 'trotWindDown', 'gateConeGrow', 'gateConeDeg', 'gateConeMax'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
   obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge'], // owner 2026-11-14 — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
   // plus every `debug.*` render toggle
 }
@@ -621,6 +637,9 @@ class FlockSim {
     }
     this.faceFlock()      // F1: never spawn staring at a fence
     this.crush = 0        // live crush at the gate mouth (density × forward pressure)
+    this.trotTurnT = 0    // T5 (POC-v13): seconds left of the turn window after the dog ends / reverses a sweep
+    this.trotDogSweep = 0 //   sign of the dog's live flank sweep last tick (0 = not sweeping)
+    this.gateCone = { len: 0, ang: 0 } // G5 (POC-v13): extra reach of the gate's draw along `ang` (from the mouth toward the trot leaders)
     this.crushTime = 0    // seconds sustained over threshold
     this.injuries = 0     // down-sheep count (welfare hit; scoring uses it in P6)
     this.resetRun()
@@ -1226,6 +1245,7 @@ class FlockSim {
     this.nextGroup = sizes.length // fresh ids for groups re-derived after pressure (B2)
     this.groupCap = {} // per-group target size for re-derived groups (spawn groups default to clusterSizeMax)
     this.crush = 0; this.crushTime = 0; this.injuries = 0
+    this.trotTurnT = 0; this.trotDogSweep = 0; this.gateCone = { len: 0, ang: 0 }
     this.resetRun()
   }
 
@@ -1300,6 +1320,12 @@ class FlockSim {
         trotLead: -1,                      //   follower files behind this sheep (−1 = a lead)
         trotHeading: 0,                    //   lead's locked column heading (rad)
         trotFreeT: 0,                      // T3: continuous pressure-free time while trotting (s)
+        trotT: 0,                          // T6 (POC-v13): time in the current trot (s)
+        trotFast: false,                   // POC-v13: full trot pace (a T2 bolt) rather than the slow trot
+        trotGroup: 0,                      // T2 (POC-v13): id of the triggered group it belonged to — followers join only within it
+        trotRest: 0,                       // T6: seconds before it may trot again
+        trotEase: 0,                       // T7: seconds left of the wind-down walk
+        trotEaseDir: 0,                    //   …along this heading (rad)
     })
   }
 
@@ -1647,8 +1673,9 @@ class FlockSim {
     // E4/I2 (POC-v7): the drive is paced off the SHEEP — walk-on at
     // walkOnSpeedFrac × vMax (= the flock's pace), easy at easySpeedFrac × vMax
     // (half). Flanks and the recall keep dogVMax.
-    const vmax = d.command === 'walk_on' ? p.vMax * p.walkOnSpeedFrac
-               : d.command === 'easy'    ? p.vMax * p.easySpeedFrac
+    const walk = Math.min(p.walkSpeed, p.vMax) // the sheep's walk — he drives at their pace (POC-v13)
+    const vmax = d.command === 'walk_on' ? walk * p.walkOnSpeedFrac
+               : d.command === 'easy'    ? walk * p.easySpeedFrac
                : d.flankEasy && (d.command === 'come_by' || d.command === 'away') ? p.dogVMax * p.flankEasySpeedFrac // C11 (POC-v10)
                : p.dogVMax
     const speed = dist < arriveR ? vmax * (dist / arriveR) : vmax
@@ -1817,7 +1844,17 @@ class FlockSim {
     {
       const gt = this.gate
       const gdist = vec2.dist(s.pos, gt)
-      let pull = p.gateAttractR > 0 ? smoothstep(p.gateAttractR, p.gateAttractR * 0.5, gdist) : 0
+      // G5 (POC-v13): inside the cone toward the trot leaders the draw reaches
+      // further (updateGateCone owns len/ang). Grazing sheep never feel the
+      // extra reach — a far-off column must not hoover up bystanders.
+      let reach = p.gateAttractR
+      const cone = this.gateCone
+      if (cone.len > 0 && !s.idle && gdist > 1e-6) {
+        const half = p.gateConeDeg / 2 * Math.PI / 180
+        const cosT = ((s.pos.x - gt.x) * Math.cos(cone.ang) + (s.pos.y - gt.y) * Math.sin(cone.ang)) / gdist
+        reach += cone.len * smoothstep(Math.cos(half), Math.cos(half * 0.5), cosT)
+      }
+      let pull = p.gateAttractR > 0 ? smoothstep(reach, p.gateAttractR * 0.5, gdist) : 0
       let lead = -1
       if (pull < 1 && p.gateFollowR > 0 && p.gateFollowDecay > 0) {
         for (const n of nbrs) {
@@ -1859,7 +1896,7 @@ class FlockSim {
     // instantly; idle only resumes after calmDelay of continuous zero threat
     // (hysteresis — no flicker at the threat boundary), re-deriving the
     // sheep's group from whoever settled nearby.
-    if (s.stress > 0 || s.gatePullNext > 0 || s.trot) { // threat, the gate's draw (G2) or a trot (T2) keeps a sheep alert
+    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0) { // threat, the gate's draw (G2) or a trot (T2) keeps a sheep alert
       s.idle = false
       s.calmT = 0
     } else if (!s.idle) {
@@ -1926,8 +1963,24 @@ class FlockSim {
       if (s.trotLead >= 0) {
         const tto = vec2.sub(this.sheep[s.trotLead].pos, s.pos)
         tdir = vec2.len(tto) > 1e-4 ? vec2.norm(tto) : { x: 0, y: 0 }
-      } else tdir = { x: Math.cos(s.trotHeading), y: Math.sin(s.trotHeading) }
-      fTrot = vec2.scale(vec2.sub(vec2.scale(tdir, p.vMax * p.trotSpeedMult), s.vel), 1 / p.vMax)
+      } else {
+        // G5: a lead the gate is drawing re-locks its column heading to where
+        // it is actually going, so the line bends into the mouth, not past it
+        if (s.gatePullNext > 0 && vec2.len(s.vel) > 2) s.trotHeading = Math.atan2(s.vel.y, s.vel.x)
+        tdir = { x: Math.cos(s.trotHeading), y: Math.sin(s.trotHeading) }
+      }
+      fTrot = vec2.scale(vec2.sub(vec2.scale(tdir, this.trotPace(s)), s.vel), 1 / p.vMax)
+    } else if (s.trotEase > 0) {
+      // T7 wind-down (POC-v13): out of the trot and unpressured, it walks on
+      // along its line while the pace eases from trot to a stand; calmDelay
+      // later it grazes. Felt pressure hands it straight back to the flee.
+      if (s.stress > 0 || p.trotWindDown <= 0) s.trotEase = 0
+      else {
+        const u = Math.min(1, s.trotEase / p.trotWindDown)
+        const tdir = { x: Math.cos(s.trotEaseDir), y: Math.sin(s.trotEaseDir) }
+        fTrot = vec2.scale(vec2.sub(vec2.scale(tdir, this.trotPace(s) * u), s.vel), 1 / p.vMax)
+        s.trotEase = Math.max(0, s.trotEase - dt)
+      }
     }
 
     // accel = accelScale · (w_sep·F_sep + w_coh·F_coh + w_align·F_align + w_graze·F_graze)
@@ -1950,8 +2003,9 @@ class FlockSim {
     // integrate: v ← clampLen((v + a·dt)·damping, vMax) ; p ← p + v·dt
     // panicking sheep get a higher speed cap so they can bolt; idle sheep are
     // hard-capped low so the unpressured field stays calm (A1).
-    let vmax = s.panic ? p.vMax * p.panicMult : p.vMax
-    if (s.trot) vmax = Math.max(vmax, p.vMax * p.trotSpeedMult) // T2: a trot outruns the walk cap (still below panic)
+    // Gaits (POC-v13, owner 2026-11-16): walk ≤ walkSpeed · slow trot · full trot · panic sprint
+    let vmax = s.panic ? p.vMax * p.panicMult : Math.min(p.walkSpeed, p.vMax)
+    if (s.trot) vmax = Math.max(vmax, this.trotPace(s)) // a trot outruns the walk cap (still below panic)
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
@@ -1990,13 +2044,37 @@ class FlockSim {
   // trotDecayMin to trotDecayMax over trotDecayRamp seconds. All rolls are on
   // the seeded stream; nothing rolls while no group is eligible and nobody
   // trots, so pre-trot runs replay draw for draw.
+  // Pace of this sheep's trot (POC-v13): the slow trot unless it is in a
+  // whole-group bolt (T2), which runs at the full trot pace.
+  trotPace(s) {
+    const p = this.p, full = p.vMax * p.trotSpeedMult
+    return s.trotFast ? full : Math.min(full, Math.max(p.trotSlowSpeed, Math.min(p.walkSpeed, p.vMax)))
+  }
+
   updateTrot(dt) {
     const p = this.p
     const roll = (perSec) => this.rng() < 1 - Math.pow(1 - Math.min(1, perSec), dt)
     // housekeeping: penned/injured sheep leave the trot; a follower whose
     // lead dropped out carries on as a lead on its own current heading
-    for (const s of this.sheep)
-      if (s.trot && (s.down || s.through)) { s.trot = false; s.trotLead = -1; s.trotFreeT = 0 }
+    for (const s of this.sheep) {
+      if (s.trot && (s.down || s.through)) { s.trot = false; s.trotLead = -1; s.trotFreeT = 0; s.trotT = 0 }
+      if (!s.trot && s.trotRest > 0) s.trotRest = Math.max(0, s.trotRest - dt) // T6 rest runs down
+    }
+    // T5 (POC-v13, owner 2026-11-16): the moment the dog ENDS or REVERSES a
+    // live flank sweep — parks, lies down, turns back, goes to walk-on / easy
+    // — opens a short window in which the group he is pressing may stream
+    // off at a trot, away from him (a recall to heel does not count).
+    const dg0 = this.dog
+    const fsign = dg0.command === 'come_by' ? 1 : dg0.command === 'away' ? -1 : 0
+    const sweep = fsign !== 0 && !dg0.flankParked ? fsign : 0
+    if (this.trotDogSweep !== 0 && sweep !== this.trotDogSweep && dg0.command !== 'that_ll_do')
+      this.trotTurnT = p.trotTurnWindow
+    this.trotDogSweep = sweep
+    const turning = this.trotTurnT > 0 && p.trotTurnProb > 0
+    // T9 (owner 2026-11-16): the T1 trot DEVELOPS under a drive — only once
+    // he has been on walk-on / easy for trotDriveDelay seconds.
+    this.trotDriveT = dg0.command === 'walk_on' || dg0.command === 'easy' ? (this.trotDriveT || 0) + dt : 0
+    if (this.trotTurnT > 0) this.trotTurnT = Math.max(0, this.trotTurnT - dt)
     for (const s of this.sheep) {
       if (!s.trot || s.trotLead < 0) continue
       if (!this.sheep[s.trotLead].trot) {
@@ -2008,7 +2086,7 @@ class FlockSim {
     for (let i = 0; i < this.sheep.length; i++)
       if (!this.sheep[i].down && !this.sheep[i].through) active.push(i)
     // T1 trigger — over the same union-find clusters scoring uses
-    if (p.trotTriggerProb > 0 && active.length > p.trotGroupMin) {
+    if ((p.trotTriggerProb > 0 || turning) && active.length > p.trotGroupMin) {
       const { labels } = this.clusterLabels(active)
       const groups = new Map() // label → member indices
       for (const i of active) {
@@ -2018,28 +2096,56 @@ class FlockSim {
       }
       for (const members of groups.values()) {
         if (members.length <= p.trotGroupMin) continue          // "over 20" — strictly more
-        let vx = 0, vy = 0, sp = 0, pressured = false, going = false
+        let vx = 0, vy = 0, sp = 0, cx = 0, cy = 0, fresh = 0, felt = 0, going = false
         for (const i of members) {
           const s = this.sheep[i]
           vx += s.vel.x; vy += s.vel.y; sp += vec2.len(s.vel)
-          if (s.stress > 0) pressured = true
+          cx += s.pos.x; cy += s.pos.y
+          if (s.stress > 0 && s.stress >= p.trotPressMin) felt++ // really pressed, not the faint fringe of his eye
           if (s.trot) going = true
+          if (!(s.trotRest > 0)) fresh++
         }
-        if (going || !pressured) continue                       // already going / no dog pressure
+        // POC-v13 (owner 2026-11-16): the dog must be WORKING this group — a
+        // real share of it pressed. One sheep on the edge of his eye used to
+        // be enough, and a group across the field could trot off.
+        if (going || felt < Math.max(1, Math.ceil(p.trotPressFrac * members.length))) continue // already going / not pressed
+        if (fresh * 2 < members.length) continue                // T6: most of them are still resting from the last trot
         const mag = Math.hypot(vx, vy)
-        if (mag / members.length < p.trotMoveSpeed) continue    // not really moving
-        if (sp < 1e-6 || mag / sp < p.trotAlignMin) continue    // not one direction
-        if (!roll(p.trotTriggerProb)) continue
+        const flowing = mag / members.length >= p.trotMoveSpeed && sp > 1e-6 && mag / sp >= p.trotAlignMin
+        let h
+        if (turning) {
+          // T5: away from the dog — a bunched, standing group qualifies. If it
+          // is already flowing roughly away, split the difference with its line.
+          let ax = cx / members.length - dg0.pos.x, ay = cy / members.length - dg0.pos.y
+          const al = Math.hypot(ax, ay)
+          if (al < 1e-6) continue
+          ax /= al; ay /= al
+          if (flowing && vx * ax + vy * ay > 0) { ax += vx / mag; ay += vy / mag }
+          if (!roll(p.trotTurnProb)) continue
+          h = Math.atan2(ay, ax)
+        } else {
+          if (!flowing || p.trotTriggerProb <= 0) continue      // T1: not really moving / not one direction
+          if (this.trotDriveT < p.trotDriveDelay) continue      // T9: no sustained walk-on behind them
+          if (!roll(p.trotTriggerProb)) continue
+          h = Math.atan2(vy, vx)
+        }
         // triggered: the frontmost trotLeadCount along the group heading lead off
-        const h = Math.atan2(vy, vx), ux = Math.cos(h), uy = Math.sin(h)
-        const byFront = members.slice().sort((i, j) =>
-          (this.sheep[j].pos.x * ux + this.sheep[j].pos.y * uy) -
-          (this.sheep[i].pos.x * ux + this.sheep[i].pos.y * uy))
+        const ux = Math.cos(h), uy = Math.sin(h)
+        // T9: the leaders are FRONT AND CENTRE — furthest forward along the
+        // heading, marked down by how far out to the side of the group they are
+        const mx = cx / members.length, my = cy / members.length
+        const lead = (i) => {
+          const dx = this.sheep[i].pos.x - mx, dy = this.sheep[i].pos.y - my
+          return dx * ux + dy * uy - Math.abs(dy * ux - dx * uy)
+        }
+        const byFront = members.filter((i) => !(this.sheep[i].trotRest > 0)).sort((i, j) => lead(j) - lead(i))
         const bolt = this.rng() < p.trotBoltProb                // T2: the whole flock goes at once
+        const gid = this.trotSeq = (this.trotSeq || 0) + 1
+        for (const i of members) this.sheep[i].trotGroup = gid  // only THESE sheep may file in behind
         const n = bolt ? byFront.length : Math.min(p.trotLeadCount, byFront.length)
         for (let k = 0; k < n; k++) {
           const s = this.sheep[byFront[k]]
-          s.trot = true; s.trotLead = -1; s.trotHeading = h; s.trotFreeT = 0
+          s.trot = true; s.trotLead = -1; s.trotHeading = h; s.trotFreeT = 0; s.trotT = 0; s.trotEase = 0; s.trotFast = bolt
         }
       }
     }
@@ -2050,13 +2156,15 @@ class FlockSim {
     if (wasTrot.length && p.trotFollowR > 0) {
       for (const i of active) {
         const s = this.sheep[i]
-        if (s.trot) continue
+        if (s.trot || s.trotRest > 0) continue                  // T6: a rested-out sheep is not re-recruited
         let lead = -1, best = p.trotFollowR
+        if (s.idle || !s.trotGroup) continue                    // POC-v13: a grazing sheep is never swept into a trot…
         for (const j of wasTrot) {
+          if (this.sheep[j].trotGroup !== s.trotGroup) continue  // …nor one from another group (no chaining across the field)
           const dd = vec2.dist(s.pos, this.sheep[j].pos)
           if (dd < best) { best = dd; lead = j }
         }
-        if (lead >= 0) { s.trot = true; s.trotLead = lead; s.trotFreeT = 0 }
+        if (lead >= 0) { s.trot = true; s.trotLead = lead; s.trotFreeT = 0; s.trotT = 0; s.trotEase = 0; s.trotFast = this.sheep[lead].trotFast }
       }
     }
     // T4 (owner 2026-08-24): a trotting sheep stays REACTIVE to the dog —
@@ -2088,18 +2196,50 @@ class FlockSim {
     // fence at a trot. The gate mouth is exempt (same aperture as
     // fenceForce) so a column can still trot THROUGH the gate. Then the
     // random decay — only once the dog's pressure is ESCAPED.
+    // POC-v13 (owner 2026-11-16) — T6: a trot also has a TIME LIMIT
+    // (trotMaxDur), pressure or not, and every drop-out rests (trotRest)
+    // before it can trot again. T7: a drop-out that is not at a fence eases
+    // down through a walk (trotWindDown) instead of stopping dead.
+    const endTrot = (s, ease) => {
+      s.trot = false; s.trotLead = -1; s.trotFreeT = 0; s.trotT = 0
+      s.trotRest = p.trotRest
+      s.trotEase = ease ? p.trotWindDown : 0
+      s.trotEaseDir = vec2.len(s.vel) > 2 ? Math.atan2(s.vel.y, s.vel.x) : s.facing
+    }
     for (const s of this.sheep) {
-      if (!s.trot) continue
-      if (p.trotFenceStop > 0 && this.trotAtFence(s)) {
-        s.trot = false; s.trotLead = -1; s.trotFreeT = 0; continue
+      if (!s.trot) {
+        if (s.trotEase > 0 && p.trotFenceStop > 0 && this.trotAtFence(s)) s.trotEase = 0 // the walk stops at a fence too
+        continue
       }
+      if (p.trotFenceStop > 0 && this.trotAtFence(s)) { endTrot(s, false); continue }
+      s.trotT += dt
+      if (p.trotMaxDur > 0 && s.trotT >= p.trotMaxDur) { endTrot(s, true); continue }
       if (s.stress > 0) { s.trotFreeT = 0; continue }
       s.trotFreeT += dt
       const u = p.trotDecayRamp > 0 ? Math.min(1, s.trotFreeT / p.trotDecayRamp) : 1
-      if (roll(p.trotDecayMin + (p.trotDecayMax - p.trotDecayMin) * u)) {
-        s.trot = false; s.trotLead = -1; s.trotFreeT = 0
-      }
+      if (roll(p.trotDecayMin + (p.trotDecayMax - p.trotDecayMin) * u)) endTrot(s, true)
     }
+  }
+
+  // G5 (POC-v13, owner 2026-11-16): while a trotting line's LEADERS are
+  // heading gate-ward, the gate's draw area grows a cone along the axis from
+  // the mouth toward them (gateConeGrow px/s, up to gateConeMax, never past
+  // the leaders); with none it shrinks back at the same rate. integrate()
+  // widens the G2 reach inside the cone; the pages draw it.
+  updateGateCone(dt) {
+    const p = this.p, gt = this.gate, c = this.gateCone
+    let cx = 0, cy = 0, n = 0
+    for (const s of this.sheep) {
+      if (!s.trot || s.trotLead >= 0 || s.down || s.through) continue
+      if (s.vel.x * (gt.x - s.pos.x) + s.vel.y * (gt.y - s.pos.y) <= 0) continue // heading away from the gate
+      cx += s.pos.x; cy += s.pos.y; n++
+    }
+    const step = p.gateConeGrow * dt
+    if (n > 0 && step > 0 && p.gateConeMax > 0 && p.gateAttractR > 0) {
+      const ax = cx / n - gt.x, ay = cy / n - gt.y
+      c.ang = Math.atan2(ay, ax)
+      c.len = Math.min(c.len + step, p.gateConeMax, Math.max(0, Math.hypot(ax, ay) - p.gateAttractR * 0.5))
+    } else c.len = step > 0 ? Math.max(0, c.len - step) : 0
   }
 
   // T3 (owner 2026-08-24): is this trotting sheep APPROACHING a wall within
@@ -2248,7 +2388,8 @@ class FlockSim {
     this.gcm = this.computeGCM()       // flock centroid → dog steering
     this.computeHull()                 // herd perimeter (same set) → flank track (C8)
     this.stepDog(dt)                   // dog moves first → sheep react to it
-    this.updateTrot(dt)                // T1–T3 trot state (POC-v9) → integrate reads it
+    this.updateTrot(dt)                // T1–T7 trot state (POC-v9, v13) → integrate reads it
+    this.updateGateCone(dt)            // G5 gate cone (POC-v13) → integrate + overlays read it
     for (let i = 0; i < this.sheep.length; i++) this.integrate(i, dt)
     for (const s of this.sheep) s.gatePull = s.gatePullNext // G3 column reads last tick's pull
     this.updateCrush(dt)               // gate crush → injury
