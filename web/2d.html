@@ -430,6 +430,7 @@
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
 <script src="lib/sheep-sim.js"></script>
 <script src="lib/sheep-gui.js"></script>
+<script src="lib/sheep-score-ui.js"></script>
 <script>
 'use strict'
 // ============================================================================
@@ -459,31 +460,9 @@ function fitCanvas() {
   canvas.style.height = Math.round(canvas.height * scale) + 'px'
 }
 window.addEventListener('resize', fitCanvas)
-let cardShown = false
-
-function showCard(sc) {
-  const el = document.getElementById('card')
-  const row = (label, pts) => `<div class="row"><span>${label}</span><span>−${pts.toFixed(1)}</span></div>`
-  el.innerHTML =
-    `<h2>${sc.won ? 'Penned! 🐑' : 'Run finished'}</h2>` +
-    `<div class="big">${sc.total.toFixed(0)}<small>/100</small></div>` +
-    row(`Time (${sc.raw.t.toFixed(0)}s)`, sc.time) +
-    row('Line — off ideal path', sc.line) +
-    row('Cohesion — splits / stragglers', sc.cohesion) +
-    row(`Calm — stress${sc.raw.injuries ? ` · ${sc.raw.injuries} injured` : ''}`, sc.calm) +
-    `<div class="foot">penned ${sc.penned}/${sim.sheep.length}</div>` +
-    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R replays this same course">dismiss</button>` +
-    `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles (R replays this same course instead)">play again</button></div>`
-  el.style.display = 'block'
-}
-function hideCard() { document.getElementById('card').style.display = 'none'; cardShown = false }
-// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = a fresh random course (the reseed ↻ button)
-document.getElementById('card').addEventListener('click', (ev) => {
-  const b = ev.target.closest('button[data-card]')
-  if (!b) return
-  if (b.dataset.card === 'again') newCourse()
-  else document.getElementById('card').style.display = 'none'
-})
+// POC-v14: the score badge, the pops and the count-up tally card live in
+// lib/sheep-score-ui.js (one copy for all three pages) — see ScoreUI.init in §4.
+function hideCard() { ScoreUI.hide() }
 
 function render(fps) {
   const { canvasW, canvasH, fenceInset } = params
@@ -506,6 +485,7 @@ function render(fps) {
 
   // obstacles — stands of trees / large rocks (solid; the flock parts round them)
   drawObstacles()
+  drawDriveGates() // POC-v14 FO1: optional hurdle pairs worth bonus points
 
   // gate attraction area (POC-v9 V1) — under the sheep, like the dog's presence
   if (params.debug.gateAttract) drawGateAttract()
@@ -539,14 +519,14 @@ function render(fps) {
     `fps ${fps.toFixed(0)}  cmd ${sim.dog.command}${sim.dog.flankEasy ? '·easy' : ''}${sim.dog.lieSide ? (sim.dog.lieSide < 0 ? '·left' : '·right') : ''}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}\n` +
     `intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
     `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
-    `time ${sc.raw.t.toFixed(0)}s  score ${sc.total.toFixed(0)}`
+    ScoreUI.hud(sim)
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
   syncObstacleSlider()
 
-  // post-run card on finish (win or Finish button)
-  if (sim.run.finished && !cardShown) { showCard(sc); cardShown = true }
+  // POC-v14 score face (shared lib)
+  ScoreUI.frame(sim) // badge, pops, and the tally card when the run ends
 }
 
 // Sheep body length in px — drawSheep's triangle is SHEEP_LEN × (2/3·SHEEP_LEN).
@@ -791,11 +771,41 @@ function drawStressMeter() {
 // the crowns of a stand, the boulders of a rock — comes from obstacleItems()
 // (lib, seeded per obstacle), cached per course since it never changes.
 let obstacleArt = { of: null, list: [] }
+// POC-v14 FO1–FO3: a drive gate = two solid hurdle panels with a gap. Sheep
+// through the gap score; once the whole working flock has been through, the
+// gate is done and turns green.
+function drawDriveGates() {
+  for (const d of sim.driveGates) {
+    const col = d.done ? '#7fd79a' : '#c9a468'
+    ctx.save()
+    ctx.strokeStyle = d.done ? 'rgba(127,215,154,0.55)' : 'rgba(159,208,255,0.55)' // the scoring line across the gap
+    ctx.lineWidth = 1.5; ctx.setLineDash([4, 5])
+    ctx.beginPath(); ctx.moveTo(d.a0.x, d.a0.y); ctx.lineTo(d.a1.x, d.a1.y); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.lineCap = 'round'
+    for (const [a, b] of [[d.a0, d.e0], [d.a1, d.e1]]) {
+      ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 7
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+      ctx.strokeStyle = col; ctx.lineWidth = 4
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+    }
+    for (const pt of [d.a0, d.a1]) {                 // the two gap posts
+      ctx.fillStyle = d.done ? '#eafaef' : '#f1e3c4'; ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    }
+    ctx.fillStyle = d.done ? '#7fd79a' : '#9fd0ff'
+    ctx.font = '600 11px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(d.done ? '✓' : d.passed.size ? String(d.passed.size) : '+', d.x, d.y)
+    ctx.restore()
+  }
+}
+
 function drawObstacles() {
   if (obstacleArt.of !== sim.obstacles) {
     obstacleArt = { of: sim.obstacles, list: sim.obstacles.map((o) => ({ o, items: obstacleItems(o) })) }
   }
   for (const { o, items } of obstacleArt.list) {
+    if (o.kind === 'hurdle') continue // a drive-gate panel disc — drawDriveGates draws the panel itself
     // ground shadow / footprint = the collision circle
     ctx.fillStyle = o.kind === 'rocks' ? 'rgba(0,0,0,0.28)' : 'rgba(10,22,10,0.45)'
     ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill()
@@ -943,13 +953,17 @@ function drawSheep(s) {
     ctx.restore()
     return
   }
-  const t = Math.max(0, Math.min(1, s.stress)) // stress tint: white → alarm red
-  const cr = Math.round(230 + (220 - 230) * t)
-  const cg = Math.round(233 + (70 - 233) * t)
-  const cb = Math.round(236 + (60 - 236) * t)
+  const t = Math.max(0, Math.min(1, s.stress)) // stress tint: wool → alarm red
+  // POC-v14 FO4–FO6: a golden ewe is gold, a lamb is small, a ram is big, dun and horned
+  const [wr, wg, wb] = s.kind === 'golden' ? [255, 205, 60] : s.kind === 'ram' ? [196, 176, 150] : [230, 233, 236]
+  const cr = Math.round(wr + (220 - wr) * t)
+  const cg = Math.round(wg + (70 - wg) * t)
+  const cb = Math.round(wb + (60 - wb) * t)
   ctx.save()
   ctx.translate(s.pos.x, s.pos.y)
   ctx.rotate(s.facing)
+  if (s.kind === 'lamb') ctx.scale(0.62, 0.62)
+  else if (s.kind === 'ram') ctx.scale(1.3, 1.3)
   ctx.beginPath()
   const h = SHEEP_LEN / 2, w = SHEEP_LEN / 3
   ctx.moveTo(h, 0)      // nose (forward = +x, length SHEEP_LEN = 12)
@@ -958,9 +972,14 @@ function drawSheep(s) {
   ctx.closePath()
   ctx.fillStyle = `rgb(${cr},${cg},${cb})`
   ctx.fill()
-  ctx.strokeStyle = '#3a444d'
+  ctx.strokeStyle = s.kind === 'golden' ? '#8a6a10' : '#3a444d'
   ctx.lineWidth = 1
   ctx.stroke()
+  if (s.kind === 'ram') {                          // horns, either side of the nose
+    ctx.strokeStyle = s.stand ? '#ffd24a' : '#5a4632'; ctx.lineWidth = 1.6
+    ctx.beginPath(); ctx.arc(h - 3, 3.2, 2.4, 0.3, Math.PI * 1.5); ctx.stroke()
+    ctx.beginPath(); ctx.arc(h - 3, -3.2, 2.4, -Math.PI * 1.5, -0.3); ctx.stroke()
+  }
   ctx.restore()
 }
 
@@ -1453,6 +1472,13 @@ fTools.add({ f: newCourse }, 'f').name('Reseed → new flock')
 fTools.add({ f: () => restartRun() }, 'f').name('Reset run')
 fTools.add({ f: exportParams }, 'f').name('Export params → clipboard')
 fTools.add({ f: captureState }, 'f').name('Capture state → clipboard')
+
+// POC-v14: the score face. `project` maps sim px → #wrap px (the canvas is CSS-scaled to fit).
+ScoreUI.init({
+  page: 'pasture-2d', stage: document.getElementById('wrap'), badge: 'left', // the canvas draws its stress meter top-centre
+  project: (x, y) => { const k = canvas.clientWidth / canvas.width; return { x: x * k, y: y * k } },
+  setSeed, newCourse, restart: restartRun,
+})
 
 let last = performance.now() / 1000
 let acc = 0

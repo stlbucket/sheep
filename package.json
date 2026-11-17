@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/sim.test.js",
+    "test:pages": "node test/pages.test.js",
+    "test:all": "node test/sim.test.js && node test/pages.test.js"
   },
   "repository": {
     "type": "git",

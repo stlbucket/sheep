@@ -352,6 +352,7 @@
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
 <script src="lib/sheep-sim.js"></script>
 <script src="lib/sheep-gui.js"></script>
+<script src="lib/sheep-score-ui.js"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.
@@ -700,6 +701,30 @@ function rebuildCourse() {
     }
   }
 
+  // drive gates (POC-v14 FO1–FO3): two hurdle panels per gate, a post at each end;
+  // a gate the whole working flock has been through turns green
+  if (sim.driveGates.length) {
+    const hurdleMat = MAT.hurdle || (MAT.hurdle = lam(0xffffff)) // white: the per-instance colour is the paint
+    const panels = []
+    for (const d of sim.driveGates) panels.push([d.a0, d.e0, d.done], [d.a1, d.e1, d.done])
+    const bars = add(new THREE.InstancedMesh(unitBox, hurdleMat, panels.length * 3))
+    const ends = add(new THREE.InstancedMesh(unitBox, hurdleMat, panels.length * 2))
+    const dc = new THREE.Color()
+    panels.forEach(([a, b, done], i) => {
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      q.setFromAxisAngle(AX_Y, -Math.atan2(b.y - a.y, b.x - a.x))
+      for (let k = 0; k < 3; k++) {
+        m.compose(new V3((a.x + b.x) / 2, 3.5 + k * 4, (a.y + b.y) / 2), q, new V3(len, 1.5, 1.2))
+        bars.setMatrixAt(i * 3 + k, m); bars.setColorAt(i * 3 + k, dc.set(done ? 0x6fcf8c : 0xd9b877))
+      }
+      ;[a, b].forEach((pt, k) => {
+        m.compose(new V3(pt.x, k ? 7 : 9.5, pt.y), q, new V3(2.4, k ? 14 : 19, 2.4))  // the gap post (a) stands taller
+        ends.setMatrixAt(i * 2 + k, m); ends.setColorAt(i * 2 + k, dc.set(done ? 0xeafaef : k ? 0x8a6f48 : 0xf6ecd2))
+      })
+    })
+    for (const im of [bars, ends]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+  }
+
   // sun + shadow box follow the field
   const R = Math.hypot(p.canvasW, p.canvasH) / 2 + 260
   sun.position.set(cx - 650, 1000, cz + 520); sun.target.position.set(cx, 0, cz)
@@ -716,7 +741,7 @@ function rebuildCourse() {
   course.gate = g
   course.sig = courseSig()
 }
-const courseSig = () => [params.canvasW, params.canvasH, params.fenceInset, params.gateWidth, sim.sheep.length].join('|')
+const courseSig = () => [params.canvasW, params.canvasH, params.fenceInset, params.gateWidth, sim.sheep.length, sim.courseRev, sim.driveGates.filter((d) => d.done).length].join('|') // courseRev: a new wave re-lays the obstacles (POC-v14) · done gates turn green
 function takeSlot(from) {
   if (course.nextSlot < course.slots.length) return course.slots[course.nextSlot++]
   return { x: from.x, y: from.y, face: 0 } // more sheep than slots (herd grew mid-run) → stay put
@@ -749,6 +774,7 @@ for (const im of [woolMesh, headMesh, legMesh]) {
   scene.add(im)
 }
 woolMesh.receiveShadow = true
+const C_GOLD = new THREE.Color(0xf5c230), C_RAM = new THREE.Color(0xb39a7c) // POC-v14 FO4 / FO6
 const C_WOOL = new THREE.Color(0xf4f2ea), C_ALARM = new THREE.Color(0xdc463c), C_DOWN = new THREE.Color(0x7a1f1f)
 const PEN_WALK = 26 // px/s — the render-only stroll from the settle line to a paddock slot
 const sheepRS = new WeakMap() // per-sheep render state, keyed by the sim's sheep object (a reseed makes new ones)
@@ -757,9 +783,10 @@ const tmp = { pos: new V3(), scale: new V3(), qYaw: new Quat(), qRoll: new Quat(
 function updateSheep(dt, time) {
   const n = Math.min(sim.sheep.length, SHEEP_CAP), SC = params.L / 12 * 0.9
   const { pos, scale, qYaw, qRoll, q, qT, mBody, mLegs, mLocal, mOut, col } = tmp
-  scale.set(SC, SC, SC)
   for (let i = 0; i < n; i++) {
     const s = sim.sheep[i]
+    const KS = SC * (s.kind === 'lamb' ? 0.62 : s.kind === 'ram' ? 1.28 : 1) // POC-v14: a lamb is small, a ram is big
+    scale.set(KS, KS, KS)
     let st = sheepRS.get(s)
     if (!st) { st = { yaw: s.facing, phase: (i * 2.399) % 6.283, amp: 0, graze: 0, roll: 0, seed: (i * 0.618034) % 1, slot: null, x: 0, y: 0 }; sheepRS.set(s, st) }
     let x = s.pos.x, y = s.pos.y, speed = Math.hypot(s.vel.x, s.vel.y), face = s.facing
@@ -803,7 +830,7 @@ function updateSheep(dt, time) {
       legMesh.setMatrixAt(i * 4 + k, mOut.multiplyMatrices(mLegs, mLocal))
     }
     if (s.down) col.copy(C_DOWN)
-    else col.copy(C_WOOL).lerp(C_ALARM, clamp01(s.stress)) // stress tint, same read-out as the 2D page
+    else col.copy(s.kind === 'golden' ? C_GOLD : s.kind === 'ram' ? C_RAM : C_WOOL).lerp(C_ALARM, clamp01(s.stress)) // stress tint, same read-out as the 2D page
     woolMesh.setColorAt(i, col)
   }
   woolMesh.count = headMesh.count = n; legMesh.count = n * 4
@@ -1119,30 +1146,9 @@ resize()
 homeOrbit()
 
 // ---- score card + HUD (same read-outs as the 2D page) --------------------------
-let cardShown = false
-function showCard(sc) {
-  const el = document.getElementById('card')
-  const row = (label, pts) => `<div class="row"><span>${label}</span><span>−${pts.toFixed(1)}</span></div>`
-  el.innerHTML =
-    `<h2>${sc.won ? 'Penned! 🐑' : 'Run finished'}</h2>` +
-    `<div class="big">${sc.total.toFixed(0)}<small>/100</small></div>` +
-    row(`Time (${sc.raw.t.toFixed(0)}s)`, sc.time) +
-    row('Line — off ideal path', sc.line) +
-    row('Cohesion — splits / stragglers', sc.cohesion) +
-    row(`Calm — stress${sc.raw.injuries ? ` · ${sc.raw.injuries} injured` : ''}`, sc.calm) +
-    `<div class="foot">penned ${sc.penned}/${sim.sheep.length}</div>` +
-    `<div class="actions"><button data-card="dismiss" title="close this card and look at the field — R replays this same course">dismiss</button>` +
-    `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles (R replays this same course instead)">play again</button></div>`
-  el.style.display = 'block'
-}
-function hideCard() { document.getElementById('card').style.display = 'none'; cardShown = false }
-// dismiss only closes the card (cardShown stays set, so it does not pop straight back up); play again = a fresh random course (the reseed ↻ button)
-document.getElementById('card').addEventListener('click', (ev) => {
-  const b = ev.target.closest('button[data-card]')
-  if (!b) return
-  if (b.dataset.card === 'again') newCourse()
-  else document.getElementById('card').style.display = 'none'
-})
+// POC-v14: the score badge, the pops and the count-up tally card live in
+// lib/sheep-score-ui.js (one copy for all three pages) — see ScoreUI.init in §4.
+function hideCard() { ScoreUI.hide() }
 
 function updateHud(fps) {
   const sc = sim.score(), d = sim.dog
@@ -1150,7 +1156,7 @@ function updateHud(fps) {
     `fps ${fps.toFixed(0)}  cmd ${d.command}${d.flankEasy ? '·easy' : ''}${d.lieSide ? (d.lieSide < 0 ? '·left' : '·right') : ''}${d.impulse ? ' ⚡' + d.impulse.name : ''}\n` +
     `intensity ${d.intensity.toFixed(2)}${d.impulseFactor > 1 ? ' ×' + d.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
     `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
-    `time ${sc.raw.t.toFixed(0)}s  score ${sc.total.toFixed(0)}`
+    ScoreUI.hud(sim)
   if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
   if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
   if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
@@ -1160,7 +1166,7 @@ function updateHud(fps) {
   const mean = sim.sheep.length ? sum / sim.sheep.length : 0
   stressFill.style.width = (Math.min(1, mean * 2) * 100).toFixed(1) + '%'
   stressFill.style.background = `rgb(${Math.round(110 + 145 * mean)},${Math.round(200 - 170 * mean)},80)`
-  if (sim.run.finished && !cardShown) { showCard(sc); cardShown = true }
+  ScoreUI.frame(sim) // badge, pops, and the tally card when the run ends
 }
 
 function render3D(dt, time, fps) {
@@ -1301,6 +1307,17 @@ syncControllers('seed')
 for (const g of guis.roots) g.close() // raw-param panels start folded; the stage is the point of this page
 issue(sim.dog.command)
 setCam(CAMS.includes(query.get('cam')) ? query.get('cam') : 'orbit')
+
+// POC-v14: the score face. `project` maps a sim point to stage px through the live camera.
+const popV = new V3()
+ScoreUI.init({
+  page: 'pasture-3d', stage, badge: 'low', // clear of the camera bar and the stress meter
+  project: (x, y) => {
+    popV.set(x, 12, y).project(camera)
+    return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }
+  },
+  setSeed, newCourse, restart: restartRun,
+})
 
 let last = performance.now() / 1000
 let acc = 0, fps = 0, fpsAcc = 0, fpsFrames = 0, clock = 0

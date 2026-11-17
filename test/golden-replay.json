@@ -1,0 +1,9 @@
+{
+  "note": "sha256 of sheep + dog positions after 40 s; see test/sim.test.js FO-1",
+  "node": "v24.20.0",
+  "digest": {
+    "3": "9ff3e1e68d647fc169c93bcf267a664a67d8f2101f7c6c7c2bbef6b011e41f70",
+    "1337": "aac234c1f0913aed75041188dee40ddacf150b6ff3aebaaca5427826e671e4c5",
+    "90210": "5924c1b6a85fdde2c581ad883af7e25a6d37a7b536ddf4c57a59d18c0515cb11"
+  }
+}

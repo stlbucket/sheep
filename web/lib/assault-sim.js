@@ -213,9 +213,15 @@ function nearestGun(pos, inRange) {
   return best
 }
 function assaultStandDown() { assault.battle = null }
-function teamFlee(T) {
+// SC11 (POC-v14): a wolf driven off — or shot — pays sim.p.wolfPoints through
+// the sim's own count-up total, at the moment it happens.
+function wolfAward(sim, x, y) {
+  if (sim && sim.award && !sim.run.finished) sim.award('wolf', sim.p.wolfPoints, x, y, 'WOLF +' + Math.round(sim.p.wolfPoints))
+}
+function teamFlee(T, sim) {
   if (T.state === 'dead' || T.state === 'away' || T.state === 'flee') return
   T.state = 'flee'; T.back = LASER.fleeFor
+  T.wolves.forEach((w, i) => { if (w.alive) { const at = wolfAt(T, i); wolfAward(sim, at.x, at.y) } })
 }
 function stepBattle(sim, dt) {
   const a = assault, b = a.battle, d = sim.dog, gun = b.gun
@@ -254,9 +260,9 @@ function stepBattle(sim, dt) {
   }
   d.facing = gun.aim
   b.cool -= dt
-  if (tgt && b.cool <= 0) { fireLaser(gun, tgt); b.cool = LASER.cadence * (0.8 + 0.4 * a.rng()) }
+  if (tgt && b.cool <= 0) { fireLaser(gun, tgt, sim); b.cool = LASER.cadence * (0.8 + 0.4 * a.rng()) }
 }
-function fireLaser(gun, w) {
+function fireLaser(gun, w, sim) {
   const a = assault, T = w.T
   const dx = w.x - gun.x, dy = w.y - gun.y, dist = Math.hypot(dx, dy) || 1
   const sd = 1 + dist * 0.07 * (1 - Math.max(0, Math.min(1, ASSAULT.dogAccuracy)))   // scatter grows with the range: ~4 px at 300 with the default 0.85
@@ -269,9 +275,10 @@ function fireLaser(gun, w) {
     const wolf = T.wolves[w.i]
     wolf.x = w.x; wolf.y = w.y; wolf.alive = false
     a.wolvesDead++
-    for (const O of a.teams) teamFlee(O)
+    wolfAward(sim, w.x, w.y)
+    for (const O of a.teams) teamFlee(O, sim)
     if (T.wolves.every((o) => !o.alive)) T.state = 'dead'
-  } else if (result !== 'miss') teamFlee(T)
+  } else if (result !== 'miss') teamFlee(T, sim)
   assaultEmit('onLaser', gun, { x: w.x - dy / dist * el, y: w.y + dx / dist * el, dh: ev, result, T, i: w.i })
 }
 
@@ -372,7 +379,7 @@ function explode(sim, x, y) {
     const dx = s.pos.x - x, dy = s.pos.y - y, d = Math.hypot(dx, dy)
     if (d <= BLAST.panic && rocks.some((o) => distToSeg(o, at, s.pos) < o.r - 1)) continue
     if (d <= BLAST.kill) {
-      s.down = true; s.vel = { x: 0, y: 0 }; s.stress = 1; s.trot = false
+      s.down = true; s.lost = true; s.vel = { x: 0, y: 0 }; s.stress = 1; s.trot = false // lost: out of the flock for the sim's full-pen test (SC11)
       sim.injuries++; a.dead++; a.killed.add(s); a.stunned.delete(s); a.panicked.delete(s)
     } else if (d <= BLAST.stun) {
       a.stunned.set(s, { left: BLAST.stunFor, x: s.pos.x, y: s.pos.y }); a.panicked.delete(s)

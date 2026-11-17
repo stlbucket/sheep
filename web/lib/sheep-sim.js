@@ -208,17 +208,60 @@ const SETTINGS = [
   { key: 'trotRest', category: 'Trot', label: 'trot rest', type: 'float', default: 6, min: 0, max: 30, step: 0.5, unit: 's', description: 'T6: after dropping out of a trot (time limit, decay or fence) a sheep cannot be recruited or lead again for this long — stops a tight column re-recruiting its own drop-outs.', exposed: true },
   { key: 'trotWindDown', category: 'Trot', label: 'trot wind-down', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'T7: an unpressured sheep leaving the trot keeps walking on its line while its pace eases from trot to a stand over this long; `calm delay` later it is grazing. Felt pressure or a fence cancels it. 0 = drops straight out.', exposed: true },
 
-  // Scoring — subtractive: total = 100 − Σ weighted penalties; each axis
-  // accumulates a normalized 0..1 fraction/s, so weights read as points/s of full badness.
-  { key: 'w_time', category: 'Scoring', label: 'time penalty', type: 'float', default: 0.1, min: 0, max: 1, step: 0.01, unit: '—', description: 'Points lost per second of run time.', exposed: true },
-  { key: 'w_line', category: 'Scoring', label: 'line penalty', type: 'float', default: 0.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'Points lost per second fully off the ideal path.', exposed: true },
-  { key: 'w_cohesion', category: 'Scoring', label: 'cohesion penalty', type: 'float', default: 0.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'Points lost per straggler-fraction-second (+1.5× per split).', exposed: true },
-  { key: 'w_calm', category: 'Scoring', label: 'calm penalty', type: 'float', default: 0.6, min: 0, max: 5, step: 0.1, unit: '—', description: 'Points lost per second of full flock panic.', exposed: true },
-  { key: 'injuryWeight', category: 'Scoring', label: 'injury weight', type: 'float', default: 5, min: 0, max: 20, step: 0.5, unit: '—', description: 'Stress-seconds equivalent charged per injury.', exposed: false },
+  // Scoring — COUNT-UP (POC-v14, owner 2026-11-16): the score starts at 0 and only climbs. Points are
+  // EVENTS (a sheep through the gate, a bonus), never per-second penalties; see spec/POC-v14/scoring.md.
+  { key: 'penPoints', category: 'Scoring', label: 'points per sheep', type: 'int', default: 100, min: 0, max: 1000, step: 10, unit: 'pts', description: 'SC2: points for a sheep through the pen gate (owner Q75: 100).', exposed: true },
+  { key: 'penCalmPoints', category: 'Scoring', label: 'points per calm sheep', type: 'int', default: 200, min: 0, max: 2000, step: 10, unit: 'pts', description: 'SC3: points when that sheep WALKS through — stress below `calm stress`, not trotting, not panicking.', exposed: true },
+  { key: 'penCalmStress', category: 'Scoring', label: 'calm stress', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC3: a crossing counts as calm while the sheep\'s stress is below this.', exposed: true },
+  { key: 'comboWindow', category: 'Scoring', label: 'stream window', type: 'float', default: 2.5, min: 0, max: 10, step: 0.1, unit: 's', description: 'SC4: longest gap between two crossings that keeps the stream multiplier climbing.', exposed: true },
+  { key: 'comboMax', category: 'Scoring', label: 'stream multiplier cap', type: 'int', default: 5, min: 1, max: 20, step: 1, unit: '×', description: 'SC4: highest stream multiplier.', exposed: true },
+  { key: 'fullFlockBonus', category: 'Scoring', label: 'full-flock bonus', type: 'int', default: 1000, min: 0, max: 10000, step: 50, unit: 'pts', description: 'SC5: bonus for penning every sheep (per wave in wave mode).', exposed: true },
+  { key: 'cleanRunBonus', category: 'Scoring', label: 'clean-run bonus', type: 'int', default: 500, min: 0, max: 10000, step: 50, unit: 'pts', description: 'SC5: extra when no sheep was injured.', exposed: true },
+  { key: 'parBase', category: 'Scoring', label: 'par base', type: 'float', default: 45, min: 0, max: 300, step: 5, unit: 's', description: 'SC6: par time before the per-sheep allowance.', exposed: true },
+  { key: 'parPerSheep', category: 'Scoring', label: 'par per sheep', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'SC6: par time added per sheep.', exposed: true },
+  { key: 'parPointsPerSec', category: 'Scoring', label: 'time bonus rate', type: 'int', default: 20, min: 0, max: 500, step: 5, unit: 'pts/s', description: 'SC6: bonus points per whole second under par on a won run.', exposed: true },
+  { key: 'awardPoints', category: 'Scoring', label: 'award bonus', type: 'int', default: 300, min: 0, max: 5000, step: 50, unit: 'pts', description: 'SC10: bonus per named award.', exposed: true },
+  { key: 'quietHandBase', category: 'Scoring', label: 'quiet hand base', type: 'float', default: 6, min: 0, max: 60, step: 1, unit: 'cmds', description: 'SC10 Quiet Hand: command allowance before the per-sheep part.', exposed: true },
+  { key: 'quietHandPerSheep', category: 'Scoring', label: 'quiet hand per sheep', type: 'float', default: 0.5, min: 0, max: 5, step: 0.1, unit: 'cmds', description: 'SC10 Quiet Hand: extra commands allowed per sheep.', exposed: true },
+  { key: 'lineOnDist', category: 'Scoring', label: 'on-line distance', type: 'float', default: 60, min: 10, max: 300, step: 5, unit: 'px', description: 'SC10 Straight as a Die: the flock centre counts as ON the ideal line within this distance of it.', exposed: true },
+  { key: 'lineAwardShare', category: 'Scoring', label: 'line award share', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC10 Straight as a Die: share of the run the flock must spend on the line.', exposed: true },
+  { key: 'photoFinishSecs', category: 'Scoring', label: 'photo finish window', type: 'float', default: 3, min: 0, max: 30, step: 0.5, unit: 's', description: 'SC10 Photo Finish: won within this many seconds either side of par.', exposed: true },
+  { key: 'starCalmShare', category: 'Scoring', label: 'third-star calm share', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC9: share of the penned sheep that must have been calm for the third star.', exposed: true },
+  { key: 'wolfPoints', category: 'Scoring', label: 'wolf points', type: 'int', default: 300, min: 0, max: 5000, step: 50, unit: 'pts', description: 'SC11 (assault): points per wolf routed or killed.', exposed: true },
   { key: 'lineNorm', category: 'Scoring', label: 'line norm', type: 'float', default: 150, min: 20, max: 400, step: 5, unit: 'px', description: 'Path deviation that counts as "fully off-line".', exposed: false },
   { key: 'T_straggle', category: 'Scoring', label: 'straggle time', type: 'float', default: 3.0, min: 0, max: 6, step: 0.5, unit: 's', description: 'Seconds outside the blob before a sheep counts as a straggler.', exposed: true },
   { key: 'splitMinSize', category: 'Scoring', label: 'split min size', type: 'int', default: 3, min: 2, max: 8, step: 1, unit: '—', description: 'Min cluster size to count as a real sub-flock.', exposed: true },
   { key: 'clusterDist', category: 'Scoring', label: 'cluster link dist', type: 'float', default: 70, min: 20, max: 160, step: 5, unit: 'px', description: 'Link distance for cluster/split detection.', exposed: false },
+
+  // Objectives (POC-v14 field-objectives.md): optional drive gates in the pasture + special sheep.
+  { key: 'driveGateMax', category: 'Objectives', label: 'drive gates (max)', type: 'int', default: 2, min: 0, max: 4, step: 1, unit: '—', description: 'FO1: most drive gates a course can draw (0 = none). None in wave mode.', exposed: true, onChange: 'respawn' },
+  { key: 'driveGateChance', category: 'Objectives', label: 'drive gate chance', type: 'float', default: 0.5, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO1: chance each possible drive gate is present on a course.', exposed: true, onChange: 'respawn' },
+  { key: 'driveGateWidth', category: 'Objectives', label: 'drive gate gap', type: 'float', default: 90, min: 40, max: 200, step: 5, unit: 'px', description: 'FO1: gap between the two hurdle panels.', exposed: true, onChange: 'respawn' },
+  { key: 'driveGatePanel', category: 'Objectives', label: 'drive gate panel', type: 'float', default: 50, min: 20, max: 120, step: 5, unit: 'px', description: 'FO1/FO3: length of each solid hurdle panel.', exposed: true, onChange: 'respawn' },
+  { key: 'driveGatePoints', category: 'Objectives', label: 'drive gate points', type: 'int', default: 100, min: 0, max: 1000, step: 10, unit: 'pts', description: 'FO2: points per sheep through the gap (once per sheep per gate, either way).', exposed: true },
+  { key: 'driveGateBonus', category: 'Objectives', label: 'drive gate bonus', type: 'int', default: 500, min: 0, max: 10000, step: 50, unit: 'pts', description: 'FO2: bonus when every sheep still being worked has been through the same gate.', exposed: true },
+  { key: 'specials', category: 'Objectives', label: 'special sheep', type: 'boolean', default: true, unit: '—', description: 'FO4–FO6: whether a course may carry a golden ewe, a lamb with its mother and a stubborn ram (each rolls independently, at most one of each).', exposed: true, onChange: 'respawn' },
+  { key: 'goldenChance', category: 'Objectives', label: 'golden ewe chance', type: 'float', default: 0.35, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO4: chance a course has a golden ewe.', exposed: true, onChange: 'respawn' },
+  { key: 'goldenMult', category: 'Objectives', label: 'golden ewe worth', type: 'float', default: 5, min: 1, max: 20, step: 0.5, unit: '×', description: 'FO4: her worth as a multiple of an ordinary sheep (stacks with calm and the stream multiplier, owner Q81).', exposed: true },
+  { key: 'lambChance', category: 'Objectives', label: 'lamb chance', type: 'float', default: 0.35, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO5: chance a course has a lamb and its mother.', exposed: true, onChange: 'respawn' },
+  { key: 'lambMult', category: 'Objectives', label: 'lamb worth', type: 'float', default: 3, min: 1, max: 20, step: 0.5, unit: '×', description: 'FO5: the lamb\'s worth when it goes through right behind its mother (within the stream window).', exposed: true },
+  { key: 'lambFollow', category: 'Objectives', label: 'lamb follow', type: 'float', default: 1.5, min: 0, max: 6, step: 0.1, unit: '—', description: 'FO5: strength of the lamb\'s pull toward its mother (toward the gate once she is penned).', exposed: true },
+  { key: 'ramChance', category: 'Objectives', label: 'ram chance', type: 'float', default: 0.25, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO6: chance a course has a stubborn ram.', exposed: true, onChange: 'respawn' },
+  { key: 'ramMult', category: 'Objectives', label: 'ram worth', type: 'float', default: 3, min: 1, max: 20, step: 0.5, unit: '×', description: 'FO6: the ram\'s worth as a multiple of an ordinary sheep.', exposed: true },
+  { key: 'ramFleeScale', category: 'Objectives', label: 'ram flee scale', type: 'float', default: 0.6, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO6: how much of the dog\'s pressure the ram feels.', exposed: true },
+  { key: 'ramSpeedScale', category: 'Objectives', label: 'ram speed scale', type: 'float', default: 0.85, min: 0.3, max: 1, step: 0.05, unit: '—', description: 'FO6: the ram\'s top speed as a fraction of a sheep\'s.', exposed: true },
+  { key: 'ramStandDist', category: 'Objectives', label: 'ram stand distance', type: 'float', default: 60, min: 0, max: 200, step: 5, unit: 'px', description: 'FO6 (owner Q84): an advancing dog inside this distance makes the ram stop and face him.', exposed: true },
+  { key: 'ramStandRelease', category: 'Objectives', label: 'ram release distance', type: 'float', default: 110, min: 0, max: 300, step: 5, unit: 'px', description: 'FO6: the ram gives way again once the dog is beyond this distance.', exposed: true },
+  { key: 'ramStandWait', category: 'Objectives', label: 'ram stand wait', type: 'float', default: 2, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6: a dog lying down this long also makes a standing ram give way (and he will not stand again for as long).', exposed: true },
+
+  // Modes (POC-v14 replay-modes.md): course / daily are the same game with a different best-score key; waves is the arcade clock.
+  { key: 'mode', category: 'Modes', label: 'mode', type: 'enum', options: ['course', 'daily', 'waves'], default: 'course', unit: '—', description: 'RM4/RM5: `course` = one flock against par · `daily` = the same, on the seed for today\'s date · `waves` = a countdown clock, a little time per sheep penned, and a new larger flock every time the pen fills.', exposed: true, onChange: 'respawn' },
+  { key: 'waveClock', category: 'Modes', label: 'wave clock', type: 'float', default: 90, min: 10, max: 600, step: 5, unit: 's', description: 'RM5: starting time on the wave-mode clock.', exposed: true, onChange: 'respawn' },
+  { key: 'waveSecsPerSheep', category: 'Modes', label: 'wave time per sheep', type: 'float', default: 3, min: 0, max: 30, step: 0.5, unit: 's', description: 'RM5: time added per sheep penned.', exposed: true },
+  { key: 'waveClockMax', category: 'Modes', label: 'wave clock cap', type: 'float', default: 120, min: 10, max: 900, step: 5, unit: 's', description: 'RM5: most time the clock can hold.', exposed: true },
+  { key: 'waveSheepStart', category: 'Modes', label: 'wave first flock', type: 'int', default: 8, min: 1, max: 150, step: 1, unit: '—', description: 'RM5: flock size of the first wave (the `herd size` slider is ignored in wave mode).', exposed: true, onChange: 'respawn' },
+  { key: 'waveGrowth', category: 'Modes', label: 'wave growth', type: 'int', default: 2, min: 0, max: 20, step: 1, unit: '—', description: 'RM5 (owner Q89): extra sheep each wave.', exposed: true },
+  { key: 'waveSheepMax', category: 'Modes', label: 'wave flock cap', type: 'int', default: 40, min: 1, max: 150, step: 1, unit: '—', description: 'RM5: largest flock a wave can reach.', exposed: true },
 
   // Debug (render toggles — never exported)
   { key: 'debug.eye', category: 'Debug', label: 'flee cone + R_flee', type: 'boolean', default: true, unit: '—', description: 'Draw the dog\'s gaze cone and flee radius.', exposed: true, export: false },
@@ -336,9 +379,9 @@ const LEVERS = [
   { key: 'pastureClutter', domain: 'pasture-builder', label: 'Clutter', blurb: 'How much stands in the way (owner Q67, 2026-11-14): how many stands / rocks, how big, and how tight the lanes between them. Moves both the exact count and the top of the random range, so it works in either mode.', respawn: true,
     ends: { 0: 'bare grass, nothing to go round', 1: 'a wooded, rocky pasture with tight lanes' },
     params: { obstacleFreq: [0, 2, 12], obstacleRangeMax: [0, 24, 60], obstacleGroupMax: [1, 3, 5], obstacleRadiusMin: [14, 20, 30], obstacleRadiusMax: [30, 46, 70], obstacleMinGap: [90, 60, 36] } },
-  { key: 'pastureStrictness', domain: 'pasture-builder', label: 'Strictness', blurb: 'How harshly this course judges — how a fault is WEIGHED, not what a fault is (Judging stays raw).', respawn: false,
-    ends: { 0: 'zen, nothing punished', 1: 'championship trial' },
-    params: { w_time: [0.02, 0.1, 0.3], w_line: [0.08, 0.4, 1.2], w_cohesion: [0.08, 0.4, 1.2], w_calm: [0.12, 0.6, 1.8] } },
+  { key: 'pastureStrictness', domain: 'pasture-builder', label: 'Strictness', blurb: 'How much the course asks for before it pays (POC-v14: re-pointed from the old penalty weights at the count-up bonuses) — how calm is calm, how tight is a stream, how generous is par.', respawn: false,
+    ends: { 0: 'generous — bonuses come easily', 1: 'championship trial — every bonus is earned' },
+    params: { penCalmStress: [0.6, 0.3, 0.15], comboWindow: [4, 2.5, 1.5], parBase: [70, 45, 30], parPerSheep: [5, 3, 2] } },
 ]
 const LEVER_DOMAINS = [
   { key: 'dog-behavior', title: 'Dog' }, { key: 'sheep-behavior', title: 'Sheep' }, { key: 'pasture-builder', title: 'Pasture' },
@@ -350,10 +393,13 @@ const LEVER_NOT_LEVERED = {
   derived: ['goal', 'clusterSizeMin', 'heelIntensity'], // heelIntensity fixed at 0 by rule A7
   substrate: ['L', 'damping', 'accelScale', 'dt', 'maxFrameDelta', 'fenceSeekRamp', 'parkFade', 'driveCloseRate', 'driveBackoffRate', 'flankCornerFrom'], // smoothing widths / rule thresholds, not feel dials (flankCornerFrom: owner Q46 — 0, always corner-first)
   draws: ['seed', 'randomSeedOnLoad', 'spawnLayout'], // a draw, not a dial (F4/F5)
-  judging: ['injuryWeight', 'lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
+  judging: ['lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
   parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg',
     'walkSpeed', 'trotSlowSpeed', 'trotDriveDelay', 'trotPressMin', 'trotPressFrac', 'trotTurnWindow', 'trotTurnProb', 'trotMaxDur', 'trotRest', 'trotWindDown', 'gateConeGrow', 'gateConeDeg', 'gateConeMax'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
   obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge'], // owner 2026-11-14 — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
+  scoring: ['penPoints', 'penCalmPoints', 'comboMax', 'fullFlockBonus', 'cleanRunBonus', 'parPointsPerSec', 'awardPoints', 'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'starCalmShare', 'wolfPoints'], // POC-v14 point values — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
+  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateBonus', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait'], // POC-v14 field objectives
+  modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax'], // POC-v14 replay modes — a mode switch and the arcade clock
   // plus every `debug.*` render toggle
 }
 const SETTING_BY_KEY = Object.fromEntries(SETTINGS.map((e) => [e.key, e]))
@@ -580,6 +626,7 @@ function distToHull(hull, pt) {
 // collision circle. Pure data (no DOM), so all three pages draw the same
 // stand; the sim itself never reads it.
 function obstacleItems(o) {
+  if (o.kind === 'hurdle') return [] // a drive-gate panel disc (POC-v14) — pages draw the panels from sim.driveGates
   const rnd = makePRNG(o.seed), items = []
   if (o.kind === 'rocks') {
     items.push({ x: o.x, y: o.y, r: o.r * 0.95, tone: rnd() })
@@ -619,6 +666,8 @@ class FlockSim {
     this.ticks = 0
     this.sheep = []
     this.obstacles = []
+    this.driveGates = []  // FO1 (POC-v14)
+    this.courseRev = 0    // bumps whenever the course furniture is re-laid (pages rebuild on it)
     this.reseed(params.seed)
     // dog: a steering agent. `command` sets target/facing/intensity (P4); facing
     // is derived (eye on the flock's GCM), never manually steered. The home
@@ -642,12 +691,69 @@ class FlockSim {
     this.gateCone = { len: 0, ang: 0 } // G5 (POC-v13): extra reach of the gate's draw along `ang` (from the mouth toward the trot leaders)
     this.crushTime = 0    // seconds sustained over threshold
     this.injuries = 0     // down-sheep count (welfare hit; scoring uses it in P6)
-    this.resetRun()
   }
 
-  // Fresh subtractive-scoring accumulators for a new run (called on reseed).
+  // Fresh count-up scoring state for a new run (called on reseed, via spawn).
+  // POC-v14: `points` only ever grows; `tally` splits it into the card's
+  // lines; `scoreEvents` is a queue the PAGES drain to draw their pops (the
+  // sim never reads it). lineDev / strag / split / stress still accumulate —
+  // as statistics for the awards and the card, no longer as penalties.
   resetRun() {
-    this.run = { t: 0, lineDev: 0, strag: 0, split: 0, stress: 0, won: false, finished: false }
+    this.run = { t: 0, lineDev: 0, onLine: 0, strag: 0, split: 0, stress: 0, won: false, finished: false,
+      combo: 1, comboT: 0, comboLive: false, comboBest: 1, breaks: 0, crossings: 0, calmPenned: 0, commands: 0,
+      awards: [], wave: 0, waveInjuries: 0, clock: this.p.waveClock }
+    this.points = 0
+    this.tally = {}
+    this.scoreEvents = []
+  }
+
+  tallyAdd(kind, points) { if (points) this.tally[kind] = (this.tally[kind] || 0) + points }
+
+  // Add points for something that happened at (x, y) — the one way points
+  // enter the total apart from a pen crossing. Also used by lib/assault-sim.js.
+  award(kind, points, x, y, label) {
+    points = Math.round(points)
+    if (!(points > 0)) return
+    this.points += points
+    this.tallyAdd(kind, points)
+    this.scoreEvents.push({ kind, points, mult: 1, x, y, label: label || '+' + points })
+    if (this.scoreEvents.length > 256) this.scoreEvents.shift() // nobody draining (headless) → bounded
+  }
+
+  par() { return this.p.parBase + this.p.parPerSheep * this.sheep.length }
+
+  // SC5 (owner Q76): an injury subtracts nothing but ends the stream combo.
+  breakCombo() {
+    const run = this.run
+    if (run.comboLive) run.breaks++
+    run.combo = 1; run.comboLive = false
+  }
+
+  // SC2–SC4 + FO4–FO6: a sheep has just crossed into the pen.
+  onPenned(s) {
+    const p = this.p, run = this.run, g = this.gate
+    s.penT = run.t
+    if (run.finished) return
+    const calm = s.stress < p.penCalmStress && !s.trot && !s.panic
+    run.combo = run.comboLive ? Math.min(Math.max(1, Math.round(p.comboMax)), run.combo + 1) : 1
+    run.comboLive = true; run.comboT = 0; run.crossings++
+    if (run.combo > run.comboBest) run.comboBest = run.combo
+    if (calm) run.calmPenned++
+    const base = calm ? p.penCalmPoints : p.penPoints
+    let k = 1, tag = ''
+    if (s.kind === 'golden') { k = p.goldenMult; tag = 'GOLDEN ' }
+    else if (s.kind === 'ram') { k = p.ramMult; tag = 'RAM ' }
+    else if (s.kind === 'lamb') {
+      const m = this.sheep[s.mother]
+      if (m && m.through && run.t - m.penT <= p.comboWindow) { k = p.lambMult; tag = 'LAMB ' }
+    }
+    const worth = Math.round(base * k), total = worth * run.combo
+    this.tallyAdd('pen', Math.min(p.penPoints, base)); this.tallyAdd('calm', base - Math.min(p.penPoints, base))
+    this.tallyAdd('special', worth - base); this.tallyAdd('stream', total - worth)
+    this.points += total
+    this.scoreEvents.push({ kind: 'pen', points: total, mult: run.combo, x: g.x, y: g.y, label: tag + '+' + worth + (run.combo > 1 ? ' ×' + run.combo : '') })
+    if (this.scoreEvents.length > 256) this.scoreEvents.shift()
+    if (p.mode === 'waves') run.clock = Math.min(p.waveClockMax, run.clock + p.waveSecsPerSheep) // RM5
   }
 
   // Working-flock centroid — drives all dog steering. Excludes penned (through)
@@ -808,8 +914,10 @@ class FlockSim {
                   bark: ['barkMult', 'barkDur', 'barkDecay'],
                   lean: ['leanMult', 'leanDur', 'leanDecay'] }[f] || []
       d.impulse = { name: f, mult: p[K[0]], dur: p[K[1]], decay: p[K[2]], t: 0 }
+      this.run.commands++ // SC10 Quiet Hand: an impulse is a command too
       return
     }
+    const was = d.command + '|' + d.flankEasy + '|' + d.lieSide
     d.impulse = null
     // POC-v10 (owner 2026-08-24): the C11/D4 variants ride the entry opts —
     // never new verbs. Every other command clears them.
@@ -849,6 +957,7 @@ class FlockSim {
     d.stallT = 0; d.driveT = 0 // fresh command → fresh stall watch + spool-up (E2)
     d.fwdEMA = this.p.stallSpeed * 3 // seeded optimistic so spool-up can't false-trip
     d.command = cmd
+    if (was !== cmd + '|' + d.flankEasy + '|' + d.lieSide) this.run.commands++ // SC10 Quiet Hand — repeats of the live command are free
   }
 
   playRect() {
@@ -868,15 +977,144 @@ class FlockSim {
   // (re)seed the PRNG, place the course, and respawn the whole herd —
   // deterministic given seed (same seed → same gate, same spawn side).
   reseed(seed) {
-    this.rng = makePRNG(seed >>> 0)
+    this.seed = seed >>> 0
+    this.rng = makePRNG(this.seed)
     this.placeGate()
-    this.placeObstacles(seed >>> 0)
-    this.spawn()
+    this.placeObstacles(this.seed)
+    this.spawn(this.p.mode === 'waves' ? this.p.waveSheepStart : undefined) // RM5: wave mode starts small
+    // POC-v14: drive gates and special sheep come AFTER the flock and draw from
+    // their own streams, so a seed's gate, obstacles and flock are exactly
+    // what they were before either existed.
+    this.placeDriveGates(this.seed)
+    this.assignSpecials(this.seed)
+    this.courseRev++
     if (this.dog) {
       this.dog.avoidSide = 0
       this.faceFlock()             // F1 — after spawn(): the NEW herd's GCM
       this.setCommand('that_ll_do') // a new course starts at heel — a bare reseed() used to
     }                               // inherit the previous drive (bit the v5 P6 harness)
+    this.run.commands = 0           // …and that recall is not the player's
+  }
+
+  // FO1–FO3 (POC-v14): optional DRIVE GATES — a pair of short hurdle panels
+  // with a gap between them, standing in open pasture. Each possible gate is
+  // present with driveGateChance; a present one is rejection-sampled clear of
+  // the fence, the pen gate's approach, the handler's post, every obstacle,
+  // every sheep's starting spot and the other gates. The panels join the
+  // solid set as rows of small `hurdle` discs, so pushOut / obstacleForce /
+  // dogDetour handle them with no new steering code (they give no cover —
+  // coverBetween skips them). Own PRNG stream; none in wave mode (owner Q85).
+  placeDriveGates(seed) {
+    const p = this.p, r = this.playRect(), gt = this.gate
+    this.driveGates = []
+    const max = p.mode === 'waves' ? 0 : Math.max(0, Math.round(p.driveGateMax))
+    if (!max) return
+    const rnd = makePRNG((seed ^ 0x51ed270b) >>> 0)
+    const half = p.driveGateWidth / 2, span = half + p.driveGatePanel
+    const inset = span + p.r_obstacle + p.L
+    const w = r.x1 - r.x0 - 2 * inset, h = r.y1 - r.y0 - 2 * inset
+    if (w <= 0 || h <= 0) return
+    const gateClear = Math.max(p.spawnGateClear, p.gateAttractR, 100) + span
+    for (let k = 0; k < max; k++) {
+      if (rnd() >= p.driveGateChance) continue
+      for (let tries = 0; tries < 60; tries++) {
+        const x = r.x0 + inset + rnd() * w, y = r.y0 + inset + rnd() * h, ang = rnd() * Math.PI
+        const tx = Math.cos(ang), ty = Math.sin(ang)
+        const e0 = { x: x - tx * span, y: y - ty * span }, e1 = { x: x + tx * span, y: y + ty * span }
+        const a0 = { x: x - tx * half, y: y - ty * half }, a1 = { x: x + tx * half, y: y + ty * half }
+        if (Math.hypot(x - gt.x, y - gt.y) < gateClear) continue
+        if (Math.hypot(x - this.home.x, y - this.home.y) < 50 + span) continue
+        if (this.obstacles.some((o) => distToSeg(o, e0, e1) < o.r + p.r_obstacle + p.L)) continue
+        if (this.driveGates.some((d) => Math.hypot(d.x - x, d.y - y) < 2 * span + p.clusterMinGap / 2)) continue
+        if (this.sheep.some((s) => distToSeg(s.pos, e0, a0) < p.L * 1.5 || distToSeg(s.pos, a1, e1) < p.L * 1.5)) continue
+        this.driveGates.push({ x, y, angle: ang, tx, ty, nx: -ty, ny: tx, half, e0, a0, a1, e1, done: false, passed: new Set(), sides: new Map() })
+        break
+      }
+    }
+    const hr = p.L / 3 // panel disc radius — a hurdle is about a third of a sheep thick
+    this.driveGates.forEach((d, gi) => {
+      for (const [from, to] of [[d.a0, d.e0], [d.a1, d.e1]]) {
+        const n = Math.max(2, Math.ceil(p.driveGatePanel / (2 * hr)) + 1)
+        for (let i = 0; i < n; i++) {
+          const u = i / (n - 1)
+          this.obstacles.push({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u, r: hr, kind: 'hurdle', group: -1 - gi, seed: 0 })
+        }
+      }
+    })
+  }
+
+  // FO2: a sheep that crosses the gap segment (either way, owner Q82) scores
+  // once per gate; when every sheep still being worked has been through the
+  // same gate it pays its bonus and is done.
+  updateDriveGates() {
+    const p = this.p
+    for (const dg of this.driveGates) {
+      if (dg.done) continue
+      let scored = false
+      for (const s of this.sheep) {
+        if (s.through || s.down) continue
+        const rx = s.pos.x - dg.x, ry = s.pos.y - dg.y
+        const side = rx * dg.nx + ry * dg.ny, along = rx * dg.tx + ry * dg.ty
+        const prev = dg.sides.get(s)
+        dg.sides.set(s, side)
+        if (prev === undefined || dg.passed.has(s)) continue
+        if ((prev < 0) !== (side < 0) && Math.abs(along) < dg.half) {
+          dg.passed.add(s); scored = true
+          this.award('gate', p.driveGatePoints, s.pos.x, s.pos.y)
+        }
+      }
+      if (!scored) continue
+      let all = true, working = 0
+      for (const s of this.sheep) if (!s.through && !s.down) { working++; if (!dg.passed.has(s)) { all = false; break } }
+      if (all && working > 0) { dg.done = true; this.award('gate', p.driveGateBonus, dg.x, dg.y, 'DRIVE GATE +' + Math.round(p.driveGateBonus)) }
+    }
+  }
+
+  // FO4–FO6 (POC-v14): special sheep. Each kind rolls independently (owner
+  // Q83), at most one of each, on its own PRNG stream — three fixed draws for
+  // the rolls, then the picks. The lamb is stood beside its mother and joins
+  // her group. With `specials` off every sheep is a plain 'ewe'.
+  assignSpecials(seed) {
+    const p = this.p, n = this.sheep.length
+    for (const s of this.sheep) { s.kind = 'ewe'; s.mother = -1 }
+    if (!p.specials || n < 4) return
+    const rnd = makePRNG((seed ^ 0x2545f491) >>> 0)
+    const golden = rnd() < p.goldenChance, ram = rnd() < p.ramChance, lamb = rnd() < p.lambChance
+    const taken = new Set()
+    const pick = () => {
+      for (let t = 0; t < 40; t++) { const i = Math.floor(rnd() * n) % n; if (!taken.has(i)) { taken.add(i); return i } }
+      return -1
+    }
+    if (golden) { const i = pick(); if (i >= 0) this.sheep[i].kind = 'golden' }
+    if (ram) { const i = pick(); if (i >= 0) this.sheep[i].kind = 'ram' }
+    if (lamb) {
+      const m = pick(), l = pick()
+      if (m >= 0 && l >= 0) {
+        const mum = this.sheep[m], s = this.sheep[l], r = this.playRect(), a = rnd() * Math.PI * 2
+        s.kind = 'lamb'; s.mother = m; s.group = mum.group; s.wanderer = false; mum.wanderer = false
+        s.pos = { x: Math.max(r.x0, Math.min(r.x1, mum.pos.x + Math.cos(a) * p.L)), y: Math.max(r.y0, Math.min(r.y1, mum.pos.y + Math.sin(a) * p.L)) }
+        this.pushOut(s.pos, 3)
+      }
+    }
+  }
+
+  // RM5 (POC-v14): the pen has filled in wave mode — empty it, keep the score,
+  // the gate and the fence, and lay a new, larger flock (and fresh obstacles
+  // and specials, owner Q85 / Q89) from a stream derived from seed + wave, so
+  // a seed's wave run is repeatable. The dog carries on where he stands.
+  nextWave() {
+    const p = this.p, run = this.run
+    run.wave++
+    const ws = (this.seed ^ Math.imul(run.wave, 0x85ebca6b)) >>> 0
+    this.rng = makePRNG(ws)
+    this.placeObstacles(ws)
+    this.driveGates = []
+    const n = Math.min(Math.max(p.waveSheepStart, p.waveSheepMax), p.waveSheepStart + p.waveGrowth * run.wave)
+    this.spawn(n, true)
+    this.assignSpecials(ws)
+    run.waveInjuries = this.injuries
+    this.dog.avoidSide = 0
+    this.courseRev++
   }
 
   // P6 (F1): the gate lives on the PERIMETER at a seeded random spot. Sides:
@@ -1040,6 +1278,7 @@ class FlockSim {
   coverBetween(a, b) {
     let cover = 0
     for (const o of this.obstacles) {
+      if (o.kind === 'hurdle') continue // a drive-gate panel hides nothing (FO3)
       const depth = o.r - distToSeg(o, a, b)
       if (depth <= 0) continue
       const c = smoothstep(0, this.p.obstacleCoverEdge, depth)
@@ -1193,9 +1432,9 @@ class FlockSim {
     }
   }
 
-  spawn() {
+  spawn(count, keepRun) {
     const r = this.playRect()
-    const p = this.p, n = p.sheepCount
+    const p = this.p, n = count === undefined ? p.sheepCount : Math.max(1, Math.round(count))
     const gt = this.gate
     this.layout = this.pickLayout()
     const sampler = this.makeSampler(this.layout)
@@ -1244,9 +1483,9 @@ class FlockSim {
     this.idealPath = [start, { x: gt.x, y: gt.y }, { x: p.goal.x, y: p.goal.y }]
     this.nextGroup = sizes.length // fresh ids for groups re-derived after pressure (B2)
     this.groupCap = {} // per-group target size for re-derived groups (spawn groups default to clusterSizeMax)
-    this.crush = 0; this.crushTime = 0; this.injuries = 0
+    this.crush = 0; this.crushTime = 0
     this.trotTurnT = 0; this.trotDogSweep = 0; this.gateCone = { len: 0, ang: 0 }
-    this.resetRun()
+    if (!keepRun) { this.injuries = 0; this.resetRun() } // a new wave (RM5) keeps the run and its score
   }
 
   // B2: an alert sheep settles back to idle — join the nearest already-idle
@@ -1326,6 +1565,13 @@ class FlockSim {
         trotRest: 0,                       // T6: seconds before it may trot again
         trotEase: 0,                       // T7: seconds left of the wind-down walk
         trotEaseDir: 0,                    //   …along this heading (rad)
+        kind: 'ewe',                       // POC-v14 FO4–FO6: 'ewe' | 'golden' | 'lamb' | 'ram' (assignSpecials)
+        mother: -1,                        //   lamb: index of its ewe
+        stand: false,                      //   ram: standing his ground, facing the dog (owner Q84)
+        standLie: 0,                       //   …how long the dog has been lying down in front of him (s)
+        standCool: 0,                      //   …seconds before he may stand again
+        penT: 0,                           // run time at which it crossed into the pen
+        lost: false,                       // killed by the assault — out of the flock (SC11)
     })
   }
 
@@ -1736,6 +1982,19 @@ class FlockSim {
     // postureRange reach, so off-beam gate relief survives.
     const Rp = p.R_flee * p.postureRange, Rb = p.R_flee * (1 + p.lieConeExt)
     const reach = lying ? Math.max(Rp, Rb) : Rc
+    // FO6 (owner Q84): the stubborn ram. An advancing dog inside ramStandDist
+    // makes him stop and face the dog; he gives way once the dog is beyond
+    // ramStandRelease, or has lain down for ramStandWait (after which he will
+    // not stand again for as long).
+    if (a.kind === 'ram') {
+      if (a.standCool > 0) a.standCool -= dt
+      if (a.stand) {
+        a.standLie = lying ? a.standLie + dt : 0
+        if (dist > p.ramStandRelease) a.stand = false
+        else if (a.standLie >= p.ramStandWait) { a.stand = false; a.standCool = p.ramStandWait }
+      } else if (dist < p.ramStandDist && dist > 1e-6 && a.standCool <= 0 &&
+                 (d.vel.x * to.x + d.vel.y * to.y) / dist > p.stallSpeed) { a.stand = true; a.standLie = 0 }
+    }
     if (dist >= reach || dist < 1e-6) {
       a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
     }
@@ -1764,7 +2023,9 @@ class FlockSim {
     // Cover: a stand / rock between the dog and this sheep hides it from him —
     // the pressure fades by how deep the sight line cuts into the obstacle.
     if (T > 0 && p.obstacleCover > 0 && this.obstacles.length) T *= 1 - p.obstacleCover * this.coverBetween(d.pos, a.pos)
+    if (a.kind === 'ram') T *= p.ramFleeScale // FO6: he feels less of the dog
     a.stress = T
+    if (a.stand) return { x: 0, y: 0 }        //   …and standing, yields nothing
     const hold = a.boldness * p.boldnessTheta
 
     if (a.protest > 0) {                    // active protest → brief stamp toward dog
@@ -1896,7 +2157,18 @@ class FlockSim {
     // instantly; idle only resumes after calmDelay of continuous zero threat
     // (hysteresis — no flicker at the threat boundary), re-deriving the
     // sheep's group from whoever settled nearby.
-    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0) { // threat, the gate's draw (G2) or a trot (T2) keeps a sheep alert
+    // FO5 (POC-v14): a lamb is drawn to its mother — and, once she is penned,
+    // to the gate after her. Out of reach of her it is alert, not grazing.
+    let fLamb = { x: 0, y: 0 }
+    if (s.kind === 'lamb' && s.mother >= 0 && this.sheep[s.mother] && !this.sheep[s.mother].down) {
+      const mum = this.sheep[s.mother], gt = this.gate
+      const at = mum.through ? { x: gt.x + gt.nx * 8, y: gt.y + gt.ny * 8 } : mum.pos
+      const to = vec2.sub(at, s.pos), dm = vec2.len(to)
+      const gap = mum.through ? 0 : p.r_sep
+      if (dm > gap + 1e-4) fLamb = vec2.scale(vec2.norm(to), smoothstep(gap, gap + p.idleCohRadius, dm))
+    }
+    const lambFar = vec2.len(fLamb) > 0.5
+    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0 || lambFar || s.stand) { // threat, the gate's draw (G2), a trot (T2), a lamb after its mother or a standing ram keeps a sheep alert
       s.idle = false
       s.calmT = 0
     } else if (!s.idle) {
@@ -1998,7 +2270,9 @@ class FlockSim {
     accel = vec2.add(accel, vec2.scale(fThrough, p.w_through))
     accel = vec2.add(accel, vec2.scale(fGate, p.w_gateAttract))
     accel = vec2.add(accel, vec2.scale(fTrot, p.w_trot))
+    accel = vec2.add(accel, vec2.scale(fLamb, p.lambFollow))
     accel = vec2.scale(accel, p.accelScale)
+    if (s.stand) accel = { x: 0, y: 0 } // FO6: a standing ram is rooted (damping stops him)
 
     // integrate: v ← clampLen((v + a·dt)·damping, vMax) ; p ← p + v·dt
     // panicking sheep get a higher speed cap so they can bolt; idle sheep are
@@ -2007,6 +2281,7 @@ class FlockSim {
     let vmax = s.panic ? p.vMax * p.panicMult : Math.min(p.walkSpeed, p.vMax)
     if (s.trot) vmax = Math.max(vmax, this.trotPace(s)) // a trot outruns the walk cap (still below panic)
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
+    if (s.kind === 'ram') vmax *= p.ramSpeedScale // FO6
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
     if (this.obstacles.length) this.pushOut(s.pos, 2, s.vel) // obstacles are solid
@@ -2019,6 +2294,7 @@ class FlockSim {
     const outGate = (s.pos.x - gt.x) * gt.nx + (s.pos.y - gt.y) * gt.ny
     if (alongGate < p.gateWidth / 2 && outGate > 0) {
       s.through = true
+      this.onPenned(s) // POC-v14: the count-up score is paid here
     } else {
       if (s.pos.x < r.x0) { s.pos.x = r.x0; if (s.vel.x < 0) s.vel.x = 0 }
       if (s.pos.x > r.x1) { s.pos.x = r.x1; if (s.vel.x > 0) s.vel.x = 0 }
@@ -2027,7 +2303,8 @@ class FlockSim {
     }
 
     // stable facing: track heading only when actually moving (no flicker at rest)
-    if (vec2.len(s.vel) > 2) s.facing = Math.atan2(s.vel.y, s.vel.x)
+    if (s.stand) s.facing = Math.atan2(this.dog.pos.y - s.pos.y, this.dog.pos.x - s.pos.x) // FO6: he faces the dog
+    else if (vec2.len(s.vel) > 2) s.facing = Math.atan2(s.vel.y, s.vel.x)
   }
 
   // Trot (POC-v9 flock-behavior T1–T3, owner 2026-08-24). T1: a cluster of
@@ -2296,6 +2573,7 @@ class FlockSim {
     if (best >= 0) {
       const s = this.sheep[best]
       s.down = true; s.vel = { x: 0, y: 0 }; s.stress = 1; this.injuries++
+      this.breakCombo() // SC5 (owner Q76)
     }
   }
 
@@ -2326,12 +2604,23 @@ class FlockSim {
     return best
   }
 
-  // Accumulate the four subtractive-scoring axes over the run (pure).
+  // Per-tick scoring bookkeeping (POC-v14 count-up). Points themselves are
+  // paid by events (onPenned / award); this keeps the run clock, the
+  // statistics the awards read, the stream window, the drive gates, the wave
+  // clock, and notices the end of the run (or of a wave).
   updateScore(dt) {
     const p = this.p, run = this.run
     if (run.finished) return
     run.t += dt
-    run.lineDev += Math.min(this.distToPath(this.gcm) / p.lineNorm, 1) * dt // line: 0..1/s off-path
+    const dev = this.distToPath(this.gcm)
+    run.lineDev += Math.min(dev / p.lineNorm, 1) * dt        // line: 0..1/s off-path (a statistic now)
+    if (dev <= p.lineOnDist) run.onLine += dt                // SC10 Straight as a Die
+
+    // SC4: the stream lapses when no sheep has crossed for comboWindow
+    if (run.comboLive) {
+      run.comboT += dt
+      if (run.comboT > p.comboWindow) { run.comboLive = false; run.combo = 1; run.breaks++ }
+    }
 
     // cohesion is judged over the flock still being worked — exclude penned
     // (succeeded) and down (already penalized) so spanning the gate isn't a "split"
@@ -2358,29 +2647,85 @@ class FlockSim {
 
     let sum = 0
     for (const s of this.sheep) sum += s.stress
-    run.stress += (sum / this.sheep.length) * dt           // calm: mean-stress integral
+    run.stress += this.sheep.length ? (sum / this.sheep.length) * dt : 0 // calm: mean-stress integral
 
-    let penned = 0
-    for (const s of this.sheep) if (s.through) penned++
-    if (penned >= this.sheep.length) { run.won = true; run.finished = true } // win = all penned
+    if (this.driveGates.length) this.updateDriveGates()    // FO2
+
+    // The pen is full when every sheep still on its feet is in it: an injured
+    // (down) sheep — or one lost to the assault (SC11) — never scores, and no
+    // longer holds the run open (SC5 / SC9 need a won run with an injury).
+    let penned = 0, down = 0
+    for (const s of this.sheep) { if (s.through) penned++; else if (s.down) down++ }
+    const full = this.sheep.length > 0 && penned >= this.sheep.length - down
+    if (p.mode === 'waves') {                              // RM5 / RM6
+      if (full) {
+        const g = this.gate
+        if (penned > 0) {
+          this.award('flock', p.fullFlockBonus, g.x, g.y, 'FULL FLOCK +' + Math.round(p.fullFlockBonus))
+          if (this.injuries === run.waveInjuries) this.award('clean', p.cleanRunBonus, g.x, g.y, 'CLEAN +' + Math.round(p.cleanRunBonus))
+        }
+        this.nextWave()
+      }
+      run.clock -= dt
+      if (run.clock <= 0) { run.clock = 0; run.finished = true }
+      return
+    }
+    if (full) this.finishCourse(penned)
+  }
+
+  // The whole flock is in: pay the end-of-run bonuses (SC5, SC6, SC10).
+  finishCourse(penned) {
+    const p = this.p, run = this.run, g = this.gate
+    run.finished = true
+    run.won = penned > 0
+    if (!run.won) return
+    this.award('flock', p.fullFlockBonus, g.x, g.y, 'FULL FLOCK +' + Math.round(p.fullFlockBonus))
+    if (this.injuries === 0) this.award('clean', p.cleanRunBonus, g.x, g.y, 'CLEAN RUN +' + Math.round(p.cleanRunBonus))
+    const par = this.par(), under = Math.floor(Math.max(0, par - run.t))
+    this.award('time', under * p.parPointsPerSec, g.x, g.y, 'UNDER PAR +' + Math.round(under * p.parPointsPerSec))
+    const give = (name) => { run.awards.push(name); this.award('award', p.awardPoints, g.x, g.y, name + ' +' + Math.round(p.awardPoints)) }
+    if (run.calmPenned >= penned) give('Not a Hair Out of Place')
+    if (run.breaks === 0 && penned >= 2) give('One Stream')
+    if (run.commands <= p.quietHandBase + p.quietHandPerSheep * this.sheep.length) give('Quiet Hand')
+    if (run.t > 0 && run.onLine / run.t >= p.lineAwardShare) give('Straight as a Die')
+    if (Math.abs(par - run.t) <= p.photoFinishSecs) give('Photo Finish')
   }
 
   finishRun() { this.run.finished = true }
 
-  // Current sub-scores + total (100 − Σ weighted penalties). Pure read-out.
+  // The score read-out (pure). `lines` sum to `total`; `stars` per SC9.
   score() {
-    const p = this.p, run = this.run
-    const time = p.w_time * run.t
-    const line = p.w_line * run.lineDev
-    const cohesion = p.w_cohesion * (run.strag + 1.5 * run.split)
-    const calm = p.w_calm * (run.stress + p.injuryWeight * this.injuries)
+    const p = this.p, run = this.run, t = this.tally, waves = p.mode === 'waves'
     let penned = 0
     for (const s of this.sheep) if (s.through) penned++
+    const par = this.par()
+    const L = (key, label) => ({ key, label, points: t[key] || 0 })
+    const lines = [
+      L('pen', `Sheep penned (${run.crossings})`),
+      L('calm', `Calm bonus (${run.calmPenned} calm)`),
+      L('special', 'Special sheep'),
+      L('stream', `Stream bonus (best ×${run.comboBest})`),
+      L('gate', 'Drive gates'),
+      L('wolf', 'Wolves routed'),
+      L('flock', waves ? `Full flock (${run.wave} wave${run.wave === 1 ? '' : 's'})` : 'Full flock'),
+      L('clean', waves ? 'Clean waves' : 'Clean run'),
+      L('time', `Time bonus (${Math.floor(Math.max(0, par - run.t))}s under par)`),
+      L('award', `Awards (${run.awards.length})`),
+    ].filter((l) => l.points > 0 || l.key === 'pen')
+    let stars = 0
+    if (!waves && run.won) {
+      stars = 1
+      if (run.t <= par) {
+        stars = 2
+        if (this.injuries === 0 && run.crossings > 0 && run.calmPenned / run.crossings >= p.starCalmShare) stars = 3
+      }
+    }
     return {
-      time, line, cohesion, calm,
-      total: Math.max(0, 100 - time - line - cohesion - calm),
-      penned, won: run.won, finished: run.finished,
-      raw: { t: run.t, lineDev: run.lineDev, strag: run.strag, split: run.split, stress: run.stress, injuries: this.injuries },
+      total: this.points, lines, stars, awards: run.awards.slice(),
+      penned, calmPenned: run.calmPenned, combo: run.comboLive ? run.combo : 1, comboBest: run.comboBest,
+      par, parLeft: par - run.t, mode: p.mode, wave: run.wave, clock: run.clock,
+      won: run.won, finished: run.finished,
+      raw: { t: run.t, lineDev: run.lineDev, onLine: run.onLine, strag: run.strag, split: run.split, stress: run.stress, injuries: this.injuries, commands: run.commands, crossings: run.crossings },
     }
   }
 
@@ -2393,7 +2738,7 @@ class FlockSim {
     for (let i = 0; i < this.sheep.length; i++) this.integrate(i, dt)
     for (const s of this.sheep) s.gatePull = s.gatePullNext // G3 column reads last tick's pull
     this.updateCrush(dt)               // gate crush → injury
-    this.updateScore(dt)               // four-axis subtractive scoring
+    this.updateScore(dt)               // count-up scoring bookkeeping (POC-v14)
     this.ticks++
   }
 }

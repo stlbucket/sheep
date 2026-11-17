@@ -6,6 +6,10 @@ against acceptance criteria. Prefer **measured** checks over screenshot
 eyeballing; use screenshots to confirm the qualitative read and to show the
 owner.
 
+## Repeatable suites first
+
+The repo carries two regression suites (see `test/README.md`): `npm test` for the sim in plain node and `npm run test:pages` for the three pages in headless Chrome from `file://`. Run them before and after any change, and add new measured checks there rather than in throwaway scripts.
+
 ## What to verify
 
 - `verify <VERSION>` → every **Acceptance** section in that version's specs,

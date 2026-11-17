@@ -40,6 +40,7 @@ web/                      the running prototype — open web/index.html
 └── lib/
     ├── sheep-sim.js      §0 PARAMS + §1 SIM — the physics, DOM-free, ONE copy
     ├── sheep-gui.js      lil-gui panels generated from the SETTINGS schema
+    ├── sheep-score-ui.js score badge, pops, tally card, saved bests, daily / waves buttons (DOM, shared)
     └── assault-sim.js    the assault's physics, DOM-free and three-free
 ```
 

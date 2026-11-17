@@ -18,7 +18,7 @@ const HOOKS = { respawn: () => { resizeCanvas(); sim.reseed(params.seed) } } // 
 const PANELS = [
   { id: 'panel-sheep', title: 'Sheep', categories: ['Sheep', 'Idle', 'Boids', 'Boldness', 'Trot'] },
   { id: 'panel-dog', title: 'Dog', categories: ['Dog', 'Flee / Eye'] },
-  { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Obstacles', 'Spawn', 'Scoring', 'Debug', 'Sim'], collapsed: true },
+  { id: 'panel-meta', title: 'Course & Meta', categories: ['Stage', 'Gate + Crush', 'Obstacles', 'Spawn', 'Scoring', 'Objectives', 'Modes', 'Debug', 'Sim'], collapsed: true },
 ]
 
 // lil-gui panels (UMD build → window.lil.GUI) — fully generated from SETTINGS,
