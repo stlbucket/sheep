@@ -53,6 +53,8 @@ Setting `trotTurnWindow`, `trotMaxDur`, `trotRest`, `trotWindDown` and `gateCone
 | `panicThreshold` | 0.6 → 0.7 | less panic sprinting (Nerve anchor `[0.9, 0.7, 0.4]`) |
 | `panicMult` | 1.6 → 1.4 | a slower sprint (Nerve anchor `[1.2, 1.4, 2]`) |
 | `perimeterMargin` | 36 → 44 | owner 2026-11-16: sheep too stressed with the dog near, "back him off a few pixels"; mean stress of pressed sheep during flanks 0.210 → 0.175 over 8 seeds (Standoff anchor `[24, 44, 64]`) |
+| `walkOnSpeedFrac` | 1 → 0.85 | owner 2026-11-16: walk-on "a bit slower" — 51 px/s against the sheep's 60 walk (Standoff anchor `[1.05, 0.85, 0.7]`) |
+| `driveTrailGap` | 40 → 60 | same note: "he should not push up into the pack". Guard G1 relaxed from R_flee/3 to R_flee/2 to allow it. 20 runs: dog within 25 px of a driven sheep 3.6% → 0.0% of walk-on time, panic sheep-ticks 983 → 94, penned 423 → 391 (Standoff anchor `[35, 60, 90]`) |
 | `gateAttractR` | 80 → 100 | "a little further" (Gate anchor `[140, 100, 60]`) |
 
 Left alone, though proposed: `trotAlignMin`, `trotTriggerProb`. T5 does the job at the turn, and loosening the general T1 trigger as well would have made trots more common everywhere, against T6's intent.

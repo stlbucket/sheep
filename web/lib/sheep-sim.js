@@ -85,7 +85,7 @@ const SETTINGS = [
   { key: 'flankCornerFrom', category: 'Dog', label: 'flank corner-first from', type: 'float', default: 0, min: 0, max: 300, step: 4, unit: 'px', description: 'C10 (POC-v8, owner 2026-08-23): a flank issued while the dog is further than this OUTSIDE the herd perimeter line runs first to the FIRST CORNER of the outline he would meet in the flank direction (come-by: next corner clockwise of his bearing; away: counter-clockwise) and only then starts to sweep — he does not cut in toward the nearest bit of the line. At the shipped 0 (owner Q46) EVERY flank from outside the line opens corner-first; on or inside the line he picks it up where he stands. Raise it to restore the v7 cut-in for near starts.', exposed: true },
   { key: 'R_drive', category: 'Dog', label: 'drive standoff', type: 'float', default: 140, min: 80, max: 260, step: 5, unit: 'px', description: 'Walk-on standoff behind the flock.', exposed: true },
   { key: 'driveShrink', category: 'Dog', label: 'drive shrink rate', type: 'float', default: 10, min: 0, max: 40, step: 1, unit: 'px/s', description: 'SUPERSEDED (POC-v3 P2: the trail-gap governor replaced creep-forever). Kept for reference.', exposed: false },
-  { key: 'driveTrailGap', category: 'Dog', label: 'drive trail gap', type: 'float', default: 40, min: 20, max: 160, step: 5, unit: 'px', description: 'Walk-on never closes on the nearest driven sheep past this gap — the dog trails, he doesn\'t catch (E1). Must sit inside the threat range that actually mobilizes sheep (~R_flee/3).', exposed: true },
+  { key: 'driveTrailGap', category: 'Dog', label: 'drive trail gap', type: 'float', default: 60, min: 20, max: 160, step: 5, unit: 'px', description: 'Walk-on never closes on the nearest driven sheep past this gap — the dog trails, he doesn\'t catch (E1). Must sit inside the threat range that actually mobilizes sheep (guard G1: at most R_flee/2). 40 → 60 by the owner 2026-11-16: he was pushing up into the pack.', exposed: true },
   { key: 'driveCloseRate', category: 'Dog', label: 'drive close rate', type: 'float', default: 25, min: 5, max: 80, step: 1, unit: 'px/s', description: 'E1 gap governor: how fast the driving dog\'s trailing distance shrinks toward the flock while the ahead-gap is ample. Was a magic 25 inside §1 until Q38 (2026-08-22); in EASY it is scaled by `easy speed` so the creep reads at ⅓ pace from the gate line too.', exposed: true },
   { key: 'driveBackoffRate', category: 'Dog', label: 'drive back-off rate', type: 'float', default: 40, min: 5, max: 120, step: 1, unit: 'px/s', description: 'E1 gap governor: how fast the trailing distance grows back when the ahead-gap tightens below `drive trail gap`. Was a magic 40 inside §1 until Q38 (2026-08-22); scaled by `easy speed` in EASY like the close rate.', exposed: true },
   { key: 'stallSpeed', category: 'Dog', label: 'stall speed', type: 'float', default: 8, min: 2, max: 30, step: 1, unit: 'px/s', description: 'Goal-ward flock speed below which a pressured drive counts as stalled.', exposed: true },
@@ -102,7 +102,7 @@ const SETTINGS = [
   { key: 'R_driveMin', category: 'Dog', label: 'drive standoff floor', type: 'float', default: 55, min: 40, max: 160, step: 5, unit: 'px', description: 'Closest walk-on gets before stopping (do not walk into the blob).', exposed: true },
   { key: 'lieDownIntensity', category: 'Dog', label: 'lie-down intensity', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'Ambient (out-of-cone) dog pressure while lying down.', exposed: true },
   { key: 'lieDownBlock', category: 'Dog', label: 'lie-down block', type: 'float', default: 1.4, min: 0, max: 3, step: 0.1, unit: '—', description: 'In-cone threat multiplier of a lying dog — the covered arc reads as a wall (D1).', exposed: true },
-  { key: 'walkOnSpeedFrac', category: 'Dog', label: 'walk-on speed', type: 'float', default: 1, min: 0.5, max: 1.6, step: 0.05, unit: '× vMax', description: 'Walk-on\'s top speed as a fraction of the SHEEP\'s vMax — the drive goes at the flock\'s own pace (owner 2026-08-22, POC-v7 E4; was dogVMax). Flanks and the recall still run at `dog max speed`.', exposed: true },
+  { key: 'walkOnSpeedFrac', category: 'Dog', label: 'walk-on speed', type: 'float', default: 0.85, min: 0.5, max: 1.6, step: 0.05, unit: '× vMax', description: 'Walk-on\'s top speed as a fraction of the SHEEP\'s vMax — the drive goes at the flock\'s own pace (owner 2026-08-22, POC-v7 E4; was dogVMax). Flanks and the recall still run at `dog max speed`.', exposed: true },
   { key: 'easySpeedFrac', category: 'Dog', label: 'easy speed', type: 'float', default: 0.5, min: 0.1, max: 0.8, step: 0.01, unit: '× vMax', description: 'Easy\'s top speed as a fraction of the SHEEP\'s vMax — half the flock\'s pace (owner 2026-08-22, POC-v7 I2 amended; was 0.33 × dogVMax). Same trailing target and gap governor as walk-on.', exposed: true },
   { key: 'postureConeK', category: 'Dog', label: 'posture cone tightness', type: 'float', default: 4, min: 1, max: 8, step: 0.5, unit: '—', description: 'SUPERSEDED (POC-v9 D3: the lie-down beam\'s width is `lie-down cone angle`, in degrees, now). Kept for reference.', exposed: false },
   { key: 'postureRange', category: 'Dog', label: 'posture range', type: 'float', default: 0.6, min: 0.2, max: 1, step: 0.05, unit: '—', description: 'Posture threat reach as a fraction of R_flee — fierce close-in wall, faint at driving distance (keeps lie-down\'s gate relief).', exposed: true },
@@ -297,7 +297,7 @@ const LEVERS = [
       lieDownIntensity: [0.15, 0.3, 0.55], postureRange: [0.4, 0.6, 0.85], dogAvoidRadius: [25, 45, 80] } },
   { key: 'dogStandoff', domain: 'dog-behavior', label: 'Standoff', blurb: 'How much room he gives the flock.',
     ends: { 0: 'works right on top of them, quick and darty', 1: 'works from a long way off, steady and unhurried' },
-    params: { dogVMax: [150, 110, 95], walkOnSpeedFrac: [1.15, 1, 0.85], easySpeedFrac: [0.6, 0.5, 0.4], perimeterMargin: [24, 44, 64], fenceSeekReach: [48, 72, 120], R_drive: [95, 140, 220], R_driveMin: [42, 55, 90], driveTrailGap: [25, 40, 70] } },
+    params: { dogVMax: [150, 110, 95], walkOnSpeedFrac: [1.05, 0.85, 0.7], easySpeedFrac: [0.6, 0.5, 0.4], perimeterMargin: [24, 44, 64], fenceSeekReach: [48, 72, 120], R_drive: [95, 140, 220], R_driveMin: [42, 55, 90], driveTrailGap: [35, 60, 90] } },
   { key: 'dogSweep', domain: 'dog-behavior', label: 'Sweep', blurb: 'The shape of his flank.',
     ends: { 0: 'tight and economical', 1: 'a big, deliberate, wide sweep' },
     params: { flankConeDeg: [30, 45, 62], flankAdvance: [1.8, 1, 0.5], flankOvershootDeg: [0, 0, 60], flankHandoffDeg: [45, 30, 15], fenceSeekBias: [0.25, 0.6, 0.9] } },
@@ -416,7 +416,7 @@ function leverModified(L) {
 // underneath them). They read the LIVE value of the other side; the guarded
 // param re-derives from its own profile when unmodified, else from its live
 // (hand-edited) value — then clamps toward the safe side.
-//   G1  driveTrailGap ≤ R_flee / 3      (Standoff limited by Presence)
+//   G1  driveTrailGap ≤ R_flee / 2      (Standoff limited by Presence)
 //   G2  dogVMax ≥ vMax × 1.05           (Standoff limited by Nerve)
 function applyLeverGuards() {
   leverState.limitedBy = {}
@@ -430,7 +430,7 @@ function applyLeverGuards() {
     if (want !== cur) { setParam(pk, want); touched.push(pk) }
     if (cur === leverState.stamped[pk] || want !== cur) leverState.stamped[pk] = want
   }
-  guard('driveTrailGap', getParam('R_flee') / 3, 'floor', (v, lim) => v <= lim, 'dogStandoff', 'dogPresence')
+  guard('driveTrailGap', getParam('R_flee') / 2, 'floor', (v, lim) => v <= lim, 'dogStandoff', 'dogPresence')
   guard('dogVMax', getParam('vMax') * 1.05, 'ceil', (v, lim) => v >= lim, 'dogStandoff', 'sheepNerve')
   return touched
 }
