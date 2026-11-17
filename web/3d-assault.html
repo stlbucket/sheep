@@ -217,6 +217,46 @@
   #assault-status { padding: 6px 8px; font-size: 12px; color: #e0a98a; border-top: 1px solid #232b32; white-space: pre-line; }
   #controls > button[data-cmd="battle_stations"] { border-color: #6b4a3a; color: #f0c9b0; }
   #controls > button[data-cmd="battle_stations"].active { background: #7a2f26; border-color: #b0503f; color: #ffece4; }
+  /* DRAWER — the side column is a drawer, closed by default (☰ button or D).
+     Closed: the column floats over the stage's top-right corner and shows only
+     the dog's buttons; the stage takes the full width. Open: the full column,
+     beside the stage. Phone landscape keeps its pad-only sidebar either way. */
+  #app { position: relative; }
+  #drawer-btn {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  #drawer-btn:hover { background: #2c353d; }
+  #drawer-btn kbd { font: inherit; font-size: 10px; opacity: 0.55; margin-left: 3px; }
+  @media not all and (pointer: coarse) and (max-height: 600px) {
+    body.drawer-closed #side {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 320px;
+      max-height: calc(100% - 36px);
+      z-index: 6;
+      gap: 6px;
+      overflow: visible;
+      pointer-events: none; /* gaps in the overlay still drag the camera */
+    }
+    body.drawer-closed #side > * { pointer-events: auto; }
+    body.drawer-closed #side > section:not(#side-dog) { display: none; }
+    body.drawer-closed #side-dog { background: rgba(10, 13, 16, 0.72); }
+    body.drawer-closed #controls .herd, body.drawer-closed #controls .obst { display: none; }
+    body.drawer-closed #stress { top: auto; bottom: 8px; } /* the corner is the pad's now */
+  }
   #rotate-overlay {
     display: none;
     position: fixed;
@@ -253,6 +293,7 @@
   @media (pointer: coarse) and (max-height: 600px) {
     body.can-fullscreen #side-fullscreen { display: block; }
     #app { padding: 6px; gap: 8px; }
+    #drawer-btn { display: none; }
     #side { flex: 0 0 240px; justify-content: center; }
     #side-debug, #side-levers, #side #side-assault { display: none; }
     #controls .pad { grid-template-rows: repeat(3, 36px); gap: 4px; }
@@ -286,7 +327,7 @@
 }
 </script>
 </head>
-<body>
+<body class="drawer-closed">
 <div id="rotate-overlay">
   <div class="icon">📱</div>
   <div>rotate your phone —<br>the pasture plays in landscape</div>
@@ -308,6 +349,7 @@
   <div id="boot-error"></div>
 </div>
 <div id="side">
+<button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels)">☰ settings <kbd>D</kbd></button>
 <section id="side-debug">
   <div class="row">
     <label for="seed-input">seed</label>
@@ -1582,6 +1624,13 @@ seedInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key
 document.getElementById('reseed-btn').addEventListener('click', newCourse)
 function togglePanels() { document.body.classList.toggle('panels-hidden') }
 document.getElementById('panels-btn').addEventListener('click', togglePanels)
+const drawerBtn = document.getElementById('drawer-btn')
+function toggleDrawer() {
+  const closed = document.body.classList.toggle('drawer-closed')
+  drawerBtn.innerHTML = (closed ? '☰ settings' : '✕ close') + ' <kbd>D</kbd>'
+  drawerBtn.blur()
+}
+drawerBtn.addEventListener('click', toggleDrawer)
 
 if (document.documentElement.requestFullscreen) {
   document.body.classList.add('can-fullscreen')
@@ -1642,6 +1691,7 @@ window.addEventListener('keydown', (ev) => {
     if (k === 'f') return sim.finishRun()
     if (k === 'r') return restartRun()
     if (k === 'h') return togglePanels()
+    if (k === 'd') return toggleDrawer()
     if (k === 'p') return togglePause()
     if (k === 'o') return toggleOverlays()
     if (k === 'c') return setCam(CAMS[(CAMS.indexOf(camState.mode) + 1) % CAMS.length])
