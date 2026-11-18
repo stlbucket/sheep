@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<!-- no browser zoom on phones (owner 2026-11-18): fast taps on the pads read as a double-tap and zoomed the page -->
+<style>* { touch-action: manipulation; }</style>
+<script>
+  for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, e => e.preventDefault(), { passive: false }) // iOS pinch + double-tap
+  document.addEventListener("touchmove", e => { if (e.touches.length > 1 && !(e.target instanceof HTMLCanvasElement)) e.preventDefault() }, { passive: false }) // two thumbs on the buttons is not a pinch
+</script>
 <title>Sheep PoC — 2D</title>
 <!--
   The 2D page (the original PoC). The game physics — §0 PARAMS + §1 SIM — is
