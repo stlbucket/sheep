@@ -30,8 +30,8 @@
 const ScoreUI = (() => {
   const CSS = `
   #score-hud { position: absolute; top: 8px; left: 8px; z-index: 6; pointer-events: none; min-width: 190px; max-width: 46%;
-    padding: 6px 12px 8px; border-radius: 6px; background: rgba(16, 20, 24, 0.80); border: 1px solid #37424c;
-    color: #e6edf3; font: 600 13px/1.25 ui-monospace, Menlo, monospace; }
+    padding: 6px 12px 8px; background: none; border: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6); /* no card (owner 2026-11-18: as on the phone) */
+    color: #fff; font: 600 13px/1.25 ui-monospace, Menlo, monospace; }
   #score-hud .top { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
   #score-hud .pts { font-size: 40px; font-weight: 800; line-height: 1; color: #7fd79a; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
   #score-hud .mult { font-size: 24px; font-weight: 800; color: #5d6a75; }
@@ -55,6 +55,12 @@ const ScoreUI = (() => {
   #score-hud .sub .best { color: #7b8894; margin-left: 8px; }
   #score-hud .objs { margin: 5px 0 0; padding: 4px 0 0; list-style: none; border-top: 1px solid #2c353d; font-size: 12px; font-weight: 400; color: #cdd6df; }
   #score-hud .objs:empty { display: none; }
+  /* no card behind the block → the greys go light so they read on grass (the phone rules, at full size) */
+  #score-hud .mult { color: #cdd6df; }
+  #score-hud .bar { background: rgba(0, 0, 0, 0.35); }
+  #score-hud .strikes b { border-color: rgba(255, 255, 255, 0.7); }
+  #score-hud .value, #score-hud .sub, #score-hud .objs, #score-hud .value small, #score-hud .sub .best { color: #fff; }
+  #score-hud .objs { border-top: none; padding-top: 0; }
   #score-hud .objs li.met { color: #7fd79a; }
   #score-hud .objs li.lost { color: #6d7781; text-decoration: line-through; }
   @keyframes su-bump { from { transform: scale(1.7); } to { transform: scale(1); } }
@@ -110,7 +116,7 @@ const ScoreUI = (() => {
     overflow-y: auto; padding: 16px 20px; box-sizing: border-box; background: rgba(16, 20, 24, 0.98); border: 1px solid #3a4650; border-radius: 8px;
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6); color: #cdd6df; font: 12px/1.45 ui-monospace, Menlo, monospace; }
   #score-panel h2 { margin: 0 0 10px; font-size: 16px; color: #e6edf3; display: flex; justify-content: space-between; align-items: center; }
-  #score-panel h2 button { font: inherit; font-size: 12px; color: #cdd6df; background: #232b32; border: 1px solid #37424c; border-radius: 3px; padding: 3px 10px; cursor: pointer; }
+  #score-panel h2 button { font: inherit; font-size: 12px; color: #cdd6df; background: #232b32; border: 1px solid #37424c; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
   #score-panel h3 { margin: 12px 0 4px; font-size: 11px; font-weight: 400; color: #7b8894; text-transform: uppercase; letter-spacing: 0.08em; }
   #score-panel table { width: 100%; border-collapse: collapse; }
   #score-panel th { text-align: left; font-weight: 400; color: #7b8894; padding: 2px 6px 4px 0; }

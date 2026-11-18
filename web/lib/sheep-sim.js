@@ -288,6 +288,8 @@ const SETTINGS = [
   { key: 'ramStandDist', category: 'Objectives', label: 'ram stand distance', type: 'float', default: 60, min: 0, max: 200, step: 5, unit: 'px', description: 'FO6 (owner Q84): an advancing dog inside this distance makes the ram stop and face him.', exposed: true },
   { key: 'ramStandRelease', category: 'Objectives', label: 'ram release distance', type: 'float', default: 110, min: 0, max: 300, step: 5, unit: 'px', description: 'FO6: the ram gives way again once the dog is beyond this distance.', exposed: true },
   { key: 'ramStandWait', category: 'Objectives', label: 'ram stand wait', type: 'float', default: 2, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6: a dog lying down this long also makes a standing ram give way (and he will not stand again for as long).', exposed: true },
+  { key: 'ramYieldWait', category: 'Objectives', label: 'ram yield wait', type: 'float', default: 1, min: 0, max: 10, step: 0.25, unit: 's', description: 'FO6 (owner 2026-11-18): a dog on a direct walk-on facing a standing ram for this long makes him turn and trot off.', exposed: true },
+  { key: 'ramYieldDur', category: 'Objectives', label: 'ram yield trot', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6 (owner 2026-11-18): how long the ram slow-trots away from the dog once he yields (pace = `slow trot speed`); he will not stand again until `ram stand wait` after that.', exposed: true },
   { key: 'blackChance', category: 'Objectives', label: 'black sheep chance', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: "FO8: chance a course has a black sheep.", exposed: true, onChange: 'respawn' },
   { key: 'blackMult', category: 'Objectives', label: 'black sheep worth', type: 'float', default: 2, min: 1, max: 20, step: 0.5, unit: '×', description: "FO8: her worth as a multiple of an ordinary sheep.", exposed: true },
   { key: 'blackThreatScale', category: 'Objectives', label: 'black sheep nerves', type: 'float', default: 1.5, min: 1, max: 4, step: 0.1, unit: '×', description: "FO8: how much more of the dog's pressure she feels — she startles sooner.", exposed: true },
@@ -483,7 +485,7 @@ const LEVER_NOT_LEVERED = {
     'multFullFlock', 'multClean', 'multAllCalm', 'multAwardCommon', 'multAwardRare', 'multAwardLegendary', 'multOneGo', 'perfectFileMin', 'frenzyEvery', 'frenzySecs', 'frenzyExtend', 'frenzyMax', 'finisherPoints',
     'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'fullPurseShare', 'wolfPoints', 'rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan',
     'gradeA', 'gradeStep', 'gradeCalmCredit', 'safetyPanicCost'], // POC-v14 / v15 point values, rates and verdict bands — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
-  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait',
+  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait', 'ramYieldWait', 'ramYieldDur',
     'blackChance', 'blackMult', 'blackThreatScale', 'blackSpookRadius', 'blackSpookThreat', 'bellChance', 'bellMult', 'bellRadius', 'bellWeight', 'yearlingChance', 'yearlingMult', 'yearlingFlightScale', 'yearlingSize', 'sideObjectiveCount', 'multSideObjective'], // POC-v14 field objectives + POC-v15 (FO7–FO11)
   modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax', 'historyMax', 'bandSmallMax', 'bandMediumMax'], // POC-v14 replay modes + POC-v15 records — a mode switch and the arcade clock
   // plus every `debug.*` render toggle
@@ -1193,6 +1195,68 @@ class FlockSim {
     if (run.commands > this.quietAllowance()) this.setObjective('few_words', 'lost')
   }
 
+  // Capture ⎘ (owner 2026-08-22; shared by all three pages since 2026-11-18): a
+  // JSON-able snapshot of the live game state — gate, numbered perimeter
+  // markers (1 = nearest the gate, then clockwise), dog, sheep. Dog angles are
+  // degrees, bird's-eye, 0 = +x (east), positive = clockwise on the y-down
+  // field. Everything is rounded to whole px / degrees to keep the paste short.
+  captureState() {
+    const sim = this, d = sim.dog, g = sim.gcm, gt = sim.gate, p = sim.p
+    const r1 = (v) => Math.round(v), deg = (a) => r1(((a * 180 / Math.PI) % 360 + 360) % 360)
+    const pt = (o) => ({ x: r1(o.x), y: r1(o.y) })
+    const bearing = (o) => deg(Math.atan2(o.y - g.y, o.x - g.x))
+    const raw = sim.perimeterMarkers(p.perimeterMargin)
+    let start = 0, sd = Infinity // marker #1 = the one nearest the gate (as numbered on the 2D canvas)
+    raw.forEach((mk, k) => { const dd = (mk.x - gt.x) ** 2 + (mk.y - gt.y) ** 2; if (dd < sd) { sd = dd; start = k } })
+    const markers = raw.map((_, k) => {
+      const mk = raw[(start + k) % raw.length]
+      return { n: k + 1, kind: mk.kind, x: r1(mk.x), y: r1(mk.y), bearing: bearing(mk) }
+    })
+    const nearestMarker = (o) => {
+      if (!markers.length) return null
+      let best = null, bd = Infinity
+      for (const mk of markers) { const dd = Math.hypot(mk.x - o.x, mk.y - o.y); if (dd < bd) { bd = dd; best = mk } }
+      return { n: best.n, dist: r1(bd) }
+    }
+    const playRect = sim.playRect()
+    const act = sim.sheep.filter((s) => !s.down && !s.through)
+    const flanking = d.command === 'come_by' || d.command === 'away'
+    const lineCW = sim.gateLineBearing(1, p.perimeterMargin), lineCCW = sim.gateLineBearing(-1, p.perimeterMargin)
+    const linePt = (a) => { const r = sim.perimeterRadius(a, p.perimeterMargin); return { x: g.x + r * Math.cos(a), y: g.y + r * Math.sin(a) } }
+    const lineInfo = (a) => ({ bearing: deg(a), ...pt(linePt(a)), nearestMarker: nearestMarker(linePt(a)) })
+    const station = deg((flanking && d.command === 'away' ? lineCCW : lineCW) + (flanking && d.command === 'away' ? -1 : 1) * p.flankOvershootDeg * Math.PI / 180)
+    const out = {
+      capturedAt: new Date().toISOString(),
+      course: { seed: p.seed, layout: sim.layout, sheepCount: sim.sheep.length, active: act.length, penned: sim.sheep.length - act.length - sim.sheep.filter((s) => s.down).length, down: sim.sheep.filter((s) => s.down).length },
+      field: { play: { x0: r1(playRect.x0), y0: r1(playRect.y0), x1: r1(playRect.x1), y1: r1(playRect.y1) }, canvas: { w: p.canvasW, h: p.canvasH } },
+      gate: { ...pt(gt), side: ['N', 'E', 'S', 'W'][gt.side], out: { x: gt.nx, y: gt.ny }, width: p.gateWidth, goal: pt(p.goal), bearingFromGCM: bearing(gt), nearestMarker: nearestMarker(gt) },
+      // where a flank ENDS: the gate's tangent to the perimeter on each side (come-by parks at CW, away at CCW)
+      gateLine: { comeBy: lineInfo(lineCW), away: lineInfo(lineCCW) },
+      flock: { gcm: pt(g), cohesive: sim.isCohesive(), hull: sim.hull.map(pt), perimeterMargin: p.perimeterMargin },
+      markers,
+      dog: {
+        command: d.command, pos: pt(d.pos), vel: pt(d.vel), speed: r1(Math.hypot(d.vel.x, d.vel.y)),
+        facingDeg: deg(d.facing), bearingFromGCM: bearing(d.pos), distFromGCM: r1(Math.hypot(d.pos.x - g.x, d.pos.y - g.y)),
+        target: pt(d.target), targetBearing: bearing(d.target), targetNearestMarker: nearestMarker(d.target),
+        nearestMarker: nearestMarker(d.pos), distOutsideHull: sim.hull.length ? r1(sim.distToHull(d.pos)) : null, // = perimeterMargin when he is ON the dotted line
+        intensity: +d.intensity.toFixed(2),
+        impulse: d.impulse ? d.impulse.name : null,
+        ...(d.flankEasy ? { flankEasy: true } : {}), ...(d.lieSide ? { lieSide: d.lieSide } : {}), // POC-v10 variants
+        flank: flanking ? {
+          dir: d.command === 'come_by' ? 'CW' : 'CCW', angleDeg: deg(d.flankAngle), radius: r1(d.flankR),
+          stationDeg: station, parked: d.flankParked, t: +d.flankT.toFixed(2), parkT: +d.parkT.toFixed(2),
+          cornerFirst: d.flankWaypoint, // C10: still running to the first corner (the point holds there)
+        } : null,
+        drive: (d.command === 'walk_on' || d.command === 'easy') ? { driveDist: r1(d.driveDist), driveT: +d.driveT.toFixed(2), stallT: +d.stallT.toFixed(2) } : null,
+        handoff: d.handoff ? pt(d.handoff) : null,
+        owner: pt(d.owner),
+      },
+      sheep: sim.sheep.map((s, i) => ({ i, ...pt(s.pos), g: s.group, state: s.through ? 'penned' : s.down ? 'down' : s.idle ? 'idle' : 'alert', ...(s.gatePull > 0 ? { gatePull: +s.gatePull.toFixed(2), lead: s.gateLead } : {}), ...(s.trot ? { trot: 1, trotLead: s.trotLead } : {}), ...(s.kind && s.kind !== 'ewe' ? { kind: s.kind } : {}), ...(s.stand ? { stand: 1, standFace: +s.standFace.toFixed(2) } : {}), ...(s.yieldT > 0 ? { yieldT: +s.yieldT.toFixed(2) } : {}), ...(s.stress > 0 ? { stress: +s.stress.toFixed(2) } : {}) })),
+      run: { t: +sim.run.t.toFixed(1), crush: +sim.crush.toFixed(1), injuries: sim.injuries },
+    }
+    return out
+  }
+
   playRect() {
     const p = this.p
     return {
@@ -1817,6 +1881,8 @@ class FlockSim {
         stand: false,                      //   ram: standing his ground, facing the dog (owner Q84)
         standLie: 0,                       //   …how long the dog has been lying down in front of him (s)
         standCool: 0,                      //   …seconds before he may stand again
+        standFace: 0,                      //   …how long a walk-on dog has faced him down (s)
+        yieldT: 0,                         //   …seconds left of his slow trot away after yielding
         penT: 0,                           // run time at which it crossed into the pen
         lost: false,                       // killed by the assault — out of the flock (SC11)
         stressAvg: 0,                      // POC-v15 SC12: stress smoothed over penStressMemory — what its tier is read from
@@ -2261,15 +2327,26 @@ class FlockSim {
     // FO6 (owner Q84): the stubborn ram. An advancing dog inside ramStandDist
     // makes him stop and face the dog; he gives way once the dog is beyond
     // ramStandRelease, or has lain down for ramStandWait (after which he will
-    // not stand again for as long).
+    // not stand again for as long). Owner 2026-11-18: a DIRECT walk-on held on
+    // him for ramYieldWait also breaks the challenge — he turns and slow-trots
+    // away from the dog for ramYieldDur (walk-on stops short of the flock, so
+    // without this a challenged ram never moved again).
     if (a.kind === 'ram') {
       if (a.standCool > 0) a.standCool -= dt
       if (a.stand) {
         a.standLie = lying ? a.standLie + dt : 0
+        a.standFace = d.command === 'walk_on' ? a.standFace + dt : 0
         if (dist > p.ramStandRelease) a.stand = false
         else if (a.standLie >= p.ramStandWait) { a.stand = false; a.standCool = p.ramStandWait }
+        else if (a.standFace >= p.ramYieldWait) { a.stand = false; a.yieldT = p.ramYieldDur; a.standCool = p.ramYieldDur + p.ramStandWait }
       } else if (dist < p.ramStandDist && dist > 1e-6 && a.standCool <= 0 &&
-                 (d.vel.x * to.x + d.vel.y * to.y) / dist > p.stallSpeed) { a.stand = true; a.standLie = 0 }
+                 (d.vel.x * to.x + d.vel.y * to.y) / dist > p.stallSpeed) { a.stand = true; a.standLie = 0; a.standFace = 0 }
+      if (a.yieldT > 0) {                     // yielding: straight away from the dog, whatever he feels
+        a.yieldT -= dt
+        if (a.protest > 0) a.protest -= dt
+        a.stress = Math.max(a.stress, p.trotPressMin)
+        return dist > 1e-6 ? { x: 2 * to.x / dist, y: 2 * to.y / dist } : { x: 0, y: 0 } // ×2: enough push to reach the slow trot
+      }
     }
     const sp = this.blackPanic ? this.spookOn(a) : null // FO8: spooked by a panicking black sheep
     if (dist >= reach || dist < 1e-6) {
@@ -2449,7 +2526,7 @@ class FlockSim {
       if (dm > gap + 1e-4) fLamb = vec2.scale(vec2.norm(to), smoothstep(gap, gap + p.idleCohRadius, dm))
     }
     const lambFar = vec2.len(fLamb) > 0.5
-    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0 || lambFar || s.stand) { // threat, the gate's draw (G2), a trot (T2), a lamb after its mother or a standing ram keeps a sheep alert
+    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0 || lambFar || s.stand || s.yieldT > 0) { // threat, the gate's draw (G2), a trot (T2), a lamb after its mother or a standing ram keeps a sheep alert
       s.idle = false
       s.calmT = 0
     } else if (!s.idle) {
@@ -2563,6 +2640,7 @@ class FlockSim {
     if (s.trot) vmax = Math.max(vmax, this.trotPace(s)) // a trot outruns the walk cap (still below panic)
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     if (s.kind === 'ram') vmax *= p.ramSpeedScale // FO6
+    if (s.yieldT > 0) vmax = Math.max(vmax, p.trotSlowSpeed) // …but a yielding ram leaves at the slow trot
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
     if (this.obstacles.length) this.pushOut(s.pos, 2, s.vel) // obstacles are solid

@@ -199,6 +199,8 @@ const SHEEP_DEFAULTS = {
   "ramStandDist": 60,
   "ramStandRelease": 110,
   "ramStandWait": 2,
+  "ramYieldWait": 1,
+  "ramYieldDur": 3,
   "mode": "course",
   "waveClock": 90,
   "waveSecsPerSheep": 3,

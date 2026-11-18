@@ -67,11 +67,11 @@
   }
   body.panels-hidden #side-levers { display: none; }
   /* CENTRE STACK — top-centre of the stage, the same on every screen: settings, the reseed / mode row, then the camera row,
-     every button one size. Pause stands alone, between the stack and the dog's pad. Keys live in the titles. */
+     every button one size. Pause lives with the dog's pad (see #pause-btn). Keys live in the titles. */
   #stage { --cs-w: 68px; --cs-h: 24px; --cs-g: 4px; --cs-top: 8px; --cs-half: calc((var(--cs-w) * 5 + var(--cs-g) * 4) / 2); --pad-edge: 327px; } /* --pad-edge: stage's right edge → the closed drawer's pad's left edge */
   #center-stack { position: absolute; top: var(--cs-top); left: 50%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: var(--cs-g); pointer-events: none; }
-  #cam-bar, #center-stack .aux { display: flex; gap: var(--cs-g); } /* .aux: reseed + the mode buttons lib/sheep-score-ui.js adds */
-  #center-stack button, #pause-btn {
+  #cam-bar, #center-stack .aux, #center-stack .top { display: flex; gap: var(--cs-g); } /* .aux: reseed + the mode buttons lib/sheep-score-ui.js adds */
+  #center-stack button {
     box-sizing: border-box;
     width: var(--cs-w);
     height: var(--cs-h);
@@ -81,16 +81,13 @@
     color: #cdd6df;
     background: rgba(16, 20, 24, 0.72);
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     white-space: nowrap;
     cursor: pointer;
     pointer-events: auto;
   }
-  #center-stack button:hover, #pause-btn:hover { background: rgba(44, 53, 61, 0.85); }
-  #center-stack button.active, #pause-btn.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
-  /* pause: centred in the gap between the stack and the pad — never closer to the stack than one gap */
-  #pause-btn { position: absolute; top: var(--cs-top); z-index: 5; left: max(calc(50% + var(--cs-half) + var(--cs-g)), calc(75% + var(--cs-half) / 2 - var(--pad-edge) / 2 - var(--cs-w) / 2)); }
-  body:not(.drawer-closed) #pause-btn { left: calc(50% + var(--cs-half) + var(--cs-g) * 3); } /* drawer open: no pad on the stage, pause sits beside the stack */
+  #center-stack button:hover { background: rgba(44, 53, 61, 0.85); }
+  #center-stack button.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
   #stress { position: absolute; top: 8px; right: 8px; width: 200px; z-index: 5; font-size: 11px; color: #e8eef3; text-shadow: 0 1px 2px rgba(0,0,0,0.7); pointer-events: none; }
   #stress .bar { height: 10px; background: rgba(0, 0, 0, 0.45); border: 1px solid #4a5560; }
   #stress .fill { height: 100%; width: 0; }
@@ -114,7 +111,7 @@
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     cursor: pointer;
   }
   #side-debug button:hover { background: #2c353d; }
@@ -129,6 +126,10 @@
   }
   #controls { --pad-g: 6px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--pad-g); }
   #controls > button[data-cmd="that_ll_do"] { width: calc((100% - var(--pad-g) * 2) / 3); }
+  /* pause (owner 2026-11-18): a command-sized button. Drawer closed: just left of the pad, level with the easy row. Drawer open: in the pad's own flow. */
+  #controls > #pause-btn { width: calc((100% - var(--pad-g) * 2) / 3); }
+  body.drawer-closed #controls { position: relative; }
+  body.drawer-closed #controls > #pause-btn { position: absolute; right: calc(100% + 16px); top: 38px; /* = pad row 2 (the easy row): one 32px row + the 6px gap */ }
   #controls .pad {
     width: 100%;
     display: grid;
@@ -201,7 +202,7 @@
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     padding: 5px 12px;
     cursor: pointer;
   }
@@ -229,7 +230,11 @@
   }
   body.drawer-closed #side > * { pointer-events: auto; }
   body.drawer-closed #side > section:not(#side-dog) { display: none; }
-  body.drawer-closed #side-dog { background: rgba(10, 13, 16, 0.72); }
+  /* no card behind the pad (owner 2026-11-18: as on the phone) — only the see-through buttons show, and the gaps between them still drag the camera */
+  body.drawer-closed #side-dog { background: none; border-color: transparent; pointer-events: none; }
+  body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+  body.drawer-closed #controls button:hover { background: rgba(44, 53, 61, 0.7); }
+  body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
   body.drawer-closed #controls .herd, body.drawer-closed #controls .obst { display: none; }
   body.drawer-closed #stress { top: auto; bottom: 8px; } /* the corner is the pad's now */
   #rotate-overlay {
@@ -255,20 +260,22 @@
   @media (pointer: coarse) and (max-height: 600px) {
     #app { padding: 6px; gap: 8px; }
     #stage { --cs-w: 48px; --cs-h: 18px; --cs-g: 3px; --cs-top: 6px; --pad-edge: 185px; }
-    #center-stack button, #pause-btn { font-size: 9px; background: rgba(20, 26, 31, 0.42); }
+    #center-stack button { font-size: 9px; background: rgba(20, 26, 31, 0.42); }
     /* the pad floats over the stage's top-right corner here too — no sidebar */
     body.drawer-closed #side { top: 6px; right: 6px; width: 186px; max-height: calc(100% - 12px); }
     /* no card behind the pad: only the buttons show (see-through), and the gaps between them still drag the camera */
     body.drawer-closed #side-dog { padding: 0; background: none; border: none; pointer-events: none; }
     body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
     body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
+    body.drawer-closed #controls > #pause-btn { right: calc(100% + 6px); top: 33px; background: rgba(20, 26, 31, 0.42); }
+    body.drawer-closed #controls > #pause-btn.active { background: rgba(47, 93, 58, 0.8); }
     #controls .pad { grid-template-rows: repeat(3, 30px); gap: 3px; }
     #controls button {
       font-size: 10px;
       line-height: 1.1;
       height: 30px;
       padding: 1px 3px;
-      border-radius: 10px;
+      border-radius: 15px;
       white-space: normal;
     }
     #controls .w2 { display: block; }
@@ -281,7 +288,7 @@
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
-<script src="sheep-defaults.json.js?v=20261118b"></script>
+<script src="sheep-defaults.json.js?v=20261118f"></script>
 <script type="importmap">
 {
   "imports": {
@@ -300,7 +307,7 @@
 <div id="stage">
   <canvas id="scene"></canvas>
   <div id="center-stack">
-  <button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels) — D">settings</button>
+  <div class="top"><button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels) — D">settings</button><button id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture</button></div>
   <div class="aux"><button id="reseed-btn" title="draw a new course">reseed</button></div>
   <div id="cam-bar">
     <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C cycles the cameras)">orbit</button>
@@ -310,7 +317,6 @@
     <button id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O">overlays</button>
   </div>
   </div>
-  <button id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
   <div id="stress">flock stress<div class="bar"><div class="fill" id="stress-fill"></div></div></div>
   <div id="cam-hint"></div>
   <div id="card"></div>
@@ -344,6 +350,7 @@
       <button data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
     </div>
     <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
+    <button id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
     <div class="herd">
       <label for="herd-size">herd</label>
       <input id="herd-size" type="range">
@@ -365,9 +372,9 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118b"></script>
-<script src="lib/sheep-gui.js?v=20261118b"></script>
-<script src="lib/sheep-score-ui.js?v=20261118b"></script>
+<script src="lib/sheep-sim.js?v=20261118f"></script>
+<script src="lib/sheep-gui.js?v=20261118f"></script>
+<script src="lib/sheep-score-ui.js?v=20261118f"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.
@@ -1243,6 +1250,17 @@ seedInput.addEventListener('change', () => {
 })
 seedInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') seedInput.blur() })
 document.getElementById('reseed-btn').addEventListener('click', newCourse)
+// capture (owner 2026-11-18): the 2D page's state snapshot, here too — JSON to the clipboard + console
+function captureState() {
+  const out = sim.captureState(), text = JSON.stringify(out)
+  console.log('[sheep-poc] state capture:\n' + text)
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
+  const btn = document.getElementById('capture-btn')
+  btn.textContent = 'copied ✓'
+  setTimeout(() => { btn.textContent = 'capture' }, 900)
+  return out
+}
+document.getElementById('capture-btn').addEventListener('click', captureState)
 function togglePanels() { document.body.classList.toggle('panels-hidden') }
 document.getElementById('panels-btn').addEventListener('click', togglePanels)
 const drawerBtn = document.getElementById('drawer-btn')

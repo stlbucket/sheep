@@ -588,6 +588,19 @@ function kindSim(kind, over) {
     Math.abs(sr / se - 0.6) < 1e-6 && stood && facesDog && released && Math.abs(t - 2) < 0.05, `stress ${sr.toFixed(3)} vs ${se.toFixed(3)}; stood ${stood}; faces ${facesDog}; released ${released}; lie-down release after ${t.toFixed(2)} s`)
   const a = kindSim('ram', { penCalmStress: 0 }); const r = cross(a, a.sheep.findIndex((q) => q.kind === 'ram')).gained
   ok('K-4b', 'ram is worth ×3 (RUSHED: 150)', r === 150, `${r}`)
+  // K-4c (owner 2026-11-18): a direct walk-on held on a standing ram makes him slow-trot away
+  const yieldRun = (cmd) => {
+    place(ri); ram.vel = { x: 0, y: 0 }; ram.stand = false; ram.standCool = 0; ram.yieldT = 0
+    s.dog.pos = { x: 500 - 50, y: 400 }; s.dog.vel = { x: 60, y: 0 }; s.dog.command = 'walk_on'; s.flee(ri, DT)
+    s.dog.vel = { x: 0, y: 0 }; s.dog.command = cmd // he has stopped short, as walk-on does
+    let tY = -1, peak = 0
+    for (let k = 0; k < 60 * 4; k++) { s.integrate(ri, DT); if (tY < 0 && !ram.stand) tY = (k + 1) * DT; peak = Math.max(peak, Math.hypot(ram.vel.x, ram.vel.y)) }
+    return { tY, peak, moved: ram.pos.x - 500, stand: ram.stand }
+  }
+  const yw = yieldRun('walk_on'), ye = yieldRun('easy')
+  ok('K-4c', 'a walk-on held on a standing ram for ramYieldWait makes him slow-trot away from the dog; easy does not',
+    Math.abs(yw.tY - s.p.ramYieldWait) < 0.05 && yw.moved > 100 && yw.peak > s.p.walkSpeed * s.p.ramSpeedScale && yw.peak <= s.p.trotSlowSpeed + 1e-6 && ye.stand && Math.abs(ye.moved) < 1,
+    `yielded after ${yw.tY.toFixed(2)} s, moved ${yw.moved.toFixed(0)} px away in 4 s, peak ${yw.peak.toFixed(0)} px/s; easy: still standing ${ye.stand}, moved ${ye.moved.toFixed(1)} px`)
   // frequency sanity over 400 seeds
   const c = { golden: 0, lamb: 0, ram: 0 }
   for (let seed = 1; seed <= 400; seed++) { const q = mkc(N, { seed, sheepCount: 20, specials: true }); for (const k of Object.keys(c)) { const n = q.sheep.filter((x) => x.kind === k).length; if (n > 1) c[k] = NaN; c[k] += n } }

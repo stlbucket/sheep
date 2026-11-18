@@ -86,7 +86,7 @@
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     cursor: pointer;
   }
   #side-debug button:hover { background: #2c353d; }
@@ -162,7 +162,7 @@
     height: auto;
     padding: 3px 8px;
     font-size: 12px;
-    border-radius: 3px;
+    border-radius: 999px;
     white-space: nowrap;
   }
   #controls .herd { display: none; }   /* phone-only — media query below */
@@ -196,7 +196,7 @@
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     padding: 5px 12px;
     cursor: pointer;
   }
@@ -314,7 +314,7 @@
     color: #cdd6df;
     background: #232b32;
     border: 1px solid #37424c;
-    border-radius: 3px;
+    border-radius: 999px;
     cursor: pointer;
   }
   @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
@@ -354,7 +354,7 @@
 <!-- P9 (Q2): slider defaults live in ONE editable sibling file — a pure JSON
      literal in a `const SHEEP_DEFAULTS =` assignment (a real .json can't be
      fetched from file://). Missing file → schema defaults + one warning. -->
-<script src="sheep-defaults.json.js?v=20261118a"></script>
+<script src="sheep-defaults.json.js?v=20261118d"></script>
 </head>
 <body class="advanced-closed">
 <div id="rotate-overlay">
@@ -428,9 +428,9 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118a"></script>
-<script src="lib/sheep-gui.js?v=20261118a"></script>
-<script src="lib/sheep-score-ui.js?v=20261118b"></script>
+<script src="lib/sheep-sim.js?v=20261118d"></script>
+<script src="lib/sheep-gui.js?v=20261118d"></script>
+<script src="lib/sheep-score-ui.js?v=20261118f"></script>
 <script>
 'use strict'
 // ============================================================================
@@ -1168,57 +1168,7 @@ pauseBtn.addEventListener('click', togglePause)
 // canvas — the same convention as flankAngle. Everything is rounded to whole
 // px / degrees to keep the paste short.
 function captureState() {
-  const d = sim.dog, g = sim.gcm, gt = sim.gate, p = params
-  const r1 = (v) => Math.round(v), deg = (a) => r1(((a * 180 / Math.PI) % 360 + 360) % 360)
-  const pt = (o) => ({ x: r1(o.x), y: r1(o.y) })
-  const bearing = (o) => deg(Math.atan2(o.y - g.y, o.x - g.x))
-  const raw = outlineMarkers(), start = markerStart(raw)
-  const markers = raw.map((_, k) => {
-    const mk = raw[(start + k) % raw.length]
-    return { n: k + 1, kind: mk.kind, x: r1(mk.x), y: r1(mk.y), bearing: bearing(mk) }
-  })
-  const nearestMarker = (o) => {
-    if (!markers.length) return null
-    let best = null, bd = Infinity
-    for (const mk of markers) { const dd = Math.hypot(mk.x - o.x, mk.y - o.y); if (dd < bd) { bd = dd; best = mk } }
-    return { n: best.n, dist: r1(bd) }
-  }
-  const playRect = sim.playRect()
-  const act = sim.sheep.filter((s) => !s.down && !s.through)
-  const flanking = d.command === 'come_by' || d.command === 'away'
-  const lineCW = sim.gateLineBearing(1, p.perimeterMargin), lineCCW = sim.gateLineBearing(-1, p.perimeterMargin)
-  const linePt = (a) => { const r = sim.perimeterRadius(a, p.perimeterMargin); return { x: g.x + r * Math.cos(a), y: g.y + r * Math.sin(a) } }
-  const lineInfo = (a) => ({ bearing: deg(a), ...pt(linePt(a)), nearestMarker: nearestMarker(linePt(a)) })
-  const station = deg((flanking && d.command === 'away' ? lineCCW : lineCW) + (flanking && d.command === 'away' ? -1 : 1) * p.flankOvershootDeg * Math.PI / 180)
-  const out = {
-    capturedAt: new Date().toISOString(),
-    course: { seed: p.seed, layout: sim.layout, sheepCount: sim.sheep.length, active: act.length, penned: sim.sheep.length - act.length - sim.sheep.filter((s) => s.down).length, down: sim.sheep.filter((s) => s.down).length },
-    field: { play: { x0: r1(playRect.x0), y0: r1(playRect.y0), x1: r1(playRect.x1), y1: r1(playRect.y1) }, canvas: { w: p.canvasW, h: p.canvasH } },
-    gate: { ...pt(gt), side: ['N', 'E', 'S', 'W'][gt.side], out: { x: gt.nx, y: gt.ny }, width: p.gateWidth, goal: pt(p.goal), bearingFromGCM: bearing(gt), nearestMarker: nearestMarker(gt) },
-    // where a flank ENDS: the gate's tangent to the perimeter on each side (come-by parks at CW, away at CCW)
-    gateLine: { comeBy: lineInfo(lineCW), away: lineInfo(lineCCW) },
-    flock: { gcm: pt(g), cohesive: sim.isCohesive(), hull: sim.hull.map(pt), perimeterMargin: p.perimeterMargin },
-    markers,
-    dog: {
-      command: d.command, pos: pt(d.pos), vel: pt(d.vel), speed: r1(Math.hypot(d.vel.x, d.vel.y)),
-      facingDeg: deg(d.facing), bearingFromGCM: bearing(d.pos), distFromGCM: r1(Math.hypot(d.pos.x - g.x, d.pos.y - g.y)),
-      target: pt(d.target), targetBearing: bearing(d.target), targetNearestMarker: nearestMarker(d.target),
-      nearestMarker: nearestMarker(d.pos), distOutsideHull: sim.hull.length ? r1(sim.distToHull(d.pos)) : null, // = perimeterMargin when he is ON the dotted line
-      intensity: +d.intensity.toFixed(2),
-      impulse: d.impulse ? d.impulse.name : null,
-      ...(d.flankEasy ? { flankEasy: true } : {}), ...(d.lieSide ? { lieSide: d.lieSide } : {}), // POC-v10 variants
-      flank: flanking ? {
-        dir: d.command === 'come_by' ? 'CW' : 'CCW', angleDeg: deg(d.flankAngle), radius: r1(d.flankR),
-        stationDeg: station, parked: d.flankParked, t: +d.flankT.toFixed(2), parkT: +d.parkT.toFixed(2),
-        cornerFirst: d.flankWaypoint, // C10: still running to the first corner (the point holds there)
-      } : null,
-      drive: (d.command === 'walk_on' || d.command === 'easy') ? { driveDist: r1(d.driveDist), driveT: +d.driveT.toFixed(2), stallT: +d.stallT.toFixed(2) } : null,
-      handoff: d.handoff ? pt(d.handoff) : null,
-      owner: pt(d.owner),
-    },
-    sheep: sim.sheep.map((s, i) => ({ i, ...pt(s.pos), g: s.group, state: s.through ? 'penned' : s.down ? 'down' : s.idle ? 'idle' : 'alert', ...(s.gatePull > 0 ? { gatePull: +s.gatePull.toFixed(2), lead: s.gateLead } : {}), ...(s.trot ? { trot: 1, trotLead: s.trotLead } : {}) })),
-    run: { t: +sim.run.t.toFixed(1), crush: +sim.crush.toFixed(1), injuries: sim.injuries },
-  }
+  const out = sim.captureState() // the snapshot itself is lib/sheep-sim.js — shared with the 3D pages
   const text = JSON.stringify(out)
   console.log('[sheep-poc] state capture:\n' + text)
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
