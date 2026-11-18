@@ -8,6 +8,12 @@
 //     its name in the space under the secondary buttons: below the camera row
 //     on the 3D pages, below the reseed / pause row on the 2D page.
 //
+//   3 A MAIN MENU button back to index.html on every version, made like the
+//     reseed-row buttons and level with that row: on the 3D pages it floats
+//     halfway between the scoring block (upper left) and the secondary buttons
+//     (top centre); on the 2D page, whose reseed row is under the pad, it is the
+//     first button of that row.
+//
 //   A page calls, once `sim` exists:   PadUI.init(sim)
 //   A command that is not a sim verb (the assault page's battle stations) calls
 //   PadUI.flash('BATTLE STATIONS') itself.
@@ -24,6 +30,13 @@ const PadUI = (() => {
     #controls #cmd-flash { width: 100%; font-size: 30px; }
     #cmd-flash.go { animation: cmd-flash 2.6s ease-out forwards; }
     @keyframes cmd-flash { 0% { opacity: 0; transform: scale(1.35); } 6% { opacity: 1; transform: scale(1); } 45% { opacity: 1; } 100% { opacity: 0; } }
+    #menu-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; white-space: nowrap; }
+    #stage > #menu-btn { position: absolute; z-index: 5; transform: translateX(-50%); height: var(--cs-h, 24px); padding: 0 10px; min-width: var(--cs-w, 68px);
+      font: inherit; font-size: 12px; color: #cdd6df; background: rgba(16, 20, 24, 0.72); border: 1px solid #37424c; border-radius: 999px; }
+    #stage > #menu-btn:hover { background: rgba(44, 53, 61, 0.85); }
+    #controls .aux #menu-btn { padding: 3px 8px; font: inherit; font-size: 12px; color: #cdd6df; background: #232b32; border: 1px solid #37424c; border-radius: 999px; }
+    #controls .aux #menu-btn:hover { background: #2c363f; }
+    @media (pointer: coarse) and (max-height: 600px) { #stage > #menu-btn { font-size: 9px; padding: 0 6px; background: rgba(20, 26, 31, 0.42); } #controls .aux #menu-btn { font-size: 11px; } }
     @media (pointer: coarse) and (max-height: 600px) { #cmd-flash { height: 28px; font-size: 22px; line-height: 28px; } }`
 
   // the name of what was just asked for — the pad's own words for the verb + entry opts
@@ -42,8 +55,39 @@ const PadUI = (() => {
     el.classList.remove('go'); void el.offsetWidth; el.classList.add('go') // restart the animation
   }
 
+  // 3D: level with the reseed row, halfway between the scoring block's own (minimum) width and the left end of the secondary buttons.
+  // The block's width is read when the page is laid out (a fresh score) or resized, never per frame, and is at least its
+  // minimum width — so the button does not creep sideways as the score grows.
+  function placeMenu(menu) {
+    const stage = document.getElementById('stage'), hud = document.getElementById('score-hud')
+    const row = document.querySelector('#center-stack .aux'), wide = document.getElementById('cam-bar') || row
+    if (!stage || !row) return
+    const s = stage.getBoundingClientRect(), r = row.getBoundingClientRect(), w = wide.getBoundingClientRect()
+    const ox = s.left + stage.clientLeft, oy = s.top + stage.clientTop // absolute children sit in the stage's padding box
+    let edge = 8
+    if (hud) {
+      const cs = getComputedStyle(hud), min = hud.offsetLeft + (parseFloat(cs.minWidth) || 0) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+      edge = Math.max(min, Math.min(hud.getBoundingClientRect().right - ox, min + 40)) // the live width only up to a little past the minimum
+    }
+    menu.style.left = ((edge + (w.left - ox)) / 2).toFixed(1) + 'px'
+    menu.style.top = (r.top - oy).toFixed(1) + 'px'
+  }
+  function addMenu() {
+    const menu = document.createElement('a'); menu.id = 'menu-btn'; menu.href = 'index.html'; menu.textContent = 'main menu'
+    menu.title = 'back to the main menu — pick a version'
+    const stage = document.getElementById('stage'), aux2d = document.querySelector('#controls .aux')
+    if (stage && document.getElementById('center-stack')) {
+      stage.appendChild(menu)
+      const place = () => placeMenu(menu)
+      place(); requestAnimationFrame(place); setTimeout(place, 400) // again once the score block and the mode buttons have laid out
+      if (typeof ResizeObserver !== 'undefined') new ResizeObserver(place).observe(stage)
+      window.addEventListener('resize', place)
+    } else if (aux2d) aux2d.insertBefore(menu, aux2d.firstChild)
+  }
+
   function init(sim) {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st)
+    addMenu()
     el = document.createElement('div'); el.id = 'cmd-flash'
     const stack = document.getElementById('center-stack'), aux = document.querySelector('#controls .aux')
     if (stack) stack.appendChild(el)                 // 3D: under the camera row

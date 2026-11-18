@@ -111,6 +111,12 @@ async function runDemo(s, file) {
     for (const via of ['top', 'handler', 'dog']) { await cam(via); const away = await s.ev(pose); await cam('orbit'); back.push(via + ':' + (away !== home && (await s.ev(pose)) === home)) }
     ok(P, 'CAM-1', 'top / handler / dog, then orbit once: the camera is back on the starting view', back.every((b) => b.endsWith('true')), back.join(' '))
   }
+  { // owner 2026-11-18: a main menu button on every version, level with the reseed row
+    const m = await s.ev(`(() => { const q = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }; const a = document.getElementById('menu-btn'); return { menu: q('#menu-btn'), reseed: q('#reseed-btn'), hud: q('#score-hud'), cam: q('#cam-bar'), href: a && a.getAttribute('href'), text: a && a.textContent, inAux: !!(a && a.closest('.aux')) } })()`)
+    const level = m.menu && Math.abs(m.menu.t - m.reseed.t) <= 1.5 && Math.abs(m.menu.b - m.reseed.b) <= 1.5
+    const mid = file === '2d.html' ? m.inAux && m.menu.r <= m.reseed.l : m.menu.l > m.hud.r - 2 && m.menu.r < m.cam.l && Math.abs((m.menu.l + m.menu.r) / 2 - (m.hud.r + m.cam.l) / 2) <= 12
+    ok(P, 'MENU-1', file === '2d.html' ? 'a main menu button leads the reseed row and links to index.html' : 'a main menu button sits level with the reseed row, midway between the score block and the secondary buttons, and links to index.html', m.href === 'index.html' && m.text === 'main menu' && level && mid, JSON.stringify(m).slice(0, 300))
+  }
   const errs = s.errors.slice(errs0)
   ok(P, 'errors-demo', 'zero console errors across the demo session', errs.length === 0, errs.slice(0, 4).join(' | '))
 }
