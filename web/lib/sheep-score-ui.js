@@ -74,7 +74,16 @@ const ScoreUI = (() => {
   #score-pops .pop.gate { color: #9fd0ff; }
   #score-pops .pop.wolf { color: #ff9a8a; }
   #score-pops .pop.big { color: #7fd79a; font-size: 20px; letter-spacing: 0.04em; }
-  #score-banner { position: absolute; left: 50%; top: 20%; z-index: 7; pointer-events: none; transform: translate(-50%, -50%);
+  /* per-sheep scores (owner 2026-11-18): not over the field — a short column under the HUD block, newest on top, sliding down and fading */
+  #score-feed { position: absolute; left: 12px; top: 100%; margin: 2px 0 0; white-space: nowrap; }
+  #score-feed div { height: 16px; font: 700 12px/16px ui-monospace, Menlo, monospace; color: #fff; animation: su-feed 2.4s linear forwards; }
+  #score-feed .rushed { color: #aab3bb; font-size: 11px; }
+  #score-feed .calm { color: #8be0a4; font-size: 13px; }
+  #score-feed .perfect { color: #ffd24a; font-size: 15px; }
+  #score-feed .frenzy { text-shadow: 0 0 8px rgba(255, 122, 60, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9); }
+  #score-feed .gate { color: #9fd0ff; }
+  @keyframes su-feed { 0%, 45% { opacity: 1; } 100% { opacity: 0; } }
+  #score-banner { position: absolute; left: 50%; top: max(27%, 150px); /* clear of the command flash under the 3D pages' camera row (lib/sheep-pad-ui.js) */ z-index: 7; pointer-events: none; transform: translate(-50%, -50%);
     padding: 10px 26px; border-radius: 8px; white-space: nowrap; text-align: center; opacity: 0;
     font: 800 30px/1.15 ui-monospace, Menlo, monospace; letter-spacing: 0.03em; color: #ffd24a;
     background: rgba(16, 20, 24, 0.86); border: 2px solid #ffd24a; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
@@ -82,7 +91,6 @@ const ScoreUI = (() => {
   #score-banner.strike { color: #ff6b5e; border-color: #ff6b5e; }
   #score-banner.bust { color: #fff; background: rgba(150, 30, 24, 0.94); border-color: #ff6b5e; font-size: 38px; }
   #score-banner.gate { color: #9fd0ff; border-color: #9fd0ff; }
-  #score-banner.frenzy { color: #ff7a3c; border-color: #ff7a3c; }
   #score-banner.objective { font-size: 20px; color: #7fd79a; border-color: #4c8a5e; }
   #score-banner.objective.lost { color: #aab3bb; border-color: #55616c; }
   #score-banner.start { font-size: 16px; font-weight: 600; color: #e6edf3; border-color: #55616c; white-space: normal; max-width: 80%; }
@@ -229,9 +237,9 @@ const ScoreUI = (() => {
   }
 
   // ---- state ----------------------------------------------------------------
-  const S = { opts: null, page: 'page', run: null, pops: [], bonusAt: 0, slot: 0, smallAt: 0, smallSlot: 0, card: null, anim: null, lastMode: null, saved: null, lastMult: 1,
+  const S = { opts: null, page: 'page', run: null, pops: [], flashes: new Map(), feedNew: 0, bonusAt: 0, slot: 0, smallAt: 0, smallSlot: 0, card: null, anim: null, lastMode: null, saved: null, lastMult: 1,
     banners: [], banner: null, bannerLog: [], hudH: -1, objSig: '', record: null } // bannerLog: the text of every banner shown, newest last (read by the page tests)
-  let hudEl, ptsEl, multEl, frzEl, barEl, barFill, strikesEl, valueEl, subEl, objsEl, popLayer, bannerEl, panelEl, btnDaily, btnWaves
+  let feedEl, hudEl, ptsEl, multEl, frzEl, barEl, barFill, strikesEl, valueEl, subEl, objsEl, popLayer, bannerEl, panelEl, btnDaily, btnWaves
 
   function init(opts) {
     S.opts = opts; S.page = opts.page || 'page'; S.lastMode = params.mode
@@ -242,6 +250,7 @@ const ScoreUI = (() => {
       '<div class="mid"><span class="strikes"></span><span class="value"></span></div>' +
       '<div class="sub"></div><ul class="objs"></ul>'
     popLayer = document.createElement('div'); popLayer.id = 'score-pops'
+    feedEl = document.createElement('div'); feedEl.id = 'score-feed'; hudEl.appendChild(feedEl)
     bannerEl = document.createElement('div'); bannerEl.id = 'score-banner'
     panelEl = document.createElement('div'); panelEl.id = 'score-panel'
     opts.stage.appendChild(popLayer); opts.stage.appendChild(hudEl); opts.stage.appendChild(bannerEl); opts.stage.appendChild(panelEl)
@@ -277,30 +286,58 @@ const ScoreUI = (() => {
   }
 
   // ---- pops (SC7, VH4) ------------------------------------------------------
-  const BANNER_KINDS = new Set(['strike', 'file', 'frenzy', 'finisher', 'onego', 'objective'])
-  function addPop(ev) {
+  const FEED_ROWS = 8, FLASH_SECS = 0.9, FLASH_OUT = { r: 0, g: 0, b: 0, k: 0 }
+  const FLASH_RGB = { rushed: [150, 160, 170], calm: [70, 220, 120], perfect: [255, 200, 40], gate: [90, 170, 255] } // a shade stronger than the text colours: they have to show on white wool
+  const BANNER_KINDS = new Set(['strike', 'file', 'finisher', 'onego', 'objective']) // no centre banner for a frenzy (owner 2026-11-18): the meter and its timer turn orange, the crossings still pay double
+  function addPop(ev, sim) {
     const el = document.createElement('div')
     const big = ev.kind !== 'pen' && !(ev.kind === 'gate' && ev.label[0] === '+')
     el.className = 'pop' + (big ? ' big' : '') + (ev.kind === 'gate' ? ' gate' : '') + (ev.kind === 'wolf' ? ' wolf' : '') + (ev.tier ? ' ' + ev.tier : '') + (ev.frenzy ? ' frenzy' : '')
     el.textContent = ev.label
+    const t = now()
+    if (!big) {                                           // one sheep's score: flash the sheep, list the number in the column
+      const tier = ev.kind === 'gate' ? 'gate' : ev.tier || 'calm'
+      const s = sim.sheep[ev.i]
+      if (s) S.flashes.set(s, { rgb: FLASH_RGB[tier] || FLASH_RGB.calm, start: t })
+      el.className = tier + (ev.frenzy ? ' frenzy' : '')
+      el.addEventListener('animationend', () => el.remove())
+      feedEl.prepend(el)
+      while (feedEl.children.length > FEED_ROWS) feedEl.lastChild.remove()
+      S.feedNew++
+      return
+    }
     el.style.opacity = '0'
     popLayer.appendChild(el)
-    const t = now()
     let start = t, oy = 0
     if (big) {                                            // end-of-run bonuses arrive in one tick → read them one after another, stacked
       if (t > S.bonusAt + 1.5) S.slot = 0
       start = Math.max(t, S.bonusAt); S.bonusAt = start + 0.3
       oy = 24 * S.slot++
     }
-    else {                                                // several sheep through in the same moment → fan the labels up instead of piling them
-      if (t > S.smallAt + 0.3) S.smallSlot = 0
-      S.smallAt = t; oy = 19 * (S.smallSlot++ % 6)
-    }
     S.pops.push({ el, x: ev.x, y: ev.y, start, oy, life: big ? 2.6 : ev.tier === 'perfect' ? 1.7 : 1.3, rise: big ? 26 : 44, dx: big ? 0 : (Math.random() - 0.5) * 30 })
     if (S.pops.length > 60) { const old = S.pops.shift(); old.el.remove() }
   }
+  // the column slides: rows that arrived this frame push the rest down, eased rather than jumped
+  function stepFeed() {
+    if (!S.feedNew) return
+    const n = Math.min(S.feedNew, FEED_ROWS); S.feedNew = 0
+    feedEl.style.transition = 'none'; feedEl.style.transform = `translateY(${-16 * n}px)`
+    void feedEl.offsetHeight
+    feedEl.style.transition = 'transform 0.22s ease-out'; feedEl.style.transform = 'translateY(0)'
+  }
+  // a sheep that has just scored blinks in its score's colour: null, or { r, g, b (0–255), k (0–1 blend) } for the page's sheep painter
+  function flash(s) {
+    const f = S.flashes.get(s)
+    if (!f) return null
+    const u = (now() - f.start) / FLASH_SECS
+    if (u >= 1) { S.flashes.delete(s); return null }
+    FLASH_OUT.r = f.rgb[0]; FLASH_OUT.g = f.rgb[1]; FLASH_OUT.b = f.rgb[2]
+    FLASH_OUT.k = (1 - u) * (0.6 + 0.4 * Math.cos(u * Math.PI * 6))
+    return FLASH_OUT
+  }
   function stepPops() {
     const t = now()
+    stepFeed()
     for (let i = S.pops.length - 1; i >= 0; i--) {
       const p = S.pops[i], u = (t - p.start) / p.life
       if (u >= 1) { p.el.remove(); S.pops.splice(i, 1); continue }
@@ -335,7 +372,7 @@ const ScoreUI = (() => {
       banner(ev.bust ? 'strike bust' : 'strike', (ev.bust ? 'BUST' : esc(ev.label)) + (why ? `<small>${ev.bust ? 'third strike — ' : ''}${why}</small>` : ''), ev.bust ? 2.6 : 1.7, true)
       return
     }
-    banner(ev.kind === 'frenzy' ? 'frenzy' : 'jackpot', esc(ev.label), sim.run.finished ? 1.1 : 1.7, true)
+    banner('jackpot', esc(ev.label), sim.run.finished ? 1.1 : 1.7, true)
   }
   function stepBanner() {
     const t = now()
@@ -428,8 +465,9 @@ const ScoreUI = (() => {
     const title = waves ? 'Time! ⏱' : sc.bust ? 'Three strikes' : sc.won ? (lostAny ? 'Survivors penned 🐑' : 'Penned! 🐑') : allLost ? 'Flock lost 🐺' : 'Run finished'
     // best for this exact course: compare, then save (only an untuned run may set one — owner Q87)
     let bestHtml = '', bestClass = 'best'
-    const isTuned = tuned(), bests = readBests()
-    if (bests) {
+    const isTuned = tuned(), isDemo = S.demoRun === sim.run, bests = readBests() // a run the demo handler touched is never saved (lib/sheep-demo-ui.js)
+    if (isDemo) bestHtml = 'demo run — not saved'
+    else if (bests) {
       const key = courseKey(sim), old = bests[key]
       const what = sc.mode === 'daily' ? 'daily best' : 'course best'
       if (isTuned) bestHtml = (old ? `${what} ${fmt(old.total)} · ` : '') + 'tuned — not saved'
@@ -442,7 +480,7 @@ const ScoreUI = (() => {
         }
       } else bestHtml = `${what} ${fmt(old.total)}`
     }
-    const rec = record(sim, sc, isTuned); S.record = rec
+    const rec = isDemo ? { firsts: [], band: '', bandNew: false } : record(sim, sc, isTuned); S.record = rec
     if (rec.bandNew) bestClass = 'best new'
     const labels = LABELS()
     const rankHtml = waves ? `<div class="rank wave">${sc.wave} wave${sc.wave === 1 ? '' : 's'} cleared${sc.bust ? ' · three strikes' : ''}</div>`
@@ -518,14 +556,14 @@ const ScoreUI = (() => {
     if (sim.run !== S.run) {                               // a new run (reseed / reset): clear the board
       S.run = sim.run; S.shown = false; S.bonusAt = 0; S.slot = 0; S.lastMult = 1
       for (const p of S.pops) p.el.remove()
-      S.pops.length = 0; S.banners.length = 0; S.banner = null; S.objSig = ''
+      S.pops.length = 0; S.flashes.clear(); feedEl.textContent = ''; S.feedNew = 0; S.banners.length = 0; S.banner = null; S.objSig = ''
       sim.layout0 = sim.layout; sim.obstacleGroups0 = sim.obstacleGroups // what the course STARTED as — a wave re-lays both, the best-score key must not move
       S.best = bestFor(sim)
       hide()
       if (sim.sideObjectives.length) // VH6: the course states its side objectives as it starts
         banner('start', 'Side objectives<small>' + sim.sideObjectives.map((o) => `<b>${esc(o.label)}</b> — ${esc(o.hint)}`).join('<br>') + '</small>', 4.5)
     }
-    while (sim.scoreEvents.length) { const ev = sim.scoreEvents.shift(); if (ev.points > 0) addPop(ev); eventBanner(ev, sim) }
+    while (sim.scoreEvents.length) { const ev = sim.scoreEvents.shift(); if (ev.points > 0) addPop(ev, sim); eventBanner(ev, sim) }
     stepPops(); stepBanner()
     const sc = sim.score()
     ptsEl.textContent = fmt(sc.total)
@@ -563,5 +601,6 @@ const ScoreUI = (() => {
     return `${t}\nscore ${fmt(sc.total)}  ×${sc.mult}  strikes ${sc.strikes}/${sc.strikeMax}  panics ${sc.panics}${S.best ? '  best ' + fmt(S.best.total) : ''}`
   }
 
-  return { init, frame, hud, hide, skip, setMode, dailySeed, tuned, courseKey, bestFor, STORE, readHistory, readBand, readCollection, bandOf, showHistory, showCollection, closePanel, keys: K, bannerLog: () => S.bannerLog.slice() }
+  function demoRun(sim) { S.demoRun = sim.run } // the demo handler issued commands in this run
+  return { init, frame, flash, hud, demoRun, hide, skip, setMode, dailySeed, tuned, courseKey, bestFor, STORE, readHistory, readBand, readCollection, bandOf, showHistory, showCollection, closePanel, keys: K, bannerLog: () => S.bannerLog.slice() }
 })()

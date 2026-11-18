@@ -7,6 +7,7 @@
 //   cross(sim, i)      — POC-v14 checks: teleport it just outside the gate mouth and step once (through the real gate path)
 // Criteria: .claude/sheep/implemented/POC-v15/{scoring,field-objectives,verdict-and-hud}.md (SC 1–19, FO 1–8, VH 7/8/10)
 //           .claude/sheep/implemented/POC-v14/{field-objectives,replay-modes}.md (the G-, K- and RM- checks carried forward)
+//           .claude/sheep/implemented/POC-v16/competition-and-demo.md (CC competition course, EX obstacles-or-gates, DM demo handler)
 const fs = require('fs'), vm = require('vm'), path = require('path'), crypto = require('crypto')
 const WEB = path.join(__dirname, '..', 'web')
 const GOLDEN = path.join(__dirname, 'golden-replay.json')
@@ -16,6 +17,7 @@ function load(dir, defaultsDir, withAssault) {
   vm.createContext(ctx)
   vm.runInContext(fs.readFileSync(path.join(defaultsDir, 'sheep-defaults.json.js'), 'utf8') + ';globalThis.SHEEP_DEFAULTS=SHEEP_DEFAULTS', ctx)
   vm.runInContext(fs.readFileSync(path.join(dir, 'sheep-sim.js'), 'utf8') + ';Object.assign(globalThis,{FlockSim,SETTINGS,buildParams,assertLevers,AWARDS,SIDE_OBJECTIVES,RANKS});globalThis.Sim=FlockSim', ctx)
+  vm.runInContext(fs.readFileSync(path.join(dir, 'sheep-auto.js'), 'utf8') + ';Object.assign(globalThis,{AutoHandler})', ctx)
   if (withAssault) vm.runInContext(fs.readFileSync(path.join(dir, 'assault-sim.js'), 'utf8') + ';Object.assign(globalThis,{assault,assaultReset,assaultStep,explode,wolfAward,teamFlee,BLAST})', ctx)
   return ctx
 }
@@ -632,6 +634,109 @@ function kindSim(kind, over) {
   ok('RM-7b', 'flock size is capped at waveSheepMax', capped.sheep.length === 40, `${capped.sheep.length}`)
   const c = mkc(N, { seed: 7, sheepCount: 6 })
   ok('RM-10', 'mode `course` is unaffected (herd size from the slider, par clock)', c.sheep.length === 6 && c.score().mode === 'course', '')
+}
+
+// =====================================================================================
+// POC-v16 — competition course (CC), obstacles OR drive gates (EX), the demo handler (DM)
+// =====================================================================================
+const comp = (seed, over) => mkc(N, Object.assign({ seed, course: 'competition', sheepCount: 8, specials: true, obstacleRandom: true, driveGateMax: 2 }, over || {}))
+{ // CC-1 / CC-2: what a competition course is made of
+  let bad = 0, minLeg = Infinity, minIn = Infinity, crossings = 0
+  const hist = {}
+  for (let seed = 1; seed <= 300; seed++) {
+    const q = comp(seed), n = q.driveGates.length, r = q.playRect(), pts = q.idealPath
+    hist[n] = (hist[n] || 0) + 1
+    if (n < 4 || n > 6 || q.obstacles.some((o) => o.kind !== 'hurdle') || q.sheep.length !== 8 || q.sheep.some((x) => x.kind !== 'ewe' || x.group !== 0) || q.layout !== 'competition') bad++
+    if (q.driveGates.some((d, i) => d.order !== i + 1) || pts.length !== n + 3) bad++
+    for (let i = 0; i + 2 < pts.length; i++) minLeg = Math.min(minLeg, Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y))
+    for (const d of q.driveGates) for (const e of [d.e0, d.e1]) minIn = Math.min(minIn, e.x - r.x0, r.x1 - e.x, e.y - r.y0, r.y1 - e.y)
+    const hit = (a, b, c, d) => { const o = (u, v, t) => Math.sign((v.x - u.x) * (t.y - u.y) - (v.y - u.y) * (t.x - u.x)); return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b) }
+    for (let i = 0; i + 2 < pts.length; i++) for (let j = i + 2; j + 2 < pts.length; j++) if (hit(pts[i], pts[i + 1], pts[j], pts[j + 1])) crossings++
+  }
+  ok('CC-1', '300 competition courses: 4–6 gates numbered in order, no obstacles, one group of plain ewes', bad === 0 && hist[4] > 0 && hist[5] > 0 && hist[6] > 0, `gate counts ${JSON.stringify(hist)}, bad ${bad}`)
+  ok('CC-2', 'the required path: every leg at least the minimum, no leg crosses another, every panel inside the fence', minLeg >= 189 && crossings === 0 && minIn > 0, `shortest leg ${minLeg.toFixed(0)} px, crossings ${crossings}, panel end to fence ${minIn.toFixed(0)} px`)
+  const a = comp(41), b = comp(41), p0 = mkc(N, { seed: 41 })
+  ok('CC-2b', 'same seed → same course; the pen gate is where the pasture course of that seed has it', JSON.stringify(a.idealPath) === JSON.stringify(b.idealPath) && a.gate.x === p0.gate.x && a.gate.y === p0.gate.y && a.gate.side === p0.gate.side, '')
+}
+{ // CC-3: in order, one way
+  const q = comp(7); q.step(DT)
+  const put = (d, k) => q.sheep.forEach((x, i) => { x.pos = { x: d.x + d.nx * k + d.tx * ((i % 4) - 1.5) * 6, y: d.y + d.ny * k + d.ty * ((i % 4) - 1.5) * 6 }; x.vel = { x: 0, y: 0 } })
+  const through = (d, from, to) => { for (const g of q.driveGates) g.sides.clear(); put(d, from); q.updateDriveGates(); put(d, to); q.updateDriveGates() } // sides cleared: the teleport to the start side is not a crossing
+  const g1 = q.driveGates[0], g2 = q.driveGates[1]
+  through(g2, -14, 14)
+  const early = g2.passed.size + g1.passed.size
+  through(g1, 14, -14)
+  const backwards = g1.passed.size
+  const before = q.points
+  through(g1, -14, 14)
+  const first = { done: g1.done, pts: q.points - before, mult: q.run.gateMult, next: q.nextGate() === g2 }
+  through(g2, -14, 14)
+  ok('CC-3', 'gates count in order and one way only: gate 2 early = nothing, gate 1 backwards = nothing, gate 1 then gate 2 clear', early === 0 && backwards === 0 && first.done && first.pts === 8 * 50 && first.mult === 1 && first.next && g2.done && q.nextGate() === q.driveGates[2],
+    `early ${early}, backwards ${backwards}, gate 1 ${JSON.stringify(first)}, gate 2 done ${g2.done}`)
+}
+{ // CC-4: the pen is shut until the last gate
+  const q = comp(7); q.step(DT)
+  cross(q, 0)
+  const shut = { open: q.penOpen(), through: q.sheep[0].through, inField: q.sheep[0].pos.x >= q.playRect().x0 - 1e-6 && q.sheep[0].pos.x <= q.playRect().x1 + 1e-6 && q.sheep[0].pos.y >= q.playRect().y0 - 1e-6 && q.sheep[0].pos.y <= q.playRect().y1 + 1e-6 }
+  for (const d of q.driveGates) d.done = true
+  cross(q, 0)
+  ok('CC-4', 'a sheep put out through the pen mouth is turned back while gates remain; once they are all cleared it is penned', !shut.open && !shut.through && shut.inField && q.penOpen() && q.sheep[0].through, JSON.stringify(shut))
+}
+{ // CC-6 / CC-7: the dog's objective, the reference and par
+  const q = comp(7); q.step(DT)
+  const g1 = q.driveGates[0], a = q.aim(), pas = mkc(N, { seed: 7 }); pas.step(DT)
+  const nearGate = Math.hypot(a.x - g1.x, a.y - g1.y) <= 125
+  for (const d of q.driveGates) d.done = true
+  q.step(DT)
+  const plain = mkc(N, { seed: 7, sheepCount: 8 })
+  ok('CC-6', 'the dog works toward the next gate, then the pen; on a pasture course it is the pen centre as before', nearGate && q.aim() === q.p.goal && pas.aim() === pas.p.goal, `aim ${a.x.toFixed(0)},${a.y.toFixed(0)} vs gate 1 ${g1.x.toFixed(0)},${g1.y.toFixed(0)}`)
+  const G = q.driveGates.length
+  ok('CC-7', 'the reference run counts the gates (points + multiplier) and par adds the walk round the path', q.run.reference === Math.round((q.p.penCalmPoints * (36 + 8 * G * q.p.driveGateMult) + 8 * G * q.p.driveGatePoints) * q.p.multFullFlock * q.p.multClean * q.p.multAllCalm) && q.run.reference > plain.run.reference && q.par() > plain.par() + 30, `reference ${q.run.reference} (${G} gates), par ${q.par().toFixed(0)} s vs ${plain.par().toFixed(0)} s`)
+  const w = comp(7, { mode: 'waves' })
+  ok('CC-8', 'wave mode has no competition course', !w.compPath && w.driveGates.length === 0 && w.penOpen(), '')
+}
+{ // EX-1: a pasture course has obstacles OR drive gates, never both
+  let both = 0, withGates = 0, withObst = 0
+  for (let seed = 1; seed <= 400; seed++) {
+    const q = mkc(N, { seed, obstacleRandom: true, driveGateMax: 2, driveGateChance: 0.5, sheepCount: 20 })
+    const o = q.obstacles.some((x) => x.kind !== 'hurdle'), g = q.driveGates.length > 0
+    if (o && g) both++
+    if (o) withObst++
+    if (g) withGates++
+  }
+  ok('EX-1', '400 pasture courses at the page settings: none has both obstacles and drive gates; both kinds still occur', both === 0 && withGates > 0 && withObst > 0, `both ${both}, with gates ${withGates}, with obstacles ${withObst}`)
+}
+{ // DM: the demo handler, through sim.setCommand only
+  const runAuto = (q, secs) => {
+    const auto = new N.AutoHandler(), order = [], verbs = new Set(), set0 = q.setCommand.bind(q)
+    q.setCommand = (c, o) => { verbs.add(c); return set0(c, o) }
+    const dog0 = q.dog
+    let moved = 0
+    for (let k = 0; k < secs * 60 && !q.run.finished; k++) {
+      const before = q.sheep.map((x) => x.pos.x + x.pos.y).join(), dx = q.dog.pos.x, dy = q.dog.pos.y
+      auto.step(q, DT)
+      if (q.sheep.map((x) => x.pos.x + x.pos.y).join() !== before || q.dog.pos.x !== dx || q.dog.pos.y !== dy) moved++
+      q.step(DT)
+      for (const d of q.driveGates) if (d.done && !order.includes(d.order)) order.push(d.order)
+    }
+    return { sc: q.score(), order, verbs: Array.from(verbs).sort().join(','), moved, sameDog: q.dog === dog0 }
+  }
+  let won = 0, inOrder = 0, moved = 0, busts = 0
+  const times = [], seeds = [1000, 1037, 1074, 1111, 1148, 1185]
+  let verbs = ''
+  for (const seed of seeds) {
+    const q = comp(seed, { sideObjectiveCount: 2 }), n = q.driveGates.length, r = runAuto(q, 300)
+    if (r.sc.won && r.sc.penned === 8) won++
+    if (r.sc.bust) busts++
+    if (r.order.length === n && r.order.every((v, i) => v === i + 1)) inOrder++
+    moved += r.moved; times.push(r.sc.raw.t.toFixed(0)); verbs = r.verbs
+  }
+  ok('DM-1', 'the demo handler runs six competition courses: every gate in order, the whole flock penned, no bust', won === seeds.length && inOrder === seeds.length && busts === 0, `won ${won}/${seeds.length}, in order ${inOrder}, times ${times.join(' ')} s`)
+  ok('DM-2', 'it only ever issues the pad\'s commands — it never moves the dog or a sheep itself', moved === 0 && verbs.split(',').every((v) => ['away', 'come_by', 'easy', 'lie_down', 'that_ll_do', 'walk_on'].includes(v)), `verbs ${verbs}, direct moves ${moved}`)
+  let pw = 0
+  const pt = []
+  for (const seed of [1074, 1296, 1555]) { const r = runAuto(mkc(N, { seed, sheepCount: 30 }), 400); if (r.sc.won && r.sc.penned === 30) pw++; pt.push((r.sc.won ? 'won ' : r.sc.bust ? 'bust ' : 'open ') + r.sc.raw.t.toFixed(0) + ' s') }
+  ok('DM-3', 'on a pasture course it gathers a scattered flock of 30 and pens it (three seeds)', pw === 3, pt.join(' · '))
 }
 
 let fails = 0

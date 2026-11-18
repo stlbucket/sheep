@@ -84,7 +84,7 @@
   /* CENTRE STACK — top-centre of the stage, the same on every screen: settings, the reseed / mode row, then the camera row,
      every button one size. Pause lives with the dog's pad (see #pause-btn). Keys live in the titles. */
   #stage { --cs-w: 68px; --cs-h: 24px; --cs-g: 4px; --cs-top: 8px; --cs-half: calc((var(--cs-w) * 5 + var(--cs-g) * 4) / 2); --pad-edge: 327px; } /* --pad-edge: stage's right edge → the closed drawer's pad's left edge */
-  #center-stack { position: absolute; top: var(--cs-top); left: 50%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: var(--cs-g); pointer-events: none; }
+  #center-stack { position: absolute; top: var(--cs-top); left: 43%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: var(--cs-g); pointer-events: none; }
   #cam-bar, #center-stack .aux, #center-stack .top { display: flex; gap: var(--cs-g); } /* .aux: reseed + the mode buttons lib/sheep-score-ui.js adds */
   #center-stack button {
     box-sizing: border-box;
@@ -309,7 +309,7 @@
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
-<script src="sheep-defaults.json.js?v=20261118f"></script>
+<script src="sheep-defaults.json.js?v=20261118m"></script>
 <script type="importmap">
 {
   "imports": {
@@ -398,11 +398,13 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118f"></script>
-<script src="lib/sheep-gui.js?v=20261118f"></script>
-<script src="lib/sheep-score-ui.js?v=20261118f"></script>
+<script src="lib/sheep-sim.js?v=20261118m"></script>
+<script>params.driveGateMax = 0 // owner 2026-11-18: the 3D pastures never carry drive gates (they live on the 3D competition course); set before lib/sheep-score-ui.js snapshots its defaults</script>
+<script src="lib/sheep-gui.js?v=20261118m"></script>
+<script src="lib/sheep-score-ui.js?v=20261118m"></script>
+<script src="lib/sheep-pad-ui.js?v=20261118m"></script>
 <!-- the wolf-mortar physics (DOM-free, three-free) -->
-<script src="lib/assault-sim.js?v=20261118f"></script>
+<script src="lib/assault-sim.js?v=20261118m"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.
@@ -464,6 +466,7 @@ const scene = new THREE.Scene()
 scene.fog = new THREE.Fog(HORIZON, 1600, 7500)
 
 const camera = new THREE.PerspectiveCamera(45, 1, 8, 24000)
+const flashCol = new THREE.Color() // scratch: the score flash on a sheep's wool
 
 const hemi = new THREE.HemisphereLight(0xe6f1ff, 0x7f9a5c, 1.5)
 scene.add(hemi)
@@ -893,6 +896,8 @@ function updateSheep(dt, time) {
     }
     if (s.down) col.copy(assault.killed.has(s) ? C_CHAR : C_DOWN) // §A: mortar kills are charred, crush injuries stay red
     else col.copy(KIND_COL[s.kind] || C_WOOL).lerp(C_ALARM, clamp01(s.stress) * (s.kind === 'black' ? 0.6 : 1)) // stress tint, same read-out as the 2D page
+    const fl = ScoreUI.flash(s) // just scored → blink in the score's colour
+    if (fl) col.lerp(flashCol.setRGB(fl.r / 255, fl.g / 255, fl.b / 255, THREE.SRGBColorSpace), fl.k)
     woolMesh.setColorAt(i, col)
   }
   woolMesh.count = headMesh.count = n; legMesh.count = n * 4
@@ -1469,17 +1474,19 @@ const camButtons = Array.from(document.querySelectorAll('#cam-bar button[data-ca
 function fieldCentre() { return new V3(params.canvasW / 2, 0, params.canvasH / 2) }
 function homeOrbit() { // a raised view from the south: north at the top, east on the right — reads like the 2D canvas
   // default zoom (owner 2026-11-18, measured off a phone-landscape screenshot): 29° down, the near fence filling ~94 % of the
-  // view width, aimed a touch north of centre. Distance = whichever is farther of the height framing and the width fit.
+  // view width, aimed a touch south of centre. Distance = whichever is farther of the height framing and the width fit.
   const c = fieldCentre(), pitch = 29 * Math.PI / 180, tanH = Math.tan(camera.fov / 2 * Math.PI / 180)
   const dH = params.canvasH * 1.147
   const dW = params.canvasW * 0.45 / (tanH * Math.max(camera.aspect, 0.5) * 0.94) + params.canvasH * 0.38 * Math.cos(pitch)
   const d = Math.max(dH, dW)
-  controls.target.set(c.x, 0, c.z - params.canvasH * 0.04)
+  controls.target.set(c.x, 0, c.z + params.canvasH * 0.04)
   camera.position.set(c.x, d * Math.sin(pitch), controls.target.z + d * Math.cos(pitch))
 }
 function setCam(mode) {
   if (!CAMS.includes(mode)) return
-  if (mode === 'orbit' && camState.mode === 'orbit') homeOrbit() // orbit again while in orbit → back to the starting view
+  // orbit always lands on the starting view (owner 2026-11-18): coming back from top / handler / dog the camera was still
+  // sitting where that mode left it — straight overhead after `top` — and it took a second click to re-centre
+  if (mode === 'orbit') homeOrbit()
   camState.mode = mode
   camState.snap = true
   controls.enabled = mode === 'orbit'
@@ -1587,6 +1594,7 @@ function updateStrip() {
 }
 function issue(cmd, flavor) {
   if (cmd === 'battle_stations') {            // §A: not a sim verb — the assault lib carries the dog to a gun
+    PadUI.flash('BATTLE STATIONS')            // …so it flashes its own name (every sim verb flashes from sim.setCommand)
     if (!assaultBattleStations(sim)) { assaultView.note = 'battle stations — no wolves in any gun’s sights'; assaultView.noteUntil = clock + 3 }
     return updateStrip()
   }
@@ -1730,6 +1738,7 @@ ScoreUI.init({
   },
   setSeed, newCourse, restart: restartRun,
 })
+PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
 
 let last = performance.now() / 1000
 let acc = 0, fps = 0, fpsAcc = 0, fpsFrames = 0, clock = 0

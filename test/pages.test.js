@@ -1,4 +1,4 @@
-// Page suite — drives web/2d.html, web/3d.html and web/3d-assault.html in headless Chrome straight from file://
+// Page suite — drives web/2d.html, web/3d.html, web/3d-assault.html and web/3d-competition.html in headless Chrome straight from file://
 // (no web server), over the DevTools websocket. Needs node 22+ (global WebSocket / fetch), Google Chrome, and
 // network access (lil-gui and three.js load from a CDN).
 //   node test/pages.test.js              all three pages (about 2 minutes)
@@ -66,6 +66,55 @@ window.__t = {
 }; true`
 const shot = (s, file, name) => s.send('Page.captureScreenshot', { format: 'png' }).then((r) => fs.writeFileSync(path.join(SHOTS, file.replace('.html', '') + '-' + name + '.png'), Buffer.from(r.result.data, 'base64')))
 
+// POC-v16 (.claude/sheep/implemented/POC-v16/competition-and-demo.md): EX — a 3D pasture never carries drive gates
+async function runNoGates(s, file) {
+  await s.send('Page.navigate', { url: WEB + file }); await sleep(5000)
+  const g = await s.ev(`(() => { let n = 0; for (let k = 1; k <= 40; k++) { sim.reseed(k); n += sim.driveGates.length } return { gates: n, tuned: ScoreUI.tuned() } })()`)
+  ok(file, 'EX-2', '40 courses on this page: no drive gates, and the page is not "tuned" for it', g.gates === 0 && !g.tuned, JSON.stringify(g))
+}
+// POC-v16: DM (demo mode) on a page; CC (the competition course) on 3d-competition.html
+async function runDemo(s, file) {
+  const P = file, comp = file === '3d-competition.html', errs0 = s.errors.length
+  await s.send('Page.navigate', { url: WEB + file + '?seed=1259' }); await sleep(file === '2d.html' ? 2500 : 5000)
+  if (comp) {
+    const b = await s.ev(`({ gates: sim.driveGates.length, sheep: sim.sheep.length, obst: sim.obstacles.filter((o) => o.kind !== 'hurdle').length, kinds: sim.sheep.filter((q) => q.kind !== 'ewe').length, open: sim.penOpen(), tuned: ScoreUI.tuned(), key: ScoreUI.keys.history() })`)
+    ok(P, 'CC-p1', 'the competition page loads a clean course: 4–6 gates, 8 plain ewes, no obstacles, the pen shut, not "tuned", its own records', b.gates >= 4 && b.gates <= 6 && b.sheep === 8 && b.obst === 0 && b.kinds === 0 && !b.open && !b.tuned && /competition-3d/.test(b.key), JSON.stringify(b))
+  } else if (file === '3d.html') await runNoGates(s, file).then(() => s.send('Page.navigate', { url: WEB + file + '?seed=1259' })).then(() => sleep(5000))
+  const pre = await s.ev(`({ btn: !!document.getElementById('demo-btn'), on: DemoUI.on, say: getComputedStyle(document.getElementById('demo-say')).display, hint: document.getElementById('demo-btn').classList.contains('hint'), anim: getComputedStyle(document.getElementById('demo-btn')).animationName })`)
+  await s.ev(`document.getElementById('demo-btn').click(); true`); await sleep(1500)
+  const live = await s.ev(`({ on: DemoUI.on, cmd: sim.dog.command, lit: Array.from(document.querySelectorAll('#controls button[data-cmd].active')).map((b) => b.dataset.cmd).join(), say: document.getElementById('demo-say').textContent, shown: getComputedStyle(document.getElementById('demo-say')).display, btn: document.getElementById('demo-btn').classList.contains('active'), commands: sim.run.commands })`)
+  await shot(s, file, 'demo')
+  const hint = await s.ev(`({ hint: document.getElementById('demo-btn').classList.contains('hint'), flag: localStorage.getItem('sheep.demoUsed.v1') })`)
+  ok(P, 'DM-p0', 'a browser that has never used demo: the button pulses blue; turning demo on once stops it for good', pre.hint && pre.anim === 'demo-hint' && !hint.hint && hint.flag === '1', JSON.stringify({ pre, hint }))
+  ok(P, 'DM-p1', 'demo ▶ starts the handler: the dog is commanded, the pad lights the command he is on, the readout names it', pre.btn && !pre.on && pre.say === 'none' && live.on && live.btn && live.commands >= 1 && live.cmd !== 'that_ll_do' && live.lit === live.cmd && live.shown === 'block' && /^DEMO/.test(live.say), JSON.stringify(live))
+  // fast-forward the page's own loop; every tick the lit button must be the dog's command once the strip has repainted
+  await s.ev(`(() => { for (let k = 0; k < 60 * ${comp ? 400 : 60} && !sim.run.finished; k++) { DemoUI.step(sim, params.dt); sim.step(params.dt) } return true })()`); await sleep(comp ? 2500 : 600)
+  const end = await s.ev(`(() => { const sc = sim.score(); return { won: sc.won, penned: sc.penned, gates: sim.driveGates.filter((d) => d.done).length, of: sim.driveGates.length, lit: Array.from(document.querySelectorAll('#controls button[data-cmd].active')).map((b) => b.dataset.cmd).join(), cmd: sim.dog.command + (sim.dog.flankEasy ? '_easy' : ''), best: (document.querySelector('#card .best') || {}).textContent || '', hist: (ScoreUI.readHistory() || []).length, bests: Object.keys(JSON.parse(localStorage.getItem(ScoreUI.STORE) || '{}')).length } })()`)
+  await shot(s, file, 'demo-end')
+  if (comp) ok(P, 'CC-p2', 'the demo takes the flock through every gate and pens it; the run is not saved', end.won && end.penned === 8 && end.gates === end.of && /demo run — not saved/.test(end.best) && end.hist === 0 && end.bests === 0, JSON.stringify(end))
+  ok(P, 'DM-p2', 'the pad still shows the dog\'s live command after the fast-forward; nothing was saved', end.lit === end.cmd && end.hist === 0 && end.bests === 0, JSON.stringify(end))
+  await s.ev(`(() => { if (sim.run.finished) (document.querySelector('#card [data-card="replay"]') || { click() {} }).click(); return true })()`); await sleep(500)
+  const again = await s.ev(`DemoUI.on`)
+  await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }); await sleep(250)
+  const back = await s.ev(`({ on: DemoUI.on, cmd: sim.dog.command, say: getComputedStyle(document.getElementById('demo-say')).display })`)
+  await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, text: 'a' }); await sleep(250)
+  const keyA = await s.ev(`DemoUI.on`)
+  await s.send('Page.navigate', { url: WEB + file }); await sleep(file === '2d.html' ? 2500 : 5000)
+  const later = await s.ev(`document.getElementById('demo-btn').classList.contains('hint')`)
+  ok(P, 'DM-p4', 'after a reload the button no longer pulses', later === false, String(later))
+  ok(P, 'DM-p3', 'demo survives a replay; a command key hands the dog back to the player; A turns demo on again', again && !back.on && back.cmd === 'lie_down' && back.say === 'none' && keyA, JSON.stringify({ again, back, keyA }))
+  if (file !== '2d.html') { // owner 2026-11-18: orbit lands on the starting view in ONE click, from any other camera
+    const pose = `(() => { const c = __sheep3d.camera, t = __sheep3d.controls.target; return [c.position.x, c.position.y, c.position.z, t.x, t.y, t.z].map((v) => Math.round(v)).join() })()`
+    const cam = async (name) => { await s.ev(`document.querySelector('#cam-bar button[data-cam="${name}"]').click(); true`); await sleep(400) }
+    await cam('orbit')
+    const home = await s.ev(pose), back = []
+    for (const via of ['top', 'handler', 'dog']) { await cam(via); const away = await s.ev(pose); await cam('orbit'); back.push(via + ':' + (away !== home && (await s.ev(pose)) === home)) }
+    ok(P, 'CAM-1', 'top / handler / dog, then orbit once: the camera is back on the starting view', back.every((b) => b.endsWith('true')), back.join(' '))
+  }
+  const errs = s.errors.slice(errs0)
+  ok(P, 'errors-demo', 'zero console errors across the demo session', errs.length === 0, errs.slice(0, 4).join(' | '))
+}
+
 async function runPage(s, file, opts = {}) {
   const P = file, is3d = file !== '2d.html'
   const errs0 = s.errors.length
@@ -98,9 +147,9 @@ async function runPage(s, file, opts = {}) {
   await s.ev(`__t.setSeed(4242); true`); await sleep(400)
   await s.ev(`__t.pause(true); __t.pen(0, 'rushed'); __t.pen(1, 'calm'); __t.pen(2, 'perfect'); true`)
   await sleep(350)
-  const p1 = await s.ev(`(() => { const pops = Array.from(document.querySelectorAll('#score-pops .pop')), f = (c) => { const e = pops.find((x) => x.classList.contains(c)); return e ? { size: parseFloat(getComputedStyle(e).fontSize), color: getComputedStyle(e).color } : null }
-    const sc = sim.score(); return { pops: pops.length, r: f('rushed'), c: f('calm'), p: f('perfect'), placed: pops.filter((e) => e.style.transform.includes('translate')).length, pts: sc.total, shown: __t.pts(), mult: document.querySelector('#score-hud .mult').textContent, want: '×' + sc.mult, bar: parseFloat(document.querySelector('#score-hud .bar i').style.width), left: sc.windowLeft, hud: document.getElementById('hud').textContent } })()`)
-  ok(P, 'VH-4', 'a RUSHED, a CALM and a PERFECT crossing give three different pops (colour and size); the HUD shows the running score',
+  const p1 = await s.ev(`(() => { const pops = Array.from(document.querySelectorAll('#score-feed div')), f = (c) => { const e = pops.find((x) => x.classList.contains(c)); return e ? { size: parseFloat(getComputedStyle(e).fontSize), color: getComputedStyle(e).color } : null }
+    const sc = sim.score(); return { pops: pops.length, r: f('rushed'), c: f('calm'), p: f('perfect'), placed: document.querySelectorAll('#score-pops .pop').length === 0 && ScoreUI.flash(sim.sheep[2]) ? 1 : 0, pts: sc.total, shown: __t.pts(), mult: document.querySelector('#score-hud .mult').textContent, want: '×' + sc.mult, bar: parseFloat(document.querySelector('#score-hud .bar i').style.width), left: sc.windowLeft, hud: document.getElementById('hud').textContent } })()`)
+  ok(P, 'VH-4', 'a RUSHED, a CALM and a PERFECT crossing give three different rows in the score column (colour and size), no label over the field, and the sheep flashes; the HUD shows the running score',
     p1.pops === 3 && p1.r && p1.c && p1.p && p1.r.size < p1.c.size && p1.c.size < p1.p.size && new Set([p1.r.color, p1.c.color, p1.p.color]).size === 3 && p1.placed >= 1 && p1.pts > 0 && p1.shown === p1.pts.toLocaleString('en-US') && /score /.test(p1.hud),
     `pops ${p1.pops}: ${p1.r && p1.r.size}/${p1.c && p1.c.size}/${p1.p && p1.p.size} px, score ${p1.shown}`)
   await shot(s, file, 'pops')
@@ -137,7 +186,7 @@ async function runPage(s, file, opts = {}) {
     await __t.wait(9000)
     const log = ScoreUI.bannerLog().slice(n0), count = (re) => log.filter((t) => re.test(t)).length
     return { frenzy: count(/^FRENZY/), last: count(/^LAST SHEEP/), onego: count(/^ONE GO/), file: count(/^PERFECT FILE/), met: count(/^✓ Long file/), jackpots: sim.score().jackpots.join(), won: sim.run.won, log: log.map((t) => t.slice(0, 14)).join(' | ') } })()`)
-  ok(P, 'VH-5b', 'FRENZY, the last sheep, ONE GO, PERFECT FILE and a side objective met each produce exactly one banner', j1.won && j1.frenzy === 1 && j1.last === 1 && j1.onego === 1 && j1.file === 1 && j1.met === 1, `${j1.log}`)
+  ok(P, 'VH-5b', 'the last sheep, ONE GO, PERFECT FILE and a side objective met each produce exactly one banner; a FRENZY produces none (owner 2026-11-18) but is still paid', j1.won && j1.frenzy === 0 && /frenzy/.test(j1.jackpots) && j1.last === 1 && j1.onego === 1 && j1.file === 1 && j1.met === 1, `${j1.log}`)
   await s.ev(`document.getElementById('card').click(); true`); await sleep(100)
   const j2 = await s.ev(`({ col: ScoreUI.readCollection(), sc: sim.score() })`)
   ok(P, 'RC-5b', 'a side objective met and the jackpots are counted in the collection', j2.col.on_feet === 1 && j2.col.long_file === 1 && j2.col.onego === 1 && j2.col.file === 1, JSON.stringify(j2.col).slice(0, 160))
@@ -236,7 +285,7 @@ async function runPage(s, file, opts = {}) {
   ok(P, 'RM-wave-off', 'leaving wave mode returns to the course with the slider herd', w4.mode === 'course' && w4.n === 10, JSON.stringify(w4))
 
   // ---- FO render: a seed with a gate and all six specials
-  const fo = await s.ev(`(async () => { for (const k of ['driveGateChance', 'goldenChance', 'lambChance', 'ramChance', 'blackChance', 'bellChance', 'yearlingChance']) params[k] = 1; __t.setHerd(40); __t.setSeed(31); await new Promise((r) => setTimeout(r, 900)); const out = { gates: sim.driveGates.length, kinds: sim.sheep.filter((q) => q.kind !== 'ewe').map((q) => q.kind).sort().join(',') }; return out })()`)
+  const fo = await s.ev(`(async () => { params.driveGateMax = 2; params.obstacleRandom = false; params.obstacleFreq = 0; /* POC-v16: gates only on a course without obstacles, and never on the 3D pastures by default */ for (const k of ['driveGateChance', 'goldenChance', 'lambChance', 'ramChance', 'blackChance', 'bellChance', 'yearlingChance']) params[k] = 1; __t.setHerd(40); __t.setSeed(31); await new Promise((r) => setTimeout(r, 900)); const out = { gates: sim.driveGates.length, kinds: sim.sheep.filter((q) => q.kind !== 'ewe').map((q) => q.kind).sort().join(',') }; return out })()`)
   await shot(s, file, 'objectives')
   ok(P, 'FO-9', 'a course with drive gates and all six specials renders', fo.gates >= 1 && fo.kinds === 'bell,black,golden,lamb,ram,yearling', JSON.stringify(fo))
   // the whole flock through a gate → per-sheep points, the gate cleared, the multiplier up, a banner
@@ -296,7 +345,7 @@ async function runPhone(s, file) {
     await s.open
     await s.send('Page.enable'); await s.send('Runtime.enable'); await s.send('Log.enable')
     const only = process.argv[2]
-    if (only && !['2d.html', '3d.html', '3d-assault.html'].includes(only)) throw new Error('unknown page ' + only)
+    if (only && !['2d.html', '3d.html', '3d-assault.html', '3d-competition.html'].includes(only)) throw new Error('unknown page ' + only)
     for (const f of ['2d.html', '3d.html', '3d-assault.html']) {
       if (only && only !== f) continue
       try { await runPage(s, f, { wait: f === '2d.html' ? 2500 : 5000 }) } catch (e) { ok(f, 'crash', 'test run completed', false, e.message) }
@@ -304,6 +353,12 @@ async function runPhone(s, file) {
       if (f !== '2d.html') { try { await runPhone(s, f) } catch (e) { ok(f, 'crash-phone', 'phone-landscape run completed', false, e.message) } }
       await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
     }
+    for (const f of ['2d.html', '3d.html', '3d-competition.html']) { // POC-v16: demo mode, the competition course, no gates on the 3D pastures
+      if (only && only !== f) continue
+      try { await runDemo(s, f) } catch (e) { ok(f, 'crash-demo', 'demo run completed', false, e.message) }
+      await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
+    }
+    if (!only || only === '3d-assault.html') { try { await runNoGates(s, '3d-assault.html') } catch (e) { ok('3d-assault.html', 'crash-ex', 'no-gates run completed', false, e.message) } }
     let fails = 0
     for (const r of results) { if (!r.pass) fails++; console.log(`${r.pass ? 'PASS' : 'FAIL'}  ${r.page.padEnd(16)} ${r.id.padEnd(12)} ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`) }
     console.log(`\n${results.length - fails}/${results.length} passed`)

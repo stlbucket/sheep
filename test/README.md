@@ -4,11 +4,11 @@ Two suites, both plain node scripts with no dependencies. Neither starts a web s
 
 | Suite | Command | What it covers | Time |
 |---|---|---|---|
-| Sim | `npm test` | `web/lib/sheep-sim.js` and `web/lib/assault-sim.js` loaded in a bare `vm` context: tiers, condition, the chain, strikes, end multipliers, awards, jackpots, drive gates, special sheep, side objectives, ranks and grades, wave mode, and an exact replay of the flock and dog physics | about 30 s |
-| Pages | `npm run test:pages` | `web/2d.html`, `web/3d.html` and `web/3d-assault.html` in headless Chrome from `file://`: the upper-left score block, chain meter, strikes, tiered pops, banners, end card, saved bests, run history, band bests, collection, daily seed, wave mode, drive-gate and special-sheep rendering, phone landscape, zero console errors | about 4 min |
+| Sim | `npm test` | `web/lib/sheep-sim.js` and `web/lib/assault-sim.js` loaded in a bare `vm` context: tiers, condition, the chain, strikes, end multipliers, awards, jackpots, drive gates, special sheep, side objectives, ranks and grades, wave mode, an exact replay of the flock and dog physics, the competition course, obstacles-or-gates, and the demo handler winning fixed courses | about 1 min |
+| Pages | `npm run test:pages` | `web/2d.html`, `web/3d.html` and `web/3d-assault.html` in headless Chrome from `file://`: the upper-left score block, chain meter, strikes, tiered pops, banners, end card, saved bests, run history, band bests, collection, daily seed, wave mode, drive-gate and special-sheep rendering, phone landscape, zero console errors; then demo mode on `2d.html`, `3d.html` and `web/3d-competition.html`, the competition course, and no drive gates on the 3D pastures | about 5 min |
 | Both | `npm run test:all` | sim, then pages | |
 
-Each check prints `PASS` or `FAIL` with the measured value, and the process exits 1 if any check fails. The criteria behind the check ids are in `.claude/sheep/implemented/POC-v15/` (SC, FO, VH, RC) and `.claude/sheep/implemented/POC-v14/` (RM, and the drive-gate `G-` and special-sheep `K-` checks carried forward).
+Each check prints `PASS` or `FAIL` with the measured value, and the process exits 1 if any check fails. The criteria behind the check ids are in `.claude/sheep/implemented/POC-v15/` (SC, FO, VH, RC) and `.claude/sheep/implemented/POC-v14/` (RM, and the drive-gate `G-` and special-sheep `K-` checks carried forward), and `.claude/sheep/implemented/POC-v16/` (CC, EX, DM).
 
 ## Sim suite
 
@@ -19,7 +19,7 @@ Each check prints `PASS` or `FAIL` with the measured value, and the process exit
 ## Page suite
 
 - Needs node 22 or newer (global `WebSocket` and `fetch`), Google Chrome, and network access, since lil-gui and three.js load from a CDN.
-- Run one page with `node test/pages.test.js 2d.html`.
+- Run one page with `node test/pages.test.js 2d.html` (also `3d.html`, `3d-assault.html`, `3d-competition.html`).
 - Use another browser binary with `CHROME=/path/to/chrome node test/pages.test.js`.
 - Screenshots are written to `test/shots/`, which is git-ignored.
 - It uses a throwaway browser profile in the system temp folder, so it never touches your own saved bests.

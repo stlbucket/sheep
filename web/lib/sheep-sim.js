@@ -275,6 +275,12 @@ const SETTINGS = [
   { key: 'driveGatePanel', category: 'Objectives', label: 'drive gate panel', type: 'float', default: 50, min: 20, max: 120, step: 5, unit: 'px', description: 'FO1/FO3: length of each solid hurdle panel.', exposed: true, onChange: 'respawn' },
   { key: 'driveGatePoints', category: 'Objectives', label: 'drive gate points', type: 'int', default: 50, min: 0, max: 1000, step: 10, unit: 'pts', description: "FO2: points per sheep through the gap (once per sheep per gate, either way).", exposed: true },
   { key: 'driveGateMult', category: 'Objectives', label: 'drive gate multiplier', type: 'float', default: 1, min: 0, max: 10, step: 0.5, unit: '×', description: "FO7 (POC-v15): when every sheep still being worked has been through a gate, the multiplier on every later crossing rises by this for the rest of the run.", exposed: true },
+  // Competition course (owner 2026-11-18): a clean field — no obstacles — with 4–6 drive gates on a REQUIRED path, taken in order, then the pen.
+  { key: 'course', category: 'Objectives', label: 'course', type: 'enum', options: ['pasture', 'competition'], default: 'pasture', unit: '—', description: 'CC1: `pasture` = the open course (obstacles OR optional drive gates, never both) · `competition` = a clean field with numbered drive gates the whole flock must take in order before the pen opens. Set by the page, not a dial. No competition course in wave mode.', exposed: false, onChange: 'respawn' },
+  { key: 'compGatesMin', category: 'Objectives', label: 'competition gates (min)', type: 'int', default: 4, min: 1, max: 8, step: 1, unit: '—', description: 'CC2: fewest gates on a competition course.', exposed: true, onChange: 'respawn' },
+  { key: 'compGatesMax', category: 'Objectives', label: 'competition gates (max)', type: 'int', default: 6, min: 1, max: 8, step: 1, unit: '—', description: 'CC2: most gates on a competition course.', exposed: true, onChange: 'respawn' },
+  { key: 'compLegMin', category: 'Objectives', label: 'competition leg (min)', type: 'float', default: 190, min: 120, max: 400, step: 10, unit: 'px', description: 'CC2: shortest leg of the required path (start → gate → gate → pen).', exposed: true, onChange: 'respawn' },
+  { key: 'compTurnMax', category: 'Objectives', label: 'competition turn (max)', type: 'float', default: 100, min: 30, max: 170, step: 5, unit: '°', description: 'CC2: sharpest turn the required path may make at a gate.', exposed: true, onChange: 'respawn' },
   { key: 'specials', category: 'Objectives', label: 'special sheep', type: 'boolean', default: true, unit: '—', description: 'FO4–FO6: whether a course may carry a golden ewe, a lamb with its mother and a stubborn ram (each rolls independently, at most one of each).', exposed: true, onChange: 'respawn' },
   { key: 'goldenChance', category: 'Objectives', label: 'golden ewe chance', type: 'float', default: 0.35, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO4: chance a course has a golden ewe.', exposed: true, onChange: 'respawn' },
   { key: 'goldenMult', category: 'Objectives', label: 'golden ewe worth', type: 'float', default: 5, min: 1, max: 20, step: 0.5, unit: '×', description: 'FO4: her worth as a multiple of an ordinary sheep (stacks with calm and the stream multiplier, owner Q81).', exposed: true },
@@ -485,7 +491,7 @@ const LEVER_NOT_LEVERED = {
     'multFullFlock', 'multClean', 'multAllCalm', 'multAwardCommon', 'multAwardRare', 'multAwardLegendary', 'multOneGo', 'perfectFileMin', 'frenzyEvery', 'frenzySecs', 'frenzyExtend', 'frenzyMax', 'finisherPoints',
     'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'fullPurseShare', 'wolfPoints', 'rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan',
     'gradeA', 'gradeStep', 'gradeCalmCredit', 'safetyPanicCost'], // POC-v14 / v15 point values, rates and verdict bands — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
-  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait', 'ramYieldWait', 'ramYieldDur',
+  objectives: ['course', 'compGatesMin', 'compGatesMax', 'compLegMin', 'compTurnMax', 'driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait', 'ramYieldWait', 'ramYieldDur',
     'blackChance', 'blackMult', 'blackThreatScale', 'blackSpookRadius', 'blackSpookThreat', 'bellChance', 'bellMult', 'bellRadius', 'bellWeight', 'yearlingChance', 'yearlingMult', 'yearlingFlightScale', 'yearlingSize', 'sideObjectiveCount', 'multSideObjective'], // POC-v14 field objectives + POC-v15 (FO7–FO11)
   modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax', 'historyMax', 'bandSmallMax', 'bandMediumMax'], // POC-v14 replay modes + POC-v15 records — a mode switch and the arcade clock
   // plus every `debug.*` render toggle
@@ -810,12 +816,12 @@ class FlockSim {
 
   // Add points for something that happened at (x, y) — the one way points
   // enter the total apart from a pen crossing. Also used by lib/assault-sim.js.
-  award(kind, points, x, y, label) {
+  award(kind, points, x, y, label, i) { // i: the sheep that earned it, when one did (the pages flash it)
     points = Math.round(points)
     if (!(points > 0)) return
     this.points += points
     this.tallyAdd(kind, points)
-    this.pushEvent({ kind, points, mult: 1, x, y, label: label || '+' + points })
+    this.pushEvent({ kind, points, mult: 1, x, y, label: label || '+' + points, i: i === undefined ? -1 : i })
   }
 
   // An announcement with no points of its own (a strike, a frenzy opening, a
@@ -824,7 +830,14 @@ class FlockSim {
 
   jackpot(name) { if (!this.run.jackpots.includes(name)) this.run.jackpots.push(name) }
 
-  par() { return this.p.parBase + this.p.parPerSheep * this.sheep.length }
+  par() {
+    let t = this.p.parBase + this.p.parPerSheep * this.sheep.length
+    if (this.compPath) { // CC: plus the required path at half a walk
+      const q = this.idealPath
+      for (let i = 0; i + 1 < q.length; i++) t += Math.hypot(q[i + 1].x - q[i].x, q[i + 1].y - q[i].y) / Math.max(1, this.p.walkSpeed * 0.5)
+    }
+    return t
+  }
   quietAllowance() { return this.p.quietHandBase + this.p.quietHandPerSheep * this.sheep.length }
 
   // What a sheep's kind is worth UNCONDITIONALLY (the conditional kinds — lamb,
@@ -963,7 +976,7 @@ class FlockSim {
     if (rushed) run.chain.rushed++
     if (run.chain.n > run.longest) run.longest = run.chain.n
     if (s.kind !== 'ewe') run.specials.push(s.kind)
-    this.pushEvent({ kind: 'pen', tier, frenzy, points: total, mult, x: g.x, y: g.y, label: tag + '+' + worth + (mult > 1 ? ' ×' + mult : '') + (frenzy ? ' ×2' : '') })
+    this.pushEvent({ kind: 'pen', tier, frenzy, points: total, mult, x: g.x, y: g.y, i: this.sheep.indexOf(s), label: tag + '+' + worth + (mult > 1 ? ' ×' + mult : '') + (frenzy ? ' ×2' : '') })
     if (p.mode === 'waves') run.clock = Math.min(p.waveClockMax, run.clock + p.waveSecsPerSheep) // RM5
     let penned = 0, down = 0
     for (const b of this.sheep) { if (b.through) penned++; else if (b.down) down++ }
@@ -1086,8 +1099,9 @@ class FlockSim {
   // vertex discs of (direction to the vertex ± the disc's half-angle).
   // Degenerate (gate inside the offset hull / no flock) → the old line.
   gateLineBearing(sign, offset) {
-    const g = this.gcm, G = this.gate, p = this.p
-    const fallback = Math.atan2(g.y - p.goal.y, g.x - p.goal.x)
+    const g = this.gcm, p = this.p
+    const goal = this.aim(), G = goal === p.goal ? this.gate : goal // CC6: the line is drawn from the current objective
+    const fallback = Math.atan2(g.y - goal.y, g.x - goal.x)
     if (this.hull.length === 0) return fallback
     const ref = Math.atan2(g.y - G.y, g.x - G.x)
     let bestRel = -Infinity, best = null
@@ -1277,7 +1291,10 @@ class FlockSim {
     this.seed = seed >>> 0
     this.rng = makePRNG(this.seed)
     this.placeGate()
-    this.placeObstacles(this.seed)
+    this.aimPt = null                 // CC6: where the dog is working toward (competition; see aim())
+    this.compPath = null              // CC2: the competition course's required path (null on a pasture course)
+    if (this.isCompetition()) { this.obstacles = []; this.obstacleGroups = 0; this.planCompetition(this.seed) } // CC1: a clean field
+    else this.placeObstacles(this.seed)
     this.spawn(this.p.mode === 'waves' ? this.p.waveSheepStart : undefined) // RM5: wave mode starts small
     // POC-v14: drive gates and special sheep come AFTER the flock and draw from
     // their own streams, so a seed's gate, obstacles and flock are exactly
@@ -1306,7 +1323,9 @@ class FlockSim {
   placeDriveGates(seed) {
     const p = this.p, r = this.playRect(), gt = this.gate
     this.driveGates = []
-    const max = p.mode === 'waves' ? 0 : Math.max(0, Math.round(p.driveGateMax))
+    if (this.compPath) return this.buildCompetitionGates()
+    // owner 2026-11-18: a course has obstacles OR drive gates, never both
+    const max = p.mode === 'waves' || this.obstacles.length ? 0 : Math.max(0, Math.round(p.driveGateMax))
     if (!max) return
     const rnd = makePRNG((seed ^ 0x51ed270b) >>> 0)
     const half = p.driveGateWidth / 2, span = half + p.driveGatePanel
@@ -1330,6 +1349,12 @@ class FlockSim {
         break
       }
     }
+    this.addHurdles()
+  }
+
+  // The panels join the solid set as rows of small `hurdle` discs (FO3).
+  addHurdles() {
+    const p = this.p
     const hr = p.L / 3 // panel disc radius — a hurdle is about a third of a sheep thick
     this.driveGates.forEach((d, gi) => {
       for (const [from, to] of [[d.a0, d.e0], [d.a1, d.e1]]) {
@@ -1342,13 +1367,155 @@ class FlockSim {
     })
   }
 
+  // ---- Competition course (CC1–CC6, owner 2026-11-18) ------------------------
+  // CC1: a clean field (no obstacles, no special sheep) carrying only drive gates.
+  // CC2: 4–6 of them on a REQUIRED PATH: start → gate 1 → … → gate N → the pen.
+  // CC3: the gates are taken IN ORDER and in the path's direction — only the
+  //      current gate counts a crossing, and it is cleared when every sheep still
+  //      being worked has been through it.
+  // CC4: the pen is SHUT until the last gate is cleared (the mouth is fence).
+  // CC5: the flock starts as one small group at the head of the path.
+  // CC6: the dog works toward the CURRENT objective — the next gate, then the
+  //      pen — so walk-on / easy drive at it and a flank ends on its line.
+  isCompetition() { return this.p.course === 'competition' && this.p.mode !== 'waves' }
+
+  // The gate the flock must take next (null: none left, or not a competition course).
+  nextGate() {
+    if (!this.compPath) return null
+    for (const d of this.driveGates) if (!d.done) return d
+    return null
+  }
+
+  penOpen() { return !this.compPath || !this.nextGate() }
+
+  // CC6: the point the dog is working the flock toward. On a pasture course —
+  // and once the gates are done — the pen centre, exactly as before. For a gate
+  // it is one of two points (updateAim, once a tick):
+  //   · THROUGH: the gate's centre, sliding out along the way through as the
+  //     flock centre arrives, so the drive line never flips while the tail is
+  //     still coming through;
+  //   · the APPROACH: a spot square in front of the gate — while the flock
+  //     stands wide of the gate's line of approach, or after a MISS (the sheep
+  //     that still owe the gate are past its line, wide of the gap), so they
+  //     are brought round to the front of it instead of pushed at a panel.
+  aim() {
+    if (!this.compPath) return this.p.goal
+    if (!this.aimPt) this.updateAim()
+    return this.aimPt
+  }
+
+  updateAim() {
+    const d = this.nextGate()
+    if (!d) { this.aimPt = this.p.goal; return }
+    const g = this.computeGCM()
+    let ux = 0, uy = 0, un = 0
+    for (const s of this.sheep) if (!s.through && !s.down && !d.passed.has(s)) { ux += s.pos.x; uy += s.pos.y; un++ }
+    let missed = false
+    if (un) {
+      ux = ux / un - d.x; uy = uy / un - d.y
+      missed = ux * d.nx + uy * d.ny > (d.approach ? -20 : 10) && Math.abs(ux * d.tx + uy * d.ty) > d.half
+    }
+    const rx = d.x - g.x, ry = d.y - g.y, rd = Math.hypot(rx, ry)
+    const a = -(rx * d.nx + ry * d.ny)                               // flock centre's progress through the gate (− = still short of it)
+    const cos = rd > 1e-6 ? (rx * d.nx + ry * d.ny) / rd : 1         // 1 = dead in front of the gate, on its line
+    const wide = a < -30 && cos < (d.approach ? 0.8 : 0.55)
+    d.approach = missed || wide
+    if (d.approach) { this.aimPt = { x: d.x - d.nx * 120, y: d.y - d.ny * 120 }; return }
+    const k = Math.max(a + 120, 20)
+    this.aimPt = { x: d.x + d.nx * k, y: d.y + d.ny * k }
+  }
+
+  // CC2: lay the required path. Own PRNG stream, so the pen gate and the
+  // handler's post of a seed are what they are on the pasture course. Whole
+  // paths are rejection-sampled (legs long enough, no hairpins, clear of the
+  // fence, the pen's approach and each other); if none fits, the gate count
+  // drops by one and it tries again.
+  planCompetition(seed) {
+    const p = this.p, r = this.playRect(), gt = this.gate
+    const rnd = makePRNG((seed ^ 0x7c3a91d5) >>> 0)
+    const lo = Math.max(1, Math.round(Math.min(p.compGatesMin, p.compGatesMax))), hi = Math.max(lo, Math.round(Math.max(p.compGatesMin, p.compGatesMax)))
+    let count = lo + Math.floor(rnd() * (hi - lo + 1))
+    const half = p.driveGateWidth / 2, span = half + p.driveGatePanel
+    const inset = span + p.L * 2
+    const w = r.x1 - r.x0 - 2 * inset, h = r.y1 - r.y0 - 2 * inset
+    const mouth = { x: gt.x, y: gt.y }
+    const penClear = Math.max(p.spawnGateClear, p.gateAttractR, 100) + span
+    const maxTurn = p.compTurnMax * Math.PI / 180
+    const turn = (a, b, c) => Math.abs(angleDiff(Math.atan2(c.y - b.y, c.x - b.x), Math.atan2(b.y - a.y, b.x - a.x)))
+    const segHit = (a, b, c, d) => { // do segments ab and cd cross?
+      const o = (u, v, t) => Math.sign((v.x - u.x) * (t.y - u.y) - (v.y - u.y) * (t.x - u.x))
+      return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b)
+    }
+    const tryPath = (n, legMin) => {
+      const pts = [] // [start, gate 1 … gate n]
+      for (let i = 0; i <= n; i++) {
+        let got = null
+        for (let t = 0; t < 40 && !got; t++) {
+          const c = { x: r.x0 + inset + rnd() * w, y: r.y0 + inset + rnd() * h }
+          if (Math.hypot(c.x - mouth.x, c.y - mouth.y) < penClear) continue
+          if (Math.hypot(c.x - this.home.x, c.y - this.home.y) < 60 + span) continue
+          if (i === 0 && Math.hypot(c.x - mouth.x, c.y - mouth.y) < Math.min(w, h)) continue // the flock starts well away from the pen
+          if (pts.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < legMin)) continue
+          if (i >= 2 && turn(pts[i - 2], pts[i - 1], c) > maxTurn) continue
+          let cross = false
+          for (let k = 0; k + 2 < i && !cross; k++) cross = segHit(pts[k], pts[k + 1], pts[i - 1], c)
+          // the new leg must not run through an earlier gate's panels, nor an earlier leg through this one's
+          for (let k = 1; k < i - 1 && !cross; k++) cross = distToSeg(pts[k], pts[i - 1], c) < span + 30
+          for (let k = 0; k + 2 < i && !cross; k++) cross = distToSeg(c, pts[k], pts[k + 1]) < span + 30
+          if (cross) continue
+          got = c
+        }
+        if (!got) return null
+        pts.push(got)
+      }
+      // the last leg, into the pen: long enough, no hairpin, clear of the other gates and legs
+      const last = pts[n]
+      if (Math.hypot(last.x - mouth.x, last.y - mouth.y) < legMin) return null
+      if (n >= 1 && turn(pts[n - 1], last, mouth) > maxTurn) return null
+      for (let k = 1; k < n; k++) if (distToSeg(pts[k], last, mouth) < span + 30) return null
+      for (let k = 0; k + 1 < n; k++) if (segHit(pts[k], pts[k + 1], last, mouth)) return null
+      return pts
+    }
+    let pts = null, legMin = p.compLegMin
+    for (let round = 0; round < 12 && !pts; round++) {
+      for (let t = 0; t < 600 && !pts; t++) pts = tryPath(count, legMin)
+      if (!pts) { if (count > lo) count--; else legMin *= 0.9 }
+    }
+    if (!pts) { // never seen in practice — a straight run across the field to the pen
+      pts = []
+      const far = { x: r.x0 + r.x1 - gt.x, y: r.y0 + r.y1 - gt.y } // the mouth, mirrored through the field centre
+      const cx = Math.max(r.x0 + inset, Math.min(r.x1 - inset, far.x)), cy = Math.max(r.y0 + inset, Math.min(r.y1 - inset, far.y))
+      for (let i = 0; i <= count; i++) { const u = i / (count + 1); pts.push({ x: cx + (mouth.x - cx) * u, y: cy + (mouth.y - cy) * u }) }
+    }
+    this.compPath = { start: pts[0], gates: pts.slice(1) }
+  }
+
+  // CC2 / CC3: stand the gates on the planned path — each one square to the leg
+  // that arrives at it, numbered in order.
+  buildCompetitionGates() {
+    const p = this.p, gt = this.gate, cp = this.compPath
+    const half = p.driveGateWidth / 2, span = half + p.driveGatePanel
+    const pts = [cp.start].concat(cp.gates, [{ x: gt.x, y: gt.y }])
+    for (let i = 1; i < pts.length - 1; i++) {
+      const nrm = vec2.norm(vec2.sub(pts[i], pts[i - 1])) // square to the leg IN: the flock walks straight through, then turns
+      const x = pts[i].x, y = pts[i].y, tx = -nrm.y, ty = nrm.x
+      this.driveGates.push({ x, y, angle: Math.atan2(ty, tx), tx, ty, nx: nrm.x, ny: nrm.y, half, order: i,
+        e0: { x: x - tx * span, y: y - ty * span }, a0: { x: x - tx * half, y: y - ty * half }, a1: { x: x + tx * half, y: y + ty * half }, e1: { x: x + tx * span, y: y + ty * span },
+        done: false, approach: false, passed: new Set(), sides: new Map() })
+    }
+    this.idealPath = pts.concat([{ x: p.goal.x, y: p.goal.y }]) // the scoring line IS the required path
+    this.addHurdles()
+  }
+
   // FO2: a sheep that crosses the gap segment (either way, owner Q82) scores
   // once per gate; when every sheep still being worked has been through the
   // same gate it is cleared: the multiplier rises for the rest of the run (FO7).
   updateDriveGates() {
     const p = this.p
+    const cur = this.compPath ? this.nextGate() : null
     for (const dg of this.driveGates) {
       if (dg.done) continue
+      const live = !this.compPath || dg === cur // CC3: only the current gate counts on a competition course
       let scored = false
       for (const s of this.sheep) {
         if (s.through || s.down) continue
@@ -1357,9 +1524,10 @@ class FlockSim {
         const prev = dg.sides.get(s)
         dg.sides.set(s, side)
         if (prev === undefined || dg.passed.has(s)) continue
-        if ((prev < 0) !== (side < 0) && Math.abs(along) < dg.half) {
+        if (!live) continue
+        if ((this.compPath ? prev < 0 && side >= 0 : (prev < 0) !== (side < 0)) && Math.abs(along) < dg.half) { // CC3: one way only
           dg.passed.add(s); scored = true
-          this.award('gate', p.driveGatePoints, s.pos.x, s.pos.y)
+          this.award('gate', p.driveGatePoints, s.pos.x, s.pos.y, undefined, this.sheep.indexOf(s))
         }
       }
       if (!scored) continue
@@ -1367,7 +1535,8 @@ class FlockSim {
       for (const s of this.sheep) if (!s.through && !s.down) { working++; if (!dg.passed.has(s)) { all = false; break } }
       if (all && working > 0) { // FO7 (POC-v15): a cleared gate feeds the multiplier for the rest of the run
         dg.done = true; this.run.gateMult += p.driveGateMult
-        this.note('gate', 'DRIVE GATE — multiplier +' + p.driveGateMult, dg.x, dg.y, { cleared: true })
+        const left = this.driveGates.filter((g) => !g.done).length
+        this.note('gate', this.compPath ? `GATE ${dg.order} of ${this.driveGates.length} — ` + (left ? 'multiplier +' + p.driveGateMult : 'the pen is open') : 'DRIVE GATE — multiplier +' + p.driveGateMult, dg.x, dg.y, { cleared: true })
         if (this.driveGates.every((g) => g.done)) this.setObjective('gates', 'met')
       }
     }
@@ -1381,7 +1550,7 @@ class FlockSim {
     const p = this.p, n = this.sheep.length
     for (const s of this.sheep) { s.kind = 'ewe'; s.mother = -1 }
     this.bellIdx = -1
-    if (!p.specials || n < 4) return
+    if (!p.specials || n < 4 || this.compPath) return // CC1: a competition flock is plain ewes
     const rnd = makePRNG((seed ^ 0x2545f491) >>> 0)
     const golden = rnd() < p.goldenChance, ram = rnd() < p.ramChance, lamb = rnd() < p.lambChance
     const taken = new Set()
@@ -1747,8 +1916,10 @@ class FlockSim {
     const r = this.playRect()
     const p = this.p, n = count === undefined ? p.sheepCount : Math.max(1, Math.round(count))
     const gt = this.gate
-    this.layout = this.pickLayout()
-    const sampler = this.makeSampler(this.layout)
+    const comp = this.compPath
+    this.layout = comp ? 'competition' : this.pickLayout()
+    const sampler = comp ? { sample: () => ({ x: comp.start.x, y: comp.start.y }), ok: () => true, start: () => ({ x: comp.start.x, y: comp.start.y }) } : this.makeSampler(this.layout)
+    if (comp) { this.holes = []; this.focus = null }
     // F8: shared clearance — no group seed within spawnGateClear (+ the member
     // jitter radius) of the gate mouth, any archetype. 0 disables.
     const clearR = p.spawnGateClear > 0 ? p.spawnGateClear + p.clusterSpread : 0
@@ -1760,7 +1931,8 @@ class FlockSim {
     // legal idle groups, so no lone-remainder guard. Group COUNT still derives
     // from sheepCount (draw until the herd is exhausted).
     const sizes = []
-    for (let left = n; left > 0;) {
+    if (comp) sizes.push(n) // CC5: one group
+    else for (let left = n; left > 0;) {
       const s = 1 + Math.floor(this.rng() * Math.min(p.clusterSizeMax, left))
       sizes.push(s); left -= s
     }
@@ -2167,6 +2339,7 @@ class FlockSim {
         // Survey the sheep he is DRIVING (his front hemisphere) — stragglers
         // beside/behind must not freeze him.
         const fx = Math.cos(d.facing), fy = Math.sin(d.facing)
+        const goal = this.aim() // CC6: the pen centre, or the next gate of a competition course
         let nearest = Infinity, fwdSum = 0, fwdN = 0, movingAhead = false
         d.driveT += dt
         for (const s of this.sheep) {
@@ -2176,7 +2349,7 @@ class FlockSim {
           if (dd > 1e-6 && (dx * fx + dy * fy) / dd < 0.3) continue // not ahead
           if (dd < nearest) nearest = dd
           if (dd < p.R_flee * (1 + p.driveConeExt)) { // in the pressure arc (E5: the drive eye reaches further)
-            const toGoal = vec2.norm(vec2.sub(p.goal, s.pos))
+            const toGoal = vec2.norm(vec2.sub(goal, s.pos))
             const fwd = s.vel.x * toGoal.x + s.vel.y * toGoal.y
             fwdSum += fwd; fwdN++
             if (fwd >= p.stallSpeed) movingAhead = true
@@ -2194,7 +2367,7 @@ class FlockSim {
         const pace = easy ? p.easySpeedFrac / p.walkOnSpeedFrac : 1 // easy : walk-on speed ratio
         if (nearest > p.driveTrailGap + 15) d.driveDist = Math.max(p.R_driveMin, d.driveDist - p.driveCloseRate * pace * dt)
         else if (nearest < p.driveTrailGap) d.driveDist = Math.min(p.R_drive, d.driveDist + p.driveBackoffRate * pace * dt)
-        const away = vec2.norm(vec2.sub(g, p.goal)) // GCM-side away from goal
+        const away = vec2.norm(vec2.sub(g, goal)) // GCM-side away from goal
         d.target = { x: g.x + away.x * d.driveDist, y: g.y + away.y * d.driveDist }
         if (nearest < p.driveTrailGap) d.target = { x: d.pos.x, y: d.pos.y } // hard hold at the gap
         const fwdMean = fwdN ? fwdSum / fwdN : 0
@@ -2281,7 +2454,7 @@ class FlockSim {
   // which stays free so approaching sheep funnel into the opening.
   fenceForce(pos) {
     const p = this.p, r = this.playRect(), g = this.gate
-    const half = p.gateWidth / 2
+    const half = p.gateWidth / 2, open = this.penOpen()
     const alongGate = Math.abs((pos.x - g.x) * g.tx + (pos.y - g.y) * g.ty)
     const walls = [
       { d: pos.y - r.y0, nx: 0, ny: 1, gate: g.side === 0 },
@@ -2292,7 +2465,7 @@ class FlockSim {
     let fx = 0, fy = 0
     for (const w of walls) {
       if (w.d > p.r_fence) continue
-      if (w.gate && alongGate < half) continue           // aperture → free
+      if (w.gate && alongGate < half && open) continue   // aperture → free (CC4: not while the pen is shut)
       const s = smoothstep(p.r_fence, 0, Math.max(0, w.d))
       fx += w.nx * s; fy += w.ny * s
     }
@@ -2473,7 +2646,7 @@ class FlockSim {
         const cosT = ((s.pos.x - gt.x) * Math.cos(cone.ang) + (s.pos.y - gt.y) * Math.sin(cone.ang)) / gdist
         reach += cone.len * smoothstep(Math.cos(half), Math.cos(half * 0.5), cosT)
       }
-      let pull = p.gateAttractR > 0 ? smoothstep(reach, p.gateAttractR * 0.5, gdist) : 0
+      let pull = p.gateAttractR > 0 && this.penOpen() ? smoothstep(reach, p.gateAttractR * 0.5, gdist) : 0 // CC4: a shut pen draws nobody
       let lead = -1
       if (pull < 1 && p.gateFollowR > 0 && p.gateFollowDecay > 0) {
         for (const n of nbrs) {
@@ -2496,7 +2669,8 @@ class FlockSim {
     {
       const gt = this.gate
       const gdist = vec2.dist(s.pos, gt)
-      if (!s.committed && !s.idle && gdist < p.gateApproachR) {
+      if (!this.penOpen()) s.committed = false
+      else if (!s.committed && !s.idle && gdist < p.gateApproachR) {
         const outSpeed = s.vel.x * gt.nx + s.vel.y * gt.ny
         if (outSpeed > p.stallSpeed) s.committed = true
       }
@@ -2651,7 +2825,7 @@ class FlockSim {
     const r = this.playRect(), gt = this.gate
     const alongGate = Math.abs((s.pos.x - gt.x) * gt.tx + (s.pos.y - gt.y) * gt.ty)
     const outGate = (s.pos.x - gt.x) * gt.nx + (s.pos.y - gt.y) * gt.ny
-    if (alongGate < p.gateWidth / 2 && outGate > 0) {
+    if (alongGate < p.gateWidth / 2 && outGate > 0 && this.penOpen()) {
       s.through = true
       this.onPenned(s) // POC-v14: the count-up score is paid here
     } else {
@@ -3143,7 +3317,8 @@ class FlockSim {
     if (p.mode === 'waves' || n === 0) return 0
     let k = 0
     for (const s of this.sheep) k += this.kindWorth(s)
-    return Math.round(p.penCalmPoints * (k / n) * n * (n + 1) / 2 * p.multFullFlock * p.multClean * p.multAllCalm)
+    const G = this.compPath ? this.driveGates.length : 0 // CC: the required gates are part of a textbook run — their points, and their multiplier on every crossing
+    return Math.round((p.penCalmPoints * (k / n) * (n * (n + 1) / 2 + n * G * p.driveGateMult) + n * G * p.driveGatePoints) * p.multFullFlock * p.multClean * p.multAllCalm)
   }
 
   // VH7: the named rank for the run so far. A bust ranks no higher than Farmhand. null where there is no reference (waves).
@@ -3218,6 +3393,7 @@ class FlockSim {
   step(dt) {
     this.gcm = this.computeGCM()       // flock centroid → dog steering
     this.computeHull()                 // herd perimeter (same set) → flank track (C8)
+    if (this.compPath) this.updateAim() // CC6: the dog's current objective (next gate / pen)
     this.stepDog(dt)                   // dog moves first → sheep react to it
     this.updateTrot(dt)                // T1–T7 trot state (POC-v9, v13) → integrate reads it
     this.updateGateCone(dt)            // G5 gate cone (POC-v13) → integrate + overlays read it

@@ -360,7 +360,7 @@
 <!-- P9 (Q2): slider defaults live in ONE editable sibling file — a pure JSON
      literal in a `const SHEEP_DEFAULTS =` assignment (a real .json can't be
      fetched from file://). Missing file → schema defaults + one warning. -->
-<script src="sheep-defaults.json.js?v=20261118d"></script>
+<script src="sheep-defaults.json.js?v=20261118m"></script>
 </head>
 <body class="advanced-closed">
 <div id="rotate-overlay">
@@ -434,9 +434,12 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118d"></script>
-<script src="lib/sheep-gui.js?v=20261118d"></script>
-<script src="lib/sheep-score-ui.js?v=20261118f"></script>
+<script src="lib/sheep-sim.js?v=20261118m"></script>
+<script src="lib/sheep-gui.js?v=20261118m"></script>
+<script src="lib/sheep-score-ui.js?v=20261118m"></script>
+<script src="lib/sheep-pad-ui.js?v=20261118m"></script>
+<script src="lib/sheep-auto.js?v=20261118m"></script>
+<script src="lib/sheep-demo-ui.js?v=20261118m"></script>
 <script>
 'use strict'
 // ============================================================================
@@ -533,6 +536,7 @@ function render(fps) {
 
   // POC-v14 score face (shared lib)
   ScoreUI.frame(sim) // badge, pops, and the tally card when the run ends
+  DemoUI.frame(sim)  // demo mode: what the auto-handler is doing, and a pulse on the pad when the command changes
 }
 
 // Sheep body length in px — drawSheep's triangle is SHEEP_LEN × (2/3·SHEEP_LEN).
@@ -963,9 +967,11 @@ function drawSheep(s) {
   // POC-v14 FO4–FO6: a golden ewe is gold, a lamb is small, a ram is big, dun and horned
   // POC-v15 FO8–FO10: a black sheep is black, the bellwether pale blue with a bell, a yearling slight and buff
   const [wr, wg, wb] = s.kind === 'golden' ? [255, 205, 60] : s.kind === 'ram' ? [196, 176, 150] : s.kind === 'black' ? [44, 44, 50] : s.kind === 'bell' ? [150, 200, 240] : s.kind === 'yearling' ? [243, 214, 184] : [230, 233, 236]
-  const cr = Math.round(wr + (220 - wr) * t)
-  const cg = Math.round(wg + (70 - wg) * t)
-  const cb = Math.round(wb + (60 - wb) * t)
+  let cr = Math.round(wr + (220 - wr) * t)
+  let cg = Math.round(wg + (70 - wg) * t)
+  let cb = Math.round(wb + (60 - wb) * t)
+  const fl = ScoreUI.flash(s) // just scored → blink in the score's colour
+  if (fl) { cr = Math.round(cr + (fl.r - cr) * fl.k); cg = Math.round(cg + (fl.g - cg) * fl.k); cb = Math.round(cb + (fl.b - cb) * fl.k) }
   ctx.save()
   ctx.translate(s.pos.x, s.pos.y)
   ctx.rotate(s.facing)
@@ -1452,6 +1458,8 @@ ScoreUI.init({
   project: (x, y) => { const k = canvas.clientWidth / canvas.width; return { x: x * k, y: y * k } },
   setSeed, newCourse, restart: restartRun,
 })
+PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
+DemoUI.init({ stage: document.getElementById('wrap') }) // demo mode (A): lib/sheep-demo-ui.js
 
 let last = performance.now() / 1000
 let acc = 0
@@ -1473,6 +1481,7 @@ function frame(nowMs) {
   else {
     acc += delta
     while (acc >= params.dt) {
+      DemoUI.step(sim, params.dt) // demo mode: the auto-handler issues the dog's commands (lib/sheep-demo-ui.js)
       sim.step(params.dt)
       acc -= params.dt
     }
