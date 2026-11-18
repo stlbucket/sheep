@@ -41,7 +41,7 @@ const SHEEP_DEFAULTS = {
   "R_orbit": 160,
   "omega": 1.2,
   "flankStandoff": 140,
-  "perimeterMargin": 44,
+  "perimeterMargin": 56,
   "fenceSeekReach": 72,
   "flankConeDeg": 45,
   "flankAdvance": 1,
