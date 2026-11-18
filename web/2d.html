@@ -1117,6 +1117,19 @@ if (document.documentElement.requestFullscreen) {
   })
 }
 
+// Full-screen is forced on touch devices: every tap made while windowed asks
+// again (the first tap gets it); the ⛶ button stays as the way back out.
+if (window.matchMedia('(pointer: coarse)').matches && document.documentElement.requestFullscreen) {
+  const goFull = (ev) => {
+    if (document.fullscreenElement || (ev.target.closest && ev.target.closest('#fullscreen-btn'))) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
+      .catch(() => {})
+  }
+  document.addEventListener('touchend', goFull, { passive: true })
+  document.addEventListener('click', goFull)
+}
+
 // POC-v11 touch-up: phone herd-size slider — a MIRROR of params.sheepCount
 // (the §0 SETTINGS entry stays the single source of min/max/step); release
 // respawns via the same HOOKS.respawn path the lil-gui slider uses, and

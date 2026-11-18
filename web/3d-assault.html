@@ -220,7 +220,7 @@
   /* DRAWER — the side column is a drawer, closed by default (☰ button or D).
      Closed: the column floats over the stage's top-right corner and shows only
      the dog's buttons; the stage takes the full width. Open: the full column,
-     beside the stage. Phone landscape keeps its pad-only sidebar either way. */
+     beside the stage. Phone landscape is always closed (no ☰ button) with a smaller pad. */
   #app { position: relative; }
   #drawer-btn {
     flex: 0 0 auto;
@@ -239,24 +239,22 @@
   }
   #drawer-btn:hover { background: #2c353d; }
   #drawer-btn kbd { font: inherit; font-size: 10px; opacity: 0.55; margin-left: 3px; }
-  @media not all and (pointer: coarse) and (max-height: 600px) {
-    body.drawer-closed #side {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      width: 320px;
-      max-height: calc(100% - 36px);
-      z-index: 6;
-      gap: 6px;
-      overflow: visible;
-      pointer-events: none; /* gaps in the overlay still drag the camera */
-    }
-    body.drawer-closed #side > * { pointer-events: auto; }
-    body.drawer-closed #side > section:not(#side-dog) { display: none; }
-    body.drawer-closed #side-dog { background: rgba(10, 13, 16, 0.72); }
-    body.drawer-closed #controls .herd, body.drawer-closed #controls .obst { display: none; }
-    body.drawer-closed #stress { top: auto; bottom: 8px; } /* the corner is the pad's now */
+  body.drawer-closed #side {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 320px;
+    max-height: calc(100% - 36px);
+    z-index: 6;
+    gap: 6px;
+    overflow: visible;
+    pointer-events: none; /* gaps in the overlay still drag the camera */
   }
+  body.drawer-closed #side > * { pointer-events: auto; }
+  body.drawer-closed #side > section:not(#side-dog) { display: none; }
+  body.drawer-closed #side-dog { background: rgba(10, 13, 16, 0.72); }
+  body.drawer-closed #controls .herd, body.drawer-closed #controls .obst { display: none; }
+  body.drawer-closed #stress { top: auto; bottom: 8px; } /* the corner is the pad's now */
   #rotate-overlay {
     display: none;
     position: fixed;
@@ -273,28 +271,16 @@
   }
   #rotate-overlay .icon { font-size: 54px; animation: tip-over 1.4s ease-in-out infinite alternate; }
   @keyframes tip-over { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
-  #side-fullscreen { display: none; }
-  #fullscreen-btn {
-    display: block;
-    width: 100%;
-    padding: 5px 8px;
-    font: inherit;
-    font-size: 12px;
-    color: #cdd6df;
-    background: #232b32;
-    border: 1px solid #37424c;
-    border-radius: 3px;
-    cursor: pointer;
-  }
   @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
     #rotate-overlay { display: flex; }
   }
   /* phone landscape — same rules as the 2D page: the sidebar is the pad only */
   @media (pointer: coarse) and (max-height: 600px) {
-    body.can-fullscreen #side-fullscreen { display: block; }
     #app { padding: 6px; gap: 8px; }
     #drawer-btn { display: none; }
-    #side { flex: 0 0 240px; justify-content: center; }
+    /* the pad floats over the stage's top-right corner here too — no sidebar */
+    body.drawer-closed #side { top: 6px; right: 6px; width: 240px; max-height: calc(100% - 12px); }
+    body.drawer-closed #side-dog { padding: 6px; }
     #side-debug, #side-levers, #side #side-assault { display: none; }
     #controls .pad { grid-template-rows: repeat(3, 36px); gap: 4px; }
     #controls button {
@@ -362,9 +348,6 @@
   </div>
   <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
   <div id="hud">boot…</div>
-</section>
-<section id="side-fullscreen">
-  <button id="fullscreen-btn" title="toggle full-screen">⛶ full-screen</button>
 </section>
 <section id="side-dog">
   <div id="controls">
@@ -1634,18 +1617,17 @@ function toggleDrawer() {
 }
 drawerBtn.addEventListener('click', toggleDrawer)
 
-if (document.documentElement.requestFullscreen) {
-  document.body.classList.add('can-fullscreen')
-  const fsBtn = document.getElementById('fullscreen-btn')
-  fsBtn.addEventListener('click', () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
-    else document.documentElement.requestFullscreen()
+// Full-screen is forced on touch devices: browsers only grant it from a user
+// gesture, so every tap made while windowed asks again (the first tap gets it).
+if (coarse && document.documentElement.requestFullscreen) {
+  const goFull = () => {
+    if (document.fullscreenElement) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
       .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
       .catch(() => {})
-  })
-  document.addEventListener('fullscreenchange', () => {
-    fsBtn.textContent = document.fullscreenElement ? '⛶ exit full-screen' : '⛶ full-screen'
-  })
+  }
+  document.addEventListener('touchend', goFull, { passive: true })
+  document.addEventListener('click', goFull)
 }
 
 const herdInput = document.getElementById('herd-size')
