@@ -75,21 +75,31 @@
     box-sizing: border-box;
   }
   body.panels-hidden #side-levers { display: none; }
-  /* floating stage chrome: camera picker (top-left), stress meter (top-centre) */
-  #cam-bar { position: absolute; top: 110px; left: 8px; display: flex; gap: 4px; flex-wrap: wrap; z-index: 5; max-width: 46%; } /* top is set by lib/sheep-score-ui.js: directly under the score block (POC-v15 VH1) */
-  #cam-bar button, #cam-bar span {
+  /* CENTRE STACK — top-centre of the stage, the same on every screen: settings, the reseed / mode row, then the camera row,
+     every button one size. Pause stands alone, between the stack and the dog's pad. Keys live in the titles. */
+  #stage { --cs-w: 68px; --cs-h: 24px; --cs-g: 4px; --cs-top: 8px; --cs-half: calc((var(--cs-w) * 5 + var(--cs-g) * 4) / 2); --pad-edge: 327px; } /* --pad-edge: stage's right edge → the closed drawer's pad's left edge */
+  #center-stack { position: absolute; top: var(--cs-top); left: 50%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: var(--cs-g); pointer-events: none; }
+  #cam-bar, #center-stack .aux { display: flex; gap: var(--cs-g); } /* .aux: reseed + the mode buttons lib/sheep-score-ui.js adds */
+  #center-stack button, #pause-btn {
+    box-sizing: border-box;
+    width: var(--cs-w);
+    height: var(--cs-h);
+    padding: 0;
     font: inherit;
     font-size: 12px;
     color: #cdd6df;
     background: rgba(16, 20, 24, 0.72);
     border: 1px solid #37424c;
     border-radius: 3px;
-    padding: 3px 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
   }
-  #cam-bar button { cursor: pointer; }
-  #cam-bar button:hover { background: rgba(44, 53, 61, 0.85); }
-  #cam-bar button.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
-  #cam-bar kbd { font: inherit; font-size: 10px; opacity: 0.55; margin-left: 3px; }
+  #center-stack button:hover, #pause-btn:hover { background: rgba(44, 53, 61, 0.85); }
+  #center-stack button.active, #pause-btn.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  /* pause: centred in the gap between the stack and the pad — never closer to the stack than one gap */
+  #pause-btn { position: absolute; top: var(--cs-top); z-index: 5; left: max(calc(50% + var(--cs-half) + var(--cs-g)), calc(75% + var(--cs-half) / 2 - var(--pad-edge) / 2 - var(--cs-w) / 2)); }
+  body:not(.drawer-closed) #pause-btn { left: calc(50% + var(--cs-half) + var(--cs-g) * 3); } /* drawer open: no pad on the stage, pause sits beside the stack */
   #stress { position: absolute; top: 8px; right: 8px; width: 200px; z-index: 5; font-size: 11px; color: #e8eef3; text-shadow: 0 1px 2px rgba(0,0,0,0.7); pointer-events: none; }
   #stress .bar { height: 10px; background: rgba(0, 0, 0, 0.45); border: 1px solid #4a5560; }
   #stress .fill { height: 100%; width: 0; }
@@ -126,7 +136,8 @@
     border-top: 1px solid #232b32;
     padding-top: 6px;
   }
-  #controls { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  #controls { --pad-g: 6px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--pad-g); }
+  #controls > button[data-cmd="that_ll_do"] { width: calc((100% - var(--pad-g) * 2) / 3); }
   #controls .pad {
     width: 100%;
     display: grid;
@@ -164,9 +175,6 @@
   #controls button:hover { background: #2c363f; }
   #controls button.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
   #controls button kbd { opacity: 0.55; font-size: 10px; margin-left: 3px; }
-  #controls .sep { align-self: stretch; height: 1px; background: #37424c; margin: 2px 0; }
-  #controls .aux { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-  #controls .aux button { height: auto; padding: 3px 8px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
   #controls .herd { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
   #controls .herd label { color: #7b8894; }
   #controls .herd input { flex: 1 1 auto; min-width: 0; }
@@ -215,30 +223,14 @@
   #side #side-assault { padding: 0; }
   #side-assault .lil-gui.root { width: 100%; --width: 100%; --name-width: 48%; }
   #assault-status { padding: 6px 8px; font-size: 12px; color: #e0a98a; border-top: 1px solid #232b32; white-space: pre-line; }
+  #controls > button[data-cmd="battle_stations"] { width: calc((100% - var(--pad-g) * 2) / 3 * 2 + var(--pad-g)); }
   #controls > button[data-cmd="battle_stations"] { border-color: #6b4a3a; color: #f0c9b0; }
   #controls > button[data-cmd="battle_stations"].active { background: #7a2f26; border-color: #b0503f; color: #ffece4; }
-  /* DRAWER — the side column is a drawer, closed by default (☰ button or D).
+  /* DRAWER — the side column is a drawer, closed by default (settings button or D).
      Closed: the column floats over the stage's top-right corner and shows only
      the dog's buttons; the stage takes the full width. Open: the full column,
-     beside the stage. Phone landscape is always closed (no ☰ button) with a smaller pad. */
+     beside the stage. Phone landscape is the same layout, only smaller and see-through. */
   #app { position: relative; }
-  #drawer-btn {
-    flex: 0 0 auto;
-    align-self: flex-end;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding: 3px 8px;
-    font: inherit;
-    font-size: 12px;
-    color: #cdd6df;
-    background: #232b32;
-    border: 1px solid #37424c;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  #drawer-btn:hover { background: #2c353d; }
-  #drawer-btn kbd { font: inherit; font-size: 10px; opacity: 0.55; margin-left: 3px; }
   body.drawer-closed #side {
     position: absolute;
     top: 18px;
@@ -274,19 +266,17 @@
   @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
     #rotate-overlay { display: flex; }
   }
-  /* phone landscape — same rules as the 2D page: the sidebar is the pad only */
+  /* phone landscape — the SAME layout as the full browser screen; only the sizes shrink and the chrome goes see-through */
   @media (pointer: coarse) and (max-height: 600px) {
     #app { padding: 6px; gap: 8px; }
-    #drawer-btn { display: none; }
+    #stage { --cs-w: 48px; --cs-h: 18px; --cs-g: 3px; --cs-top: 6px; --pad-edge: 185px; }
+    #center-stack button, #pause-btn { font-size: 9px; background: rgba(20, 26, 31, 0.42); }
     /* the pad floats over the stage's top-right corner here too — no sidebar */
     body.drawer-closed #side { top: 6px; right: 6px; width: 186px; max-height: calc(100% - 12px); }
     /* no card behind the pad: only the buttons show (see-through), and the gaps between them still drag the camera */
     body.drawer-closed #side-dog { padding: 0; background: none; border: none; pointer-events: none; }
     body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
     body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
-    body.drawer-closed #controls .sep { display: none; }
-    #cam-bar button { padding: 2px 6px; font-size: 10px; background: rgba(20, 26, 31, 0.42); }
-    #side-debug, #side-levers, #side #side-assault { display: none; }
     #controls .pad { grid-template-rows: repeat(3, 30px); gap: 3px; }
     #controls button {
       font-size: 10px;
@@ -297,23 +287,16 @@
       white-space: normal;
     }
     #controls .w2 { display: block; }
-    /* the pad's lower rows: that'll do (+ battle stations) share one row; the aux buttons leave the pad for a row under the camera buttons */
-    #controls { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
-    #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 6px) / 3); }
-    #controls .aux { position: fixed; top: 34px; left: 50%; transform: translateX(-50%); flex-wrap: nowrap; width: max-content; }
-    #cam-bar { top: 6px !important; left: 50%; transform: translateX(-50%); flex-wrap: nowrap; max-width: none; width: max-content; }
-    #controls > button[data-cmd="battle_stations"] { width: calc((100% - 6px) / 3 * 2 + 3px); white-space: nowrap; }
-    #controls .aux { gap: 3px; }
-    #controls .aux button { height: auto; padding: 2px 5px; font-size: 10px; white-space: nowrap; }
+    #controls { --pad-g: 3px; }
     #controls .herd { font-size: 11px; }
-    #controls button kbd, #cam-bar kbd, #cam-bar span, #cam-hint { display: none; }
+    #controls button kbd, #cam-hint { display: none; }
     #stress { width: 100px; font-size: 10px; }
   }
   #home-link { margin-left: auto; align-self: center; font-size: 12px; color: #9fb0c0; text-decoration: none; }
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
-<script src="sheep-defaults.json.js?v=20261118a"></script>
+<script src="sheep-defaults.json.js?v=20261118b"></script>
 <script type="importmap">
 {
   "imports": {
@@ -331,21 +314,24 @@
 <div id="app">
 <div id="stage">
   <canvas id="scene"></canvas>
+  <div id="center-stack">
+  <button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels) — D">settings</button>
+  <div class="aux"><button id="reseed-btn" title="draw a new course">reseed</button></div>
   <div id="cam-bar">
-    <span>camera <kbd>C</kbd></span>
-    <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view">orbit <kbd>1</kbd></button>
-    <button data-cam="top" title="straight down — matches the 2D page">top <kbd>2</kbd></button>
-    <button data-cam="handler" title="over the handler's shoulder, by the gate">handler <kbd>3</kbd></button>
-    <button data-cam="dog" title="behind the dog, looking down his eye">dog <kbd>4</kbd></button>
-    <button id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw)">overlays <kbd>O</kbd></button>
+    <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C cycles the cameras)">orbit</button>
+    <button data-cam="top" title="straight down — matches the 2D page — 2 (C cycles the cameras)">top</button>
+    <button data-cam="handler" title="over the handler's shoulder, by the gate — 3 (C cycles the cameras)">handler</button>
+    <button data-cam="dog" title="behind the dog, looking down his eye — 4 (C cycles the cameras)">dog</button>
+    <button id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O">overlays</button>
   </div>
+  </div>
+  <button id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
   <div id="stress">flock stress<div class="bar"><div class="fill" id="stress-fill"></div></div></div>
   <div id="cam-hint"></div>
   <div id="card"></div>
   <div id="boot-error"></div>
 </div>
 <div id="side">
-<button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels)">☰ settings <kbd>D</kbd></button>
 <section id="side-debug">
   <div class="row">
     <label for="seed-input">seed</label>
@@ -372,14 +358,8 @@
       <button data-cmd="lie_down">lie <span class="w2">down</span> <kbd>↓</kbd></button>
       <button data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
     </div>
-    <div class="sep"></div>
     <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
     <button data-cmd="battle_stations" title="the dog runs to the nearest fence gun that bears on a wolf, rears up and shoots — ⌘⇧B, Ctrl⇧B or plain B">battle stations <kbd>⌘⇧B</kbd></button>
-    <div class="sep"></div>
-    <div class="aux">
-      <button id="reseed-btn" title="draw a new course">reseed ↻</button>
-      <button id="pause-btn" title="freeze the sim — the camera stays live">pause <kbd>P</kbd></button>
-    </div>
     <div class="herd">
       <label for="herd-size">herd</label>
       <input id="herd-size" type="range">
@@ -405,11 +385,11 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118a"></script>
-<script src="lib/sheep-gui.js?v=20261118a"></script>
-<script src="lib/sheep-score-ui.js?v=20261118a"></script>
+<script src="lib/sheep-sim.js?v=20261118b"></script>
+<script src="lib/sheep-gui.js?v=20261118b"></script>
+<script src="lib/sheep-score-ui.js?v=20261118b"></script>
 <!-- the wolf-mortar physics (DOM-free, three-free) -->
-<script src="lib/assault-sim.js?v=20261118a"></script>
+<script src="lib/assault-sim.js?v=20261118b"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.
@@ -1622,7 +1602,7 @@ document.getElementById('panels-btn').addEventListener('click', togglePanels)
 const drawerBtn = document.getElementById('drawer-btn')
 function toggleDrawer() {
   const closed = document.body.classList.toggle('drawer-closed')
-  drawerBtn.innerHTML = (closed ? '☰ settings' : '✕ close') + ' <kbd>D</kbd>'
+  drawerBtn.textContent = closed ? 'settings' : 'close'
   drawerBtn.blur()
 }
 drawerBtn.addEventListener('click', toggleDrawer)
@@ -1659,7 +1639,8 @@ let paused = false
 const pauseBtn = document.getElementById('pause-btn')
 function togglePause() {
   paused = !paused
-  pauseBtn.innerHTML = paused ? 'resume <kbd>P</kbd>' : 'pause <kbd>P</kbd>'
+  pauseBtn.textContent = paused ? 'resume' : 'pause'
+  pauseBtn.classList.toggle('active', paused)
 }
 pauseBtn.addEventListener('click', togglePause)
 
@@ -1711,7 +1692,7 @@ setCam(CAMS.includes(query.get('cam')) ? query.get('cam') : 'orbit')
 // POC-v14: the score face. `project` maps a sim point to stage px through the live camera.
 const popV = new V3()
 ScoreUI.init({
-  page: 'assault-3d', stage, below: document.getElementById('cam-bar'), // POC-v15 VH1: the score block owns the upper left; the camera bar sits directly under it
+  page: 'assault-3d', stage,
   project: (x, y) => {
     popV.set(x, 12, y).project(camera)
     return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }

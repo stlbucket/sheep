@@ -132,6 +132,23 @@ const ScoreUI = (() => {
     #score-hud .value, #score-hud .sub, #score-hud .objs, #score-hud .value small, #score-hud .sub .best { color: #fff; }
     #score-hud .sub, #score-hud .objs { font-size: 9px; margin-top: 2px; }
     #score-hud .objs { border-top: none; padding-top: 0; }
+    /* end card on a phone: almost the whole stage, two columns (verdict left, the bonus lines right, run facts + buttons along the bottom) — nothing to scroll */
+    #card.score-card { top: 5px; right: 5px; bottom: 5px; left: 5px; transform: none; min-width: 0; max-height: none; padding: 8px 14px; box-sizing: border-box; }
+    #card.score-card .sc-grid { display: grid; height: 100%; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "head lines" "tail lines" "bottom bottom"; column-gap: 18px; }
+    #card.score-card .sc-head { grid-area: head; } #card.score-card .sc-tail { grid-area: tail; min-height: 0; overflow: hidden; }
+    #card.score-card .sc-lines { grid-area: lines; min-height: 0; overflow-y: auto; align-self: center; max-height: 100%; }
+    #card.score-card .sc-bottom { grid-area: bottom; display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+    #card.score-card .actions { flex: 0 0 auto; margin-top: 0; flex-wrap: nowrap; gap: 5px; }
+    #card.score-card .actions button { padding: 3px 8px; font-size: 10px; white-space: nowrap; }
+    #card.score-card h2 { font-size: 13px; margin: 0; }
+    #card.score-card .rank { font-size: 18px; margin: 0; } #card.score-card .rank.wave { font-size: 11px; }
+    #card.score-card .pct { font-size: 10px; margin: 1px 0 2px; }
+    #card.score-card .big { font-size: 28px; line-height: 1.05; margin-bottom: 0; }
+    #card.score-card .row { font-size: 10px; line-height: 1.25; padding: 1px 0; gap: 12px; }
+    #card.score-card .row.mrow { font-size: 9px; padding: 0 0 0 12px; }
+    #card.score-card .grades { margin-top: 5px; gap: 4px; } #card.score-card .grades div { padding: 2px 0 3px; font-size: 9px; } #card.score-card .grades b { font-size: 15px; }
+    #card.score-card .awards { margin-top: 4px; font-size: 10px; line-height: 1.35; }
+    #card.score-card .best { margin-top: 3px; font-size: 10px; } #card.score-card .foot { flex: 1 1 0; min-width: 0; margin-top: 0; font-size: 9px; line-height: 1.3; }
     #score-banner { font-size: 20px; padding: 6px 14px; } #score-banner.bust { font-size: 24px; }
   }
   `
@@ -241,7 +258,7 @@ const ScoreUI = (() => {
       if (ev.key === 'Escape' && panelEl.style.display === 'block') { closePanel(); return }
       if (S.anim && !S.anim.done) skip()
     }, true)
-    const aux = document.querySelector('#controls .aux')
+    const aux = document.querySelector('#center-stack .aux, #controls .aux') // 3D pages: the centre stack's middle row; 2D: the row under the pad
     if (aux) {
       const mk = (label, title, mode) => {
         const b = document.createElement('button'); b.className = 'mode'; b.textContent = label; b.title = title
@@ -436,15 +453,15 @@ const ScoreUI = (() => {
     const flock = waves ? `${sc.raw.crossings} penned` : `penned ${sc.penned}/${sim.sheep.length}`
     const par = waves ? '' : ` · par ${sc.par.toFixed(0)}s`
     S.card.innerHTML =
-      `<h2>${title}</h2>` + rankHtml +
-      `<div class="big">0</div>` + rows + grades +
+      `<div class="sc-grid"><div class="sc-head"><h2>${title}</h2>` + rankHtml +
+      `<div class="big">0</div></div><div class="sc-lines">` + rows + `</div><div class="sc-tail">` + grades +
       `<div class="awards">${awards ? '🏅 ' + awards : ''}${awards && objs ? '<br>' : ''}${objs}${firsts}</div>` +
       `<div class="${bestClass}">${[bestHtml, rec.band].filter(Boolean).map(esc).join(' · ')}</div>` +
-      `<div class="foot">${flock} · time ${sc.raw.t.toFixed(0)}s${par} · ${sc.raw.commands} commands · ${sc.strikes} strike${sc.strikes === 1 ? '' : 's'} · ${sc.panics} panics${sc.raw.injuries ? ` · ${sc.raw.injuries} ${lostAny ? 'lost' : 'injured'}` : ''}</div>` +
+      `</div><div class="sc-bottom"><div class="foot">${flock} · time ${sc.raw.t.toFixed(0)}s${par} · ${sc.raw.commands} commands · ${sc.strikes} strike${sc.strikes === 1 ? '' : 's'} · ${sc.panics} panics${sc.raw.injuries ? ` · ${sc.raw.injuries} ${lostAny ? 'lost' : 'injured'}` : ''}</div>` +
       `<div class="actions"><button data-card="history" title="your last runs">history</button><button data-card="collection" title="awards, jackpots, side objectives and special sheep you have earned">collection</button>` +
       `<button data-card="dismiss" title="close this card and look at the field">dismiss</button>` +
       `<button data-card="replay" title="play this same course again (R)">replay</button>` +
-      `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles">play again</button></div>`
+      `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles">play again</button></div></div></div>`
     S.card.classList.remove('done')
     S.card.style.display = 'block'
     S.anim = { lines: sc.lines, total: sc.total, rows: Array.from(S.card.querySelectorAll('.row.line')), mrows: Array.from(S.card.querySelectorAll('.row.mrow')),
