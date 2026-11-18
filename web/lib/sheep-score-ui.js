@@ -125,9 +125,13 @@ const ScoreUI = (() => {
   #score-panel .item.none .rare, #score-panel .item.none .legendary { color: #4f5962; }
   #score-panel .empty { color: #7b8894; padding: 8px 0; }
   @media (pointer: coarse) and (max-height: 600px) {
-    #score-hud { padding: 4px 8px 5px; min-width: 130px; font-size: 11px; }
-    #score-hud .pts { font-size: 26px; } #score-hud .mult { font-size: 17px; }
-    #score-hud .sub, #score-hud .objs { font-size: 10px; }
+    #score-hud { padding: 0; min-width: 110px; font-size: 10px; background: none; border: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6); }
+    #score-hud .pts { font-size: 20px; } #score-hud .mult { font-size: 14px; color: #cdd6df; }
+    #score-hud .bar { height: 3px; margin: 3px 0 4px; background: rgba(0, 0, 0, 0.35); }
+    #score-hud .strikes b { width: 11px; height: 11px; font-size: 9px; line-height: 10px; margin-right: 3px; border-color: rgba(255, 255, 255, 0.7); }
+    #score-hud .value, #score-hud .sub, #score-hud .objs, #score-hud .value small, #score-hud .sub .best { color: #fff; }
+    #score-hud .sub, #score-hud .objs { font-size: 9px; margin-top: 2px; }
+    #score-hud .objs { border-top: none; padding-top: 0; }
     #score-banner { font-size: 20px; padding: 6px 14px; } #score-banner.bust { font-size: 24px; }
   }
   `
