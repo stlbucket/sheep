@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
+     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-title" content="Sheep" />
 <!-- no browser zoom on phones (owner 2026-11-18): fast taps on the pads read as a double-tap and zoomed the page -->
 <style>* { touch-action: manipulation; }</style>
 <script>
@@ -294,7 +300,7 @@
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
-<script src="sheep-defaults.json.js?v=20261118o"></script>
+<script src="sheep-defaults.json.js?v=20261118p"></script>
 <script type="importmap">
 {
   "imports": {
@@ -378,13 +384,13 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118o"></script>
+<script src="lib/sheep-sim.js?v=20261118p"></script>
 <script>params.driveGateMax = 0 // owner 2026-11-18: the 3D pastures never carry drive gates (they live on the 3D competition course); set before lib/sheep-score-ui.js snapshots its defaults</script>
-<script src="lib/sheep-gui.js?v=20261118o"></script>
-<script src="lib/sheep-score-ui.js?v=20261118o"></script>
-<script src="lib/sheep-pad-ui.js?v=20261118o"></script>
-<script src="lib/sheep-auto.js?v=20261118o"></script>
-<script src="lib/sheep-demo-ui.js?v=20261118o"></script>
+<script src="lib/sheep-gui.js?v=20261118p"></script>
+<script src="lib/sheep-score-ui.js?v=20261118p"></script>
+<script src="lib/sheep-pad-ui.js?v=20261118p"></script>
+<script src="lib/sheep-auto.js?v=20261118p"></script>
+<script src="lib/sheep-demo-ui.js?v=20261118p"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.

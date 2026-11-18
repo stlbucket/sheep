@@ -266,7 +266,7 @@ const ScoreUI = (() => {
       else if (what === 'replay') opts.restart()
       else if (what === 'history') showHistory()
       else if (what === 'collection') showCollection()
-      else S.card.style.display = 'none'                  // dismiss: look at the field (the card does not pop back up)
+      else { S.card.style.display = 'none'; closed(true) } // dismiss: look at the field (the card does not pop back up — `see scoring` under the main menu button brings it back)
     })
     panelEl.addEventListener('click', (ev) => { if (ev.target.closest('button[data-panel="close"]')) closePanel() })
     window.addEventListener('keydown', (ev) => {
@@ -508,6 +508,7 @@ const ScoreUI = (() => {
       `<button data-card="again" class="primary" title="draw a brand-new random course — new gate, flock, layout and obstacles">play again</button></div></div></div>`
     S.card.classList.remove('done')
     S.card.style.display = 'block'
+    closed(false)
     S.anim = { lines: sc.lines, total: sc.total, rows: Array.from(S.card.querySelectorAll('.row.line')), mrows: Array.from(S.card.querySelectorAll('.row.mrow')),
       multAt: sc.lines.findIndex((l) => l.key === 'mult'), big: S.card.querySelector('.big'), t0: now(), per: 0.5, done: false }
     if (!S.anim.rows.length) skip()
@@ -536,7 +537,16 @@ const ScoreUI = (() => {
     a.big.textContent = fmt(a.total)
     S.card.classList.add('done')
   }
+  // the end card was dismissed with the run still finished: the page shows a `see scoring` button (lib/sheep-pad-ui.js) while this class is on
+  function closed(on) { document.body.classList.toggle('score-closed', !!on) }
+  function reopen() {
+    if (!S.card || !S.shown || !S.card.innerHTML) return
+    skip()
+    S.card.style.display = 'block'
+    closed(false)
+  }
   function hide() {
+    closed(false)
     if (S.card) S.card.style.display = 'none'
     if (panelEl) closePanel()
     S.anim = null
@@ -554,7 +564,7 @@ const ScoreUI = (() => {
     }
     if (btnDaily) { btnDaily.classList.toggle('active', params.mode === 'daily'); btnWaves.classList.toggle('active', params.mode === 'waves') }
     if (sim.run !== S.run) {                               // a new run (reseed / reset): clear the board
-      S.run = sim.run; S.shown = false; S.bonusAt = 0; S.slot = 0; S.lastMult = 1
+      S.run = sim.run; S.shown = false; closed(false); S.bonusAt = 0; S.slot = 0; S.lastMult = 1
       for (const p of S.pops) p.el.remove()
       S.pops.length = 0; S.flashes.clear(); feedEl.textContent = ''; S.feedNew = 0; S.banners.length = 0; S.banner = null; S.objSig = ''
       sim.layout0 = sim.layout; sim.obstacleGroups0 = sim.obstacleGroups // what the course STARTED as — a wave re-lays both, the best-score key must not move
@@ -602,5 +612,5 @@ const ScoreUI = (() => {
   }
 
   function demoRun(sim) { S.demoRun = sim.run } // the demo handler issued commands in this run
-  return { init, frame, flash, hud, demoRun, hide, skip, setMode, dailySeed, tuned, courseKey, bestFor, STORE, readHistory, readBand, readCollection, bandOf, showHistory, showCollection, closePanel, keys: K, bannerLog: () => S.bannerLog.slice() }
+  return { init, frame, flash, hud, demoRun, hide, reopen, skip, setMode, dailySeed, tuned, courseKey, bestFor, STORE, readHistory, readBand, readCollection, bandOf, showHistory, showCollection, closePanel, keys: K, bannerLog: () => S.bannerLog.slice() }
 })()

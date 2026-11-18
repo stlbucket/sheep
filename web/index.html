@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
+     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-title" content="Sheep" />
 <title>Sheep PoC</title>
 <!--
   HOME — pick a version. Every page here runs the same herding physics
@@ -17,7 +23,8 @@
   landscape (4 across) — the page never scrolls. Each card shows as much of its text
   as its own height allows (container queries); the keyboard footer is dropped.
 
-  Plain links, no script — works from file:// by double-click.
+  Plain links — works from file:// by double-click. The one script only decides
+  whether to show the iPhone "Add to Home Screen" tip.
 -->
 <style>
   * { box-sizing: border-box; }
@@ -61,6 +68,9 @@
     body { padding: 28px 16px; }
     .versions { grid-template-columns: 1fr; }
   }
+  /* iPhone Safari only (set by the script at the foot): how to get the game full screen */
+  #ios-tip { display: none; margin: 4px 0 0; font-size: 12px; line-height: 1.3; color: #9fd0ff; }
+  body.ios-browser #ios-tip { display: block; }
   /* phones: everything on one screen, no scrolling, either way up */
   @media (pointer: coarse) and (max-width: 950px) {
     html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
@@ -88,6 +98,8 @@
     body { padding: 6px 12px; }
     header { margin-bottom: 4px; }
     header p { display: none; }
+    header { display: flex; align-items: baseline; justify-content: center; gap: 12px; }
+    body.ios-browser #ios-tip { display: block; margin: 0; font-size: 11px; }
     h1 { font-size: 16px; margin: 0; }
     .versions { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
   }
@@ -97,6 +109,7 @@
 <header>
   <h1>🐑 Sheep PoC</h1>
   <p>Work the dog, gather the flock, pen it through the gate. Pick a version.</p>
+  <p id="ios-tip">Full screen on iPhone: Share <b>→</b> Add to Home Screen, then open it from there.</p>
 </header>
 
 <main class="versions">
@@ -133,5 +146,14 @@
 <footer>
   same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do
 </footer>
+<script>
+  // iPhone / iPod Safari cannot make a page full screen (no Fullscreen API there) — a home-screen web app is the way.
+  // Show the tip only in the browser, never once it is running from the home screen.
+  (function () {
+    var iphone = /iPhone|iPod/.test(navigator.userAgent)
+    var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)
+    if (iphone && !standalone) document.body.classList.add('ios-browser')
+  })()
+</script>
 </body>
 </html>

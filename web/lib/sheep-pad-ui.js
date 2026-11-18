@@ -34,9 +34,18 @@ const PadUI = (() => {
     #stage > #menu-btn { position: absolute; z-index: 5; transform: translateX(-50%); height: var(--cs-h, 24px); padding: 0 10px; min-width: var(--cs-w, 68px);
       font: inherit; font-size: 12px; color: #cdd6df; background: rgba(16, 20, 24, 0.72); border: 1px solid #37424c; border-radius: 999px; }
     #stage > #menu-btn:hover { background: rgba(44, 53, 61, 0.85); }
+    #score-btn { display: none; box-sizing: border-box; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
+    body.score-closed #score-btn { display: inline-flex; }
+    #stage > #score-btn { position: absolute; z-index: 5; transform: translateX(-50%); height: var(--cs-h, 24px); padding: 0 10px; min-width: var(--cs-w, 68px);
+      font: inherit; font-size: 12px; color: #eafff0; background: rgba(22, 74, 40, 0.82); border: 1px solid #3f8a58; border-radius: 999px; }
+    #stage > #score-btn:hover { background: rgba(31, 110, 58, 0.9); }
+    #controls .aux { align-items: flex-start; }
+    #menu-col { display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; }
+    #controls .aux #score-btn { padding: 3px 8px; font: inherit; font-size: 12px; color: #eafff0; background: #1c4a2b; border: 1px solid #3f8a58; border-radius: 999px; }
+    #controls .aux #score-btn:hover { background: #24603a; }
     #controls .aux #menu-btn { padding: 3px 8px; font: inherit; font-size: 12px; color: #cdd6df; background: #232b32; border: 1px solid #37424c; border-radius: 999px; }
     #controls .aux #menu-btn:hover { background: #2c363f; }
-    @media (pointer: coarse) and (max-height: 600px) { #stage > #menu-btn { font-size: 9px; padding: 0 6px; background: rgba(20, 26, 31, 0.42); } #controls .aux #menu-btn { font-size: 11px; } }
+    @media (pointer: coarse) and (max-height: 600px) { #stage > #menu-btn, #stage > #score-btn { font-size: 9px; padding: 0 6px; } #stage > #menu-btn { background: rgba(20, 26, 31, 0.42); } #controls .aux #menu-btn, #controls .aux #score-btn { font-size: 11px; } }
     @media (pointer: coarse) and (max-height: 600px) { #cmd-flash { height: 28px; font-size: 22px; line-height: 28px; } }`
 
   // the name of what was just asked for — the pad's own words for the verb + entry opts
@@ -71,18 +80,28 @@ const PadUI = (() => {
     }
     menu.style.left = ((edge + (w.left - ox)) / 2).toFixed(1) + 'px'
     menu.style.top = (r.top - oy).toFixed(1) + 'px'
+    const score = document.getElementById('score-btn')            // `see scoring` sits directly under it
+    if (score) { score.style.left = menu.style.left; score.style.top = (r.top - oy + (menu.offsetHeight || 24) + 4).toFixed(1) + 'px' }
   }
   function addMenu() {
     const menu = document.createElement('a'); menu.id = 'menu-btn'; menu.href = 'index.html'; menu.textContent = 'main menu'
     menu.title = 'back to the main menu — pick a version'
+    // owner 2026-11-18: once a finished run's scoring card has been closed, a `see scoring` button under the main menu button brings it back
+    const score = document.createElement('button'); score.id = 'score-btn'; score.type = 'button'; score.textContent = 'see scoring'
+    score.title = 'show the scoring for the run you just finished'
+    score.addEventListener('click', () => { if (typeof ScoreUI !== 'undefined' && ScoreUI.reopen) ScoreUI.reopen() })
     const stage = document.getElementById('stage'), aux2d = document.querySelector('#controls .aux')
     if (stage && document.getElementById('center-stack')) {
-      stage.appendChild(menu)
+      stage.appendChild(menu); stage.appendChild(score)
       const place = () => placeMenu(menu)
       place(); requestAnimationFrame(place); setTimeout(place, 400) // again once the score block and the mode buttons have laid out
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(place).observe(stage)
       window.addEventListener('resize', place)
-    } else if (aux2d) aux2d.insertBefore(menu, aux2d.firstChild)
+    } else if (aux2d) {
+      const col = document.createElement('span'); col.id = 'menu-col'
+      col.appendChild(menu); col.appendChild(score)
+      aux2d.insertBefore(col, aux2d.firstChild)
+    }
   }
 
   function init(sim) {
