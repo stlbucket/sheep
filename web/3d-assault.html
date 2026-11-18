@@ -285,7 +285,6 @@
     body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
     body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
     body.drawer-closed #controls .sep { display: none; }
-    body.drawer-closed #controls { gap: 4px; }
     #cam-bar button { padding: 2px 6px; font-size: 10px; background: rgba(20, 26, 31, 0.42); }
     #side-debug, #side-levers, #side #side-assault { display: none; }
     #controls .pad { grid-template-rows: repeat(3, 30px); gap: 3px; }
@@ -298,8 +297,12 @@
       white-space: normal;
     }
     #controls .w2 { display: block; }
-    #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 8px) / 3); }
-    #controls > button[data-cmd="battle_stations"] { width: calc((100% - 8px) / 3 * 2); }
+    /* the pad's lower rows: that'll do (+ battle stations) share one row; the aux buttons leave the pad for a row under the camera buttons */
+    #controls { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
+    #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 6px) / 3); }
+    #controls .aux { position: fixed; top: 34px; left: 50%; transform: translateX(-50%); flex-wrap: nowrap; width: max-content; }
+    #cam-bar { top: 6px !important; left: 50%; transform: translateX(-50%); flex-wrap: nowrap; max-width: none; width: max-content; }
+    #controls > button[data-cmd="battle_stations"] { width: calc((100% - 6px) / 3 * 2 + 3px); white-space: nowrap; }
     #controls .aux { gap: 3px; }
     #controls .aux button { height: auto; padding: 2px 5px; font-size: 10px; white-space: nowrap; }
     #controls .herd { font-size: 11px; }
@@ -310,7 +313,7 @@
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
-<script src="sheep-defaults.json.js"></script>
+<script src="sheep-defaults.json.js?v=20261117c"></script>
 <script type="importmap">
 {
   "imports": {
@@ -402,11 +405,11 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js"></script>
-<script src="lib/sheep-gui.js"></script>
-<script src="lib/sheep-score-ui.js"></script>
+<script src="lib/sheep-sim.js?v=20261117c"></script>
+<script src="lib/sheep-gui.js?v=20261117c"></script>
+<script src="lib/sheep-score-ui.js?v=20261117c"></script>
 <!-- the wolf-mortar physics (DOM-free, three-free) -->
-<script src="lib/assault-sim.js"></script>
+<script src="lib/assault-sim.js?v=20261117c"></script>
 <script>
 // A blocked CDN / offline load would otherwise leave a blank stage with the
 // error only in the console — say it on the page.
