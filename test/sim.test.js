@@ -1,9 +1,12 @@
-// Headless sim suite — scoring (SC), field objectives (FO), wave mode (RM).
+// Headless sim suite — scoring (SC), field objectives (FO), verdict (VH), wave mode (RM).
 //   node test/sim.test.js            run every check (exit 1 on any failure)
 //   node test/sim.test.js --update   re-record test/golden-replay.json (only after an INTENDED change to flock / dog physics)
 // Loads web/lib/sheep-sim.js and web/lib/assault-sim.js in a bare `vm` context: no DOM, no browser.
-// Sheep are pushed through the pen gate by the harness (`cross`), so no check depends on a scripted dog winning a course.
-// Criteria: .claude/sheep/implemented/POC-v14/{scoring,field-objectives,replay-modes}.md
+// Two ways of penning a sheep, so no check depends on a scripted dog winning a course:
+//   pen(sim, s, tier)  — POC-v15 checks: set the sheep's state, mark it through and call onPenned (fully controlled)
+//   cross(sim, i)      — POC-v14 checks: teleport it just outside the gate mouth and step once (through the real gate path)
+// Criteria: .claude/sheep/implemented/POC-v15/{scoring,field-objectives,verdict-and-hud}.md (SC 1–19, FO 1–8, VH 7/8/10)
+//           .claude/sheep/implemented/POC-v14/{field-objectives,replay-modes}.md (the G-, K- and RM- checks carried forward)
 const fs = require('fs'), vm = require('vm'), path = require('path'), crypto = require('crypto')
 const WEB = path.join(__dirname, '..', 'web')
 const GOLDEN = path.join(__dirname, 'golden-replay.json')
@@ -12,17 +15,388 @@ function load(dir, defaultsDir, withAssault) {
   const ctx = { console: { log() {}, warn() {}, error: (...a) => console.error('[ctx error]', ...a) } }
   vm.createContext(ctx)
   vm.runInContext(fs.readFileSync(path.join(defaultsDir, 'sheep-defaults.json.js'), 'utf8') + ';globalThis.SHEEP_DEFAULTS=SHEEP_DEFAULTS', ctx)
-  vm.runInContext(fs.readFileSync(path.join(dir, 'sheep-sim.js'), 'utf8') + ';Object.assign(globalThis,{FlockSim,SETTINGS,buildParams,assertLevers})', ctx)
+  vm.runInContext(fs.readFileSync(path.join(dir, 'sheep-sim.js'), 'utf8') + ';Object.assign(globalThis,{FlockSim,SETTINGS,buildParams,assertLevers,AWARDS,SIDE_OBJECTIVES,RANKS});globalThis.Sim=FlockSim', ctx)
   if (withAssault) vm.runInContext(fs.readFileSync(path.join(dir, 'assault-sim.js'), 'utf8') + ';Object.assign(globalThis,{assault,assaultReset,assaultStep,explode,wolfAward,teamFlee,BLAST})', ctx)
   return ctx
 }
-const N = load(path.join(WEB, 'lib'), WEB, true)
+const N = load(path.join(WEB, 'lib'), WEB, true), c = N
 const DT = 1 / 60
 const results = []
-const ok = (id, name, pass, detail) => { results.push({ id, name, pass: !!pass, detail }); }
-function mk(ctx, over = {}) {
+const ok = (id, name, pass, detail) => { results.push({ id, name, pass: !!pass, detail: detail === undefined ? '' : String(detail) }) }
+
+// =====================================================================================
+// POC-v15 — scoring.md (SC), field-objectives.md (FO), verdict-and-hud.md (VH)
+// =====================================================================================
+// A controlled course: no specials, no drive gates, no side objectives unless asked.
+function mk(over) {
+  const p = c.buildParams(c.SETTINGS)
+  Object.assign(p, { seed: 42, randomSeedOnLoad: false, sheepCount: 30, specials: false, driveGateMax: 0, sideObjectiveCount: 0, mode: 'course', obstacleRandom: false, obstacleFreq: 0 }, over || {})
+  const sim = new c.Sim(p)
+  sim.step(DT)
+  return sim
+}
+const set = (s, o) => Object.assign(s, { stress: 0, stressAvg: 0, trot: false, panic: false, idle: false }, o)
+const TIER = { perfect: { stress: 0.01 }, calm: { stress: 0.1 }, rushed: { trot: true } }
+function pen(sim, s, tier) { set(s, TIER[tier] || tier); s.through = true; const b = sim.points; sim.onPenned(s); return sim.points - b }
+function wait(sim, secs) { for (let i = 0, n = Math.round(secs / DT); i < n; i++) sim.updateScore(DT) }
+const free = (sim) => sim.sheep.filter((s) => !s.through && !s.down)
+const quiet = (sim) => { for (const s of sim.sheep) set(s, {}) }
+
+// ---------------- scoring.md 1: never decreases (incl. a bust, every jackpot)
+{
+  const sim = mk({ sheepCount: 40 })
+  quiet(sim)
+  let last = 0, mono = true, steps = 0
+  const tick = (n) => { for (let i = 0; i < n; i++) { sim.updateScore(DT); steps++; if (sim.points < last) mono = false; last = sim.points } }
+  for (let i = 0; i < 25; i++) { pen(sim, free(sim)[0], i % 7 === 3 ? 'calm' : 'perfect'); if (sim.points < last) mono = false; last = sim.points; tick(20) }
+  tick(400) // chain lapses → perfect file
+  for (let k = 0; k < 3; k++) { sim.strike('test', 0, 0); if (sim.points < last) mono = false; last = sim.points; tick(240) }
+  ok('SC-1', 'total never decreases (jackpots + a bust)', mono && sim.run.bust && sim.run.finished, `${steps} steps, bust=${sim.run.bust}, total=${sim.points}, jackpots=${sim.run.jackpots}`)
+}
+// ---------------- 2: tiers
+{
+  const a = mk(), b = mk(), d = mk()
+  quiet(a); quiet(b); quiet(d)
+  const w = mk(); quiet(w)
+  ok('SC-2', 'one sheep alone: 50 trotting / 200 at stress 0.1 / 500 at 0.01; walking at 0.2 is RUSHED (50)',
+    pen(a, a.sheep[0], { trot: true }) === 50 && pen(b, b.sheep[0], { stress: 0.1 }) === 200 && pen(d, d.sheep[0], { stress: 0.01 }) === 500 && pen(w, w.sheep[0], { stress: 0.2 }) === 50,
+    [a.points, b.points, d.points].join(' / '))
+}
+// ---------------- 3: condition
+{
+  const sim = mk(); quiet(sim)
+  const s = sim.sheep[0]
+  s.panic = true; s.wasPanic = true
+  wait(sim, 3); s.panic = false
+  const cond = s.cond, got = pen(sim, s, 'perfect')
+  const sim2 = mk(); quiet(sim2); const t = sim2.sheep[0]; t.panic = true; t.wasPanic = true; wait(sim2, 20)
+  ok('SC-3', '3 s of panic → ~70 % condition, PERFECT pays 500 × cond; floor holds', Math.abs(cond - 0.7) < 0.01 && got === Math.round(500 * cond) && Math.abs(t.cond - sim2.p.condFloor) < 1e-9,
+    `cond ${cond.toFixed(3)}, paid ${got}, floor ${t.cond.toFixed(2)}`)
+}
+// ---------------- 4: flock value
+{
+  const sim = mk(); quiet(sim); wait(sim, 0.1)
+  const v0 = sim.run.value, expect = sim.sheep.reduce((a, s) => a + 500 * s.cond, 0)
+  for (const s of sim.sheep.slice(0, 10)) { s.panic = true; s.wasPanic = true }
+  wait(sim, 2); const v1 = sim.run.value, dr = sim.run.draining
+  for (const s of sim.sheep) set(s, { idle: true })
+  wait(sim, 5); const v2 = sim.run.value
+  ok('SC-4', 'flock value = sum; falls under panic; rises grazing', Math.abs(v0 - expect) < 1e-6 && v1 < v0 && dr && v2 > v1 && !sim.run.draining, `${v0} → ${v1.toFixed(0)} → ${v2.toFixed(0)}`)
+}
+// ---------------- 5: chain steps, no cap
+{
+  const sim = mk(); quiet(sim)
+  const seq = ['perfect', 'perfect', 'calm', 'rushed', 'calm'], got = []
+  for (const t of seq) { pen(sim, free(sim)[0], t); got.push(sim.run.combo); wait(sim, 0.2) }
+  const b = mk({ sheepCount: 40, frenzyEvery: 0 }); quiet(b)
+  for (let i = 0; i < 30; i++) { pen(b, free(b)[0], 'calm'); wait(b, 0.1) }
+  ok('SC-5', 'P,P,C,R,C → ×1,×3,×4,×4,×5; 30 calm crossings reach ×30', got.join(',') === '1,3,4,4,5' && b.run.combo === 30, got.join(',') + ' · ×' + b.run.combo)
+}
+// ---------------- 6: window tightening
+{
+  const sim = mk(); quiet(sim)
+  pen(sim, free(sim)[0], 'calm'); const w1 = sim.comboWindowNow()
+  pen(sim, free(sim)[0], 'calm'); wait(sim, 1); const keeps = sim.run.comboLive
+  const b = mk({ sheepCount: 40, frenzyEvery: 0 }); quiet(b)
+  for (let i = 0; i < 35; i++) { pen(b, free(b)[0], 'calm'); wait(b, 0.05) }
+  const w35 = b.comboWindowNow(); wait(b, 1)
+  ok('SC-6', 'window 1.5 s at ×1, 0.4 s at ×30+; a 1 s gap keeps ×2, breaks ×35', Math.abs(w1 - 1.5) < 1e-9 && Math.abs(w35 - 0.4) < 1e-9 && keeps && !b.run.comboLive, `w1 ${w1}, w35 ${w35}, ×2 alive ${keeps}, ×35 alive ${b.run.comboLive}`)
+}
+// ---------------- 7: strike sources
+{
+  const sim = mk(); quiet(sim)
+  pen(sim, free(sim)[0], 'calm'); pen(sim, free(sim)[0], 'calm'); pen(sim, free(sim)[0], 'calm')
+  const f = free(sim)
+  for (let i = 0; i < 4; i++) f[i].panic = true
+  wait(sim, 0.1); const after4 = sim.run.strikes
+  f[4].panic = true; wait(sim, 0.1)
+  const afterPanics = sim.run.strikes, comboAfter = sim.run.comboLive ? sim.run.combo : 1
+  const ev = sim.scoreEvents.filter((e) => e.kind === 'strike').length
+  quiet(sim); wait(sim, 4)
+  { const v = free(sim)[0]; v.pos = { x: sim.gate.x, y: sim.gate.y } }
+  sim.injureAtGate(); const afterInjury = sim.run.strikes
+  // fence slam: a sheep carried into the fence at speed vs walking into it
+  const b = mk(); quiet(b)
+  const r = b.playRect(), w = b.sheep[0], q = b.sheep[1]
+  w.pos = { x: r.x0 + 0.2, y: (r.y0 + r.y1) / 2 + 200 }; w.vel = { x: -40, y: 0 }
+  const iw = b.sheep.indexOf(w); b.integrate(iw, DT); const walk = b.run.strikes
+  q.pos = { x: r.x0 + 0.5, y: (r.y0 + r.y1) / 2 - 200 }; q.vel = { x: -160, y: 0 }; q.panic = true
+  // integrate recomputes the velocity (damping, caps): drive the clamp path directly with a known speed
+  const before = b.run.strikes
+  { const s2 = q; s2.pos.x = r.x0 - 1; let into = Math.max(0, 160); if (into > b.p.fenceSlamSpeed) b.fenceSlam(s2) }
+  ok('SC-7', '5 panics = 1 strike; downed sheep = 1 strike; fence slam = 1 strike, a walk-in = none; chain reset; one event each',
+    after4 === 0 && afterPanics === 1 && comboAfter === 1 && ev === 1 && afterInjury === 2 && walk === 0 && b.run.strikes === before + 1,
+    `panics ${after4}→${afterPanics}, combo ×${comboAfter}, events ${ev}, injury → ${afterInjury}, walk-in ${walk}, slam ${b.run.strikes}`)
+}
+// fence slam through the real integrate path (the clamp reads velocity before zeroing it)
+{
+  const b = mk({ fenceSlamSpeed: 20 }); quiet(b)
+  const r = b.playRect(), q = b.sheep[0], i = 0
+  let slammed = false
+  for (let n = 0; n < 5 && !slammed; n++) {
+    q.pos = { x: r.x0 + 0.3, y: (r.y0 + r.y1) / 2 + 150 }; q.vel = { x: -88, y: 0 }; q.idle = false
+    b.integrate(i, DT); slammed = b.run.slams > 0
+  }
+  ok('SC-7b', 'fence slam detected inside integrate()', slammed, `slams ${b.run.slams}, strikes ${b.run.strikes}`)
+}
+// ---------------- 8: bust
+{
+  const sim = mk(); quiet(sim)
+  for (let i = 0; i < 6; i++) pen(sim, free(sim)[0], 'rushed')
+  wait(sim, 4)
+  sim.strike('a', 0, 0); wait(sim, 4); sim.strike('b', 0, 0); wait(sim, 4)
+  const before = sim.points, evs = sim.scoreEvents.length
+  sim.strike('c', 0, 0)
+  const sc = sim.score(), keys = sc.endMults.map((m) => m.key).join(',')
+  ok('SC-8', 'third strike busts; the strike itself takes nothing; no clean / award multiplier', sim.run.bust && sim.run.finished && !sim.run.won && sim.points >= before && !/clean|award/.test(keys), `bust ${sim.run.bust}, ${before} → ${sim.points}, mults [${keys}]`)
+  // 12b: bust with 6 of 30 penned → ×1.1
+  ok('SC-12b', 'bust with 6/30 penned (rushed) → end multiplier 1.1', Math.abs(sc.endMult - 1.1) < 1e-9, sc.endMult)
+}
+// helper: win a course by penning everyone
+function winAll(sim, tier, gap) { let i = 0; for (const s of free(sim)) { pen(sim, s, typeof tier === 'function' ? tier(i++) : tier); if (gap) wait(sim, gap) } sim.updateScore(DT) }
+// ---------------- 9 + 10: time bonus after the multipliers; ×4.5
+{
+  const off = { frenzyEvery: 0, perfectFileMin: 9999, finisherPoints: 0, multOneGo: 1, multAwardCommon: 1, multAwardRare: 1, multAwardLegendary: 1 }
+  const sim = mk(off); quiet(sim)
+  sim.run.t = sim.par() - 20.5
+  winAll(sim, 'calm')
+  const sc = sim.score(), time = sim.tally.time || 0
+  const over = mk(off); quiet(over); over.run.t = over.par() + 5; winAll(over, 'calm')
+  ok('SC-9', '20 s under par → +200 added after the multipliers; over par → none', time === 200 && !(over.tally.time > 0) && sim.points === Math.round(sc.playPoints * sc.endMult) + 200, `time ${time}, over ${over.tally.time || 0}`)
+  ok('SC-10', 'won, strike-free, all-calm, no awards → ×4.5; total = play × 4.5 + time', Math.abs(sc.endMult - 4.5) < 1e-9 && sim.points === Math.round(sc.playPoints * 4.5) + time, `×${sc.endMult}, play ${sc.playPoints}, total ${sim.points}`)
+  const sum = sc.lines.reduce((a, l) => a + l.points, 0)
+  ok('SC-10b', 'card lines sum to the total', sum === sc.total, `${sum} = ${sc.total}`)
+}
+// ---------------- 11: awards on / off with rarity
+{
+  const P0 = c.buildParams(c.SETTINGS)
+  const mult = { common: P0.multAwardCommon, rare: P0.multAwardRare, legendary: P0.multAwardLegendary }
+  const run = (prep, tier, gap) => { const sim = mk({ driveGateMax: 0 }); quiet(sim); sim.run.t = 5; prep && prep(sim); winAll(sim, tier || 'calm', gap); return sim }
+  const has = (sim, n) => sim.run.awards.includes(n)
+  const cases = {
+    'Quiet Hand': [(s) => { s.run.commands = 3 }, (s) => { s.run.commands = 99 }],
+    'Straight as a Die': [(s) => { s.run.onLine = s.run.t }, (s) => { s.run.onLine = 0 }],
+    'Photo Finish': [(s) => { s.run.t = s.par() - 1 }, (s) => { s.run.t = 5 }],
+    'Gatekeeper': [(s) => { s.driveGates = [{ done: true, passed: new Set(), sides: new Map() }] }, (s) => { s.driveGates = [{ done: false, passed: new Set(), sides: new Map(), x: -999, y: -999, nx: 1, ny: 0, tx: 0, ty: 1, half: 1 }] }],
+    'Not a Hair Out of Place': [null, (s) => { s.run.strikes = 1 }],
+    'Never Sat': [null, (s) => { s.run.lieDowns = 1 }],
+    'Steady Away': [null, (s) => { s.run.fullFlanks = 2 }],
+    'Full Purse': [null, (s) => { s.run.condMin = 0.5 }],
+    'Nobody Ran': [null, (s) => { s.run.trotEver = true }],
+    'Not a Word Wasted': [(s) => { s.run.commands = 2 }, (s) => { s.run.commands = 15 }],
+  }
+  const bad = []
+  for (const [name, [on, off]] of Object.entries(cases)) {
+    const a = run(on), b = run(off)
+    const rar = c.AWARDS.find((x) => x.name === name).rarity
+    const entry = a.run.awardList.find((x) => x.name === name)
+    if (!has(a, name) || has(b, name) || !entry || entry.mult !== mult[rar]) bad.push(name)
+  }
+  const ss = run(null, 'perfect'), ns = run(null, 'calm')
+  if (!has(ss, 'Sunday Stroll') || has(ns, 'Sunday Stroll')) bad.push('Sunday Stroll')
+  const rushedRun = run(null, (i) => (i === 3 ? 'rushed' : 'calm'))
+  if (has(rushedRun, 'Not a Hair Out of Place')) bad.push('NaHOoP(rushed)')
+  ok('SC-11', 'each of the 11 awards on and off, multiplier by rarity', bad.length === 0 && c.AWARDS.length === 11, bad.length ? 'failed: ' + bad.join(', ') : '11 / 11')
+}
+// ---------------- 12: partial credit
+{
+  const sim = mk(); quiet(sim)
+  for (let i = 0; i < 15; i++) pen(sim, free(sim)[0], 'calm')
+  sim.finishRun()
+  ok('SC-12', 'ended early, 15/30 penned none RUSHED → (1 + 0.5×0.5) × 2 = 2.5', Math.abs(sim.run.endMult - 2.5) < 1e-9 && !sim.run.won, sim.run.endMult)
+}
+// ---------------- 13: perfect file
+{
+  const a = mk({ frenzyEvery: 0 }); quiet(a)
+  let chainPts = 0
+  for (let i = 0; i < 20; i++) { chainPts += pen(a, free(a)[0], 'calm'); wait(a, 0.1) }
+  const before = a.points; wait(a, 3)
+  const b = mk({ frenzyEvery: 0 }); quiet(b)
+  for (let i = 0; i < 20; i++) { pen(b, free(b)[0], i === 4 ? 'rushed' : 'calm'); wait(b, 0.1) }
+  const bb = b.points; wait(b, 3)
+  ok('SC-13', '20 non-RUSHED crossings pay the chain again at its end; one RUSHED in it → nothing', a.points - before === chainPts && b.points === bb, `chain ${chainPts}, paid again ${a.points - before}; with a rushed sheep +${b.points - bb}`)
+}
+// ---------------- 14: one go
+{
+  const a = mk({ sheepCount: 12 }); quiet(a); winAll(a, 'calm', 0.1)
+  const b = mk({ sheepCount: 12 }); quiet(b)
+  let i = 0; for (const s of free(b)) { pen(b, s, 'calm'); wait(b, i++ === 5 ? 4 : 0.1) } b.updateScore(DT)
+  const k = (s) => s.run.endMults.some((m) => m.key === 'onego' && m.mult === 1.5)
+  ok('SC-14', 'whole flock in one chain → ×1.5; one lapse removes it', k(a) && !k(b) && a.run.won && b.run.won, `one chain ${k(a)}, with a lapse ${k(b)}`)
+}
+// ---------------- 15: frenzy
+{
+  const sim = mk({ sheepCount: 60 }); quiet(sim)
+  const paid = []
+  for (let i = 0; i < 27; i++) { paid.push(pen(sim, free(sim)[0], 'calm')); wait(sim, 0.05) }
+  // crossing 25 (×25) opens it; crossing 26 pays double: 200 × 26 × 2
+  const opened = sim.run.frenzyT > 0, c10 = paid[24], c11 = paid[25]
+  const t0 = sim.run.frenzyT; pen(sim, free(sim)[0], 'calm'); const ext = sim.run.frenzyT - t0
+  for (let i = 0; i < 30; i++) pen(sim, free(sim)[0], 'calm')
+  const capped = sim.run.frenzyT <= sim.p.frenzyMax + 1e-9
+  sim.strike('x', 0, 0)
+  ok('SC-15', '×25 opens a frenzy; inside it crossings pay double and extend it; capped; a strike ends it',
+    opened && c10 === 5000 && c11 === 10400 && Math.abs(ext - 0.5) < 1e-9 && capped && sim.run.frenzyT === 0, `×25 paid ${c10}, ×26 paid ${c11}, extend ${ext.toFixed(2)}, capped ${capped}, after strike ${sim.run.frenzyT}`)
+}
+// ---------------- 16: last sheep
+{
+  const f = (tier) => { const sim = mk({ sheepCount: 5, frenzyEvery: 0 }); quiet(sim); const all = free(sim); for (let i = 0; i < 4; i++) pen(sim, all[i], 'calm'); pen(sim, all[4], tier); return [sim.tally.finisher || 0, sim.run.combo + sim.run.gateMult] }
+  const [fp, mp] = f('perfect'), [fc, mc] = f('calm'), [fr] = f('rushed')
+  ok('SC-16', 'the crossing that fills the pen: 500 × mult if PERFECT, half if CALM, none if RUSHED', fp === 500 * mp && fc === 250 * mc && fr === 0, `perfect ${fp} (×${mp}), calm ${fc} (×${mc}), rushed ${fr}`)
+}
+// ---------------- 17: removed keys
+{
+  const dead = ['comboMax', 'fullFlockBonus', 'cleanRunBonus', 'awardPoints', 'starCalmShare', 'driveGateBonus']
+  const files = ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'lib/sheep-score-ui.js', 'sheep-defaults.json.js', '2d.html', '3d.html', '3d-assault.html']
+  const hits = []
+  for (const f of files) { const t = fs.readFileSync(path.join(WEB, f), 'utf8'); for (const k of dead) if (t.includes(k)) hits.push(f + ':' + k) }
+  ok('SC-17', 'removed keys appear nowhere under web/', hits.length === 0, hits.join(' ') || 'none found')
+}
+// ---------------- FO-2: gate multiplier
+{
+  const sim = mk({ sheepCount: 6 }); quiet(sim)
+  const dg = { x: 300, y: 300, nx: 1, ny: 0, tx: 0, ty: 1, half: 45, done: false, passed: new Set(), sides: new Map() }
+  const dg2 = Object.assign({}, dg, { x: 500, passed: new Set(), sides: new Map() })
+  sim.driveGates = [dg, dg2]
+  const through = (g) => { for (const s of free(sim)) { s.pos = { x: g.x - 5, y: g.y } } sim.updateDriveGates(); for (const s of free(sim)) { s.pos = { x: g.x + 5, y: g.y } } sim.updateDriveGates() }
+  const m0 = sim.score().mult; through(dg); const m1 = sim.score().mult
+  const p1 = pen(sim, free(sim)[0], 'calm'); wait(sim, 4)
+  through(dg2); const m2 = sim.score().mult
+  const p2 = pen(sim, free(sim)[0], 'calm')
+  ok('FO-2', 'one cleared gate → next crossing ×2 (not ×1); a second → ×3; per-sheep gate points still paid', m0 === 1 && m1 === 2 && m2 === 3 && p1 === 400 && p2 === 600 && sim.tally.gate === 50 * (6 + 5), `mult ${m0}→${m1}→${m2}, crossings ${p1}, ${p2}, gate points ${sim.tally.gate}`)
+}
+// ---------------- FO-4: black sheep
+{
+  const sim = mk({ sheepCount: 20 })
+  for (const s of sim.sheep) s.pos = { x: 900, y: 600 }
+  const b = sim.sheep[0], near = sim.sheep[1], far = sim.sheep[2]
+  b.kind = 'black'; b.pos = { x: 400, y: 300 }; near.pos = { x: 430, y: 300 }; far.pos = { x: 400, y: 450 }
+  sim.dog.pos = { x: 100, y: 100 } // out of everyone's reach
+  sim.blackPanic = { x: b.pos.x, y: b.pos.y }
+  sim.flee(1, DT); sim.flee(2, DT)
+  const sn = near.stress, sf = far.stress
+  const a = mk(), d = mk(); quiet(a); quiet(d); a.sheep[0].kind = 'black'
+  const pb = pen(a, a.sheep[0], 'calm'), pe = pen(d, d.sheep[0], 'calm')
+  // she startles sooner: same dog distance, more threat
+  const e = mk({ sheepCount: 20 }); for (const s of e.sheep) s.pos = { x: 900, y: 600 }
+  e.sheep[0].pos = { x: 400, y: 300 }; e.sheep[1].pos = { x: 400, y: 300 }; e.sheep[0].kind = 'black'; e.dog.pos = { x: 340, y: 300 }; e.dog.facing = 0; e.dog.command = 'walk_on'; e.dog.intensity = 1
+  e.flee(0, DT); e.flee(1, DT)
+  ok('FO-4', 'a panicking black sheep raises stress inside her radius only; she feels more of the dog; pays ×2', sn > 0.2 && sf === 0 && pb === 2 * pe && e.sheep[0].stress > e.sheep[1].stress * 1.4, `near ${sn.toFixed(2)}, far ${sf}, pays ${pb} vs ${pe}, threat ${e.sheep[0].stress.toFixed(2)} vs ${e.sheep[1].stress.toFixed(2)}`)
+}
+// ---------------- FO-5: bellwether
+{
+  const drift = (kind) => {
+    const sim = mk({ sheepCount: 7 })
+    for (const s of sim.sheep) { s.pos = { x: 1000, y: 650 }; s.through = true; s.committed = false }
+    const lead = sim.sheep[0], f = sim.sheep.slice(1, 7)
+    for (const s of [lead, ...f]) s.through = false
+    lead.pos = { x: 380, y: 360 }; lead.kind = kind; sim.bellIdx = kind === 'bell' ? 0 : -1
+    f.forEach((s, i) => { s.pos = { x: 440 + (i % 3) * 14, y: 340 + Math.floor(i / 3) * 20 }; s.idle = false; s.vel = { x: 0, y: 0 } })
+    sim.dog.pos = { x: 60, y: 60 }
+    const x0 = f.reduce((a, s) => a + s.pos.x, 0) / f.length
+    for (let i = 0; i < 180; i++) {
+      lead.pos.x -= 40 * DT; lead.vel = { x: -40, y: 0 }
+      for (const s of f) { s.idle = false; s.calmT = 0 }
+      for (const s of f) sim.integrate(sim.sheep.indexOf(s), DT)
+    }
+    return x0 - f.reduce((a, s) => a + s.pos.x, 0) / f.length // how far they went HER way (−x)
+  }
+  const withBell = drift('bell'), plain = drift('ewe')
+  const a = mk(), b = mk(); quiet(a); quiet(b); a.sheep[0].kind = 'bell'; b.sheep[3].kind = 'bell'
+  const first = pen(a, a.sheep[0], 'calm'); pen(b, b.sheep[0], 'calm'); wait(b, 4); const later = pen(b, b.sheep[3], 'calm')
+  ok('FO-5', 'sheep near a moving bellwether follow her more than an ordinary ewe; ×3 first through, ×1 otherwise', withBell > plain + 5 && first === 600 && later === 200, `followed ${withBell.toFixed(1)} px vs ${plain.toFixed(1)} px in 3 s; pays ${first} first, ${later} later`)
+}
+// ---------------- FO-6: yearling
+{
+  const sim = mk({ sheepCount: 20 }); for (const s of sim.sheep) s.pos = { x: 900, y: 600 }
+  const y = sim.sheep[0], e = sim.sheep[1]
+  y.kind = 'yearling'; y.pos = { x: 400, y: 300 }; e.pos = { x: 400, y: 300 }
+  sim.dog.pos = { x: 250, y: 300 }; sim.dog.facing = 0; sim.dog.command = 'that_ll_do'; sim.dog.intensity = 1 // 150 px: outside R_flee 120, inside 192
+  sim.flee(0, DT); sim.flee(1, DT)
+  const a = mk(), b = mk(); quiet(a); quiet(b); a.sheep[0].kind = 'yearling'; b.sheep[0].kind = 'yearling'
+  const pc = pen(a, a.sheep[0], 'calm'), pr = pen(b, b.sheep[0], 'rushed')
+  ok('FO-6', 'the yearling feels the dog from further than an ordinary sheep; ×3 CALM, ×1 RUSHED', y.stress > 0 && e.stress === 0 && pc === 600 && pr === 50, `at 150 px: yearling ${y.stress.toFixed(3)}, ewe ${e.stress}; pays ${pc} calm, ${pr} rushed`)
+}
+// ---------------- FO-7: side objectives eligibility + count
+{
+  let bad = 0, counts = {}, seen = new Set()
+  for (let seed = 1; seed <= 300; seed++) {
+    const p = c.buildParams(c.SETTINGS); Object.assign(p, { seed, randomSeedOnLoad: false, sheepCount: 30 })
+    const sim = new c.Sim(p)
+    const has = (k) => sim.sheep.some((s) => s.kind === k)
+    const ids = sim.sideObjectives.map((o) => o.id)
+    ids.forEach((i) => seen.add(i))
+    if (ids.length !== 2 || new Set(ids).size !== 2) bad++
+    if (ids.includes('last_golden') && !has('golden')) bad++
+    if (ids.includes('lead_bell') && !has('bell')) bad++
+    if (ids.includes('gates') && !sim.driveGates.length) bad++
+  }
+  const w = mk({ mode: 'waves', sideObjectiveCount: 2 })
+  ok('FO-7', '300 seeds: exactly 2 objectives, never an impossible one, all 8 kinds occur; none in wave mode', bad === 0 && seen.size === 8 && w.sideObjectives.length === 0, `violations ${bad}, kinds seen ${seen.size}/8, wave mode ${w.sideObjectives.length}`)
+}
+// ---------------- FO-8: each side objective met / lost, ×1.5 only when met
+{
+  const withObj = (id) => { const sim = mk({ sheepCount: 8 }); quiet(sim); const o = c.SIDE_OBJECTIVES.find((x) => x.id === id); sim.sideObjectives = [{ id, label: o.label, hint: o.hint, state: 'open' }]; return sim }
+  const st = (sim) => sim.sideObjectives[0].state
+  const mult = (sim) => sim.run.endMults.some((m) => m.key === 'objective' && m.mult === 1.25)
+  const bad = []
+  const check = (id, metRun, lostRun) => { const a = withObj(id); metRun(a); const b = withObj(id); lostRun(b); if (st(a) !== 'met' || !mult(a) || st(b) !== 'lost' || mult(b)) bad.push(`${id}(${st(a)}/${st(b)})`) }
+  check('no_rush', (s) => winAll(s, 'calm', 3), (s) => winAll(s, (i) => (i === 2 ? 'rushed' : 'calm'), 3))
+  check('spotless', (s) => winAll(s, 'calm', 3), (s) => { s.strike('x', 0, 0); winAll(s, 'calm', 3) })
+  check('on_feet', (s) => winAll(s, 'calm', 3), (s) => { s.setCommand('lie_down'); winAll(s, 'calm', 3) })
+  check('few_words', (s) => winAll(s, 'calm', 3), (s) => { for (let i = 0; i < 12; i++) s.setCommand(i % 2 ? 'come_by' : 'away'); winAll(s, 'calm', 3) })
+  check('long_file', (s) => winAll(s, 'calm', 0.1), (s) => winAll(s, 'calm', 4))
+  check('gates', (s) => { s.driveGates = [{ done: true }]; s.setObjective('gates', 'met'); winAll(s, 'calm', 3) }, (s) => { s.driveGates = [{ done: false, x: -999, y: -999, nx: 1, ny: 0, tx: 0, ty: 1, half: 1, passed: new Set(), sides: new Map() }]; winAll(s, 'calm', 3) })
+  check('last_golden', (s) => { const f = free(s); f[7].kind = 'golden'; winAll(s, 'calm', 3) }, (s) => { const f = free(s); f[2].kind = 'golden'; winAll(s, 'calm', 3) })
+  check('lead_bell', (s) => { const f = free(s); f[0].kind = 'bell'; winAll(s, 'calm', 3) }, (s) => { const f = free(s); f[3].kind = 'bell'; winAll(s, 'calm', 3) })
+  // flips at the right moment: no_rush is lost on the rushed crossing itself, with one event
+  const m = withObj('no_rush'); pen(m, free(m)[0], 'calm'); const s1 = st(m); pen(m, free(m)[0], 'rushed'); const s2 = st(m), evs = m.scoreEvents.filter((e) => e.kind === 'objective').length
+  ok('FO-8', 'each of the 8 side objectives can be met and lost; ×1.25 only when met; flips when it happens', bad.length === 0 && s1 === 'open' && s2 === 'lost' && evs === 1, bad.length ? 'failed: ' + bad.join(' ') : `8 / 8; no_rush ${s1} → ${s2} with ${evs} event`)
+}
+// ---------------- VH-7: reference = a scripted reference run (jackpots off)
+{
+  const off = { frenzyEvery: 0, perfectFileMin: 9999, finisherPoints: 0, multOneGo: 1, multAwardCommon: 1, multAwardRare: 1, multAwardLegendary: 1, parPointsPerSec: 0 }
+  const sim = mk(off); quiet(sim); const ref = sim.run.reference
+  winAll(sim, 'calm', 0.05)
+  ok('VH-7', 'reference score = total of a scripted reference run (every sheep CALM, full condition, one chain; jackpots off)', sim.points === ref && sim.run.won, `reference ${ref}, scripted run ${sim.points}`)
+}
+// ---------------- VH-8: ranks
+{
+  const at = (f, bust) => { const sim = mk(); sim.points = Math.round(sim.run.reference * f); sim.run.bust = !!bust; return sim.rank() }
+  const names = [0.005, 0.10, 0.70, 1.0, 6.0].map((f) => at(f).name)
+  const b = at(0.70, true), nx = at(0.10)
+  ok('VH-8', '0.5 % / 10 % / 70 % / 100 % / 600 % → ranks (One Man and His Dog from 1,000 %); a bust at 70 % → Farmhand; next rank and points given',
+    names.join('|') === 'Lost Tourist|Drover|Head Shepherd|Trial Champion|Trial Champion' && at(12).name === 'One Man and His Dog' && b.name === 'Farmhand' && nx.next.name === 'Shepherd' && nx.next.points > 0, names.join(' · ') + ` · bust → ${b.name} · next ${nx.next.name} in ${nx.next.points}`)
+}
+// ---------------- VH-10: category grades move the right way
+{
+  const base = () => { const s = mk(); quiet(s); s.run.t = 60; s.run.onLine = 50; s.run.commands = 10; return s }
+  const a = base(); winAll(a, 'calm', 0.1); const A = a.categories()
+  const b = base(); winAll(b, (i) => (i % 2 ? 'rushed' : 'calm'), 0.1); const B = b.categories()
+  const d = base(); winAll(d, 'calm', 4); const D = d.categories()
+  const e = base(); e.run.commands = 80; winAll(e, 'calm', 0.1); const E = e.categories()
+  const f = base(); f.strike('x', 0, 0); winAll(f, 'calm', 0.1); const F = f.categories()
+  ok('VH-10', 'more RUSHED lowers Calm; shorter chains lower Flow; more commands lower Control; a strike lowers Safety',
+    B.calm.value < A.calm.value && D.flow.value < A.flow.value && E.control.value < A.control.value && F.safety.value < A.safety.value,
+    `calm ${A.calm.grade}→${B.calm.grade}, flow ${A.flow.grade}→${D.flow.grade}, control ${A.control.grade}→${E.control.grade}, safety ${A.safety.grade}→${F.safety.grade}`)
+}
+// ---------------- waves: strikes carry, multipliers per wave, total monotonic
+{
+  const sim = mk({ mode: 'waves', specials: false }); quiet(sim)
+  const n0 = sim.sheep.length
+  for (const s of free(sim)) pen(sim, s, 'calm')
+  const before = sim.points; sim.updateScore(DT)
+  const paid = sim.points - before
+  sim.strike('x', 0, 0)
+  ok('WAVE', 'a filled wave pays its multipliers on its own points, the next flock is larger, strikes carry', paid > 0 && sim.run.wave === 1 && sim.sheep.length > n0 && sim.run.strikes === 1 && sim.rank() === null, `wave bonus +${paid}, flock ${n0} → ${sim.sheep.length}, strikes ${sim.run.strikes}`)
+}
+
+// =====================================================================================
+// Carried forward from POC-v14 — through the real gate path (cross), with POC-v15 values
+// =====================================================================================
+function mkc(ctx, over = {}) {
   const p = ctx.buildParams(ctx.SETTINGS)
-  Object.assign(p, { obstacleRandom: false, obstacleFreq: 0, driveGateMax: 0, specials: false }, over)
+  Object.assign(p, { obstacleRandom: false, obstacleFreq: 0, driveGateMax: 0, specials: false, sideObjectiveCount: 0 }, over)
   return new ctx.FlockSim(p)
 }
 const steps = (sim, secs) => { for (let i = 0; i < Math.round(secs / DT); i++) sim.step(DT) }
@@ -34,132 +408,60 @@ function cross(sim, i) {
   sim.step(DT)
   return { through: s.through, gained: sim.points - before }
 }
-const lastEv = (sim) => sim.scoreEvents[sim.scoreEvents.length - 1]
-
-// ---------------- SC ----------------
-{ // SC-1 starts at 0, monotonic over a driven run
-  const sim = mk(N, { seed: 11, sheepCount: 30 })
-  let mono = sim.points === 0, prev = 0
-  const cmds = ['away', 'walk_on', 'come_by', 'walk_on', 'lie_down', 'walk_on']
-  for (let k = 0; k < 60 * 90; k++) {
-    if (k % 300 === 0) sim.setCommand(cmds[(k / 300) % cmds.length])
-    if (k === 1800) for (let i = 0; i < 5; i++) cross(sim, i)
-    sim.step(DT)
-    if (sim.points < prev) mono = false
-    prev = sim.points
-  }
-  ok('SC-1', 'score starts at 0 and never decreases over a 90 s run', mono && sim.points > 0, `final ${sim.points}`)
-}
-{ // SC-2
-  const a = mk(N, { seed: 5, sheepCount: 10, penCalmStress: 0 })
-  const r1 = cross(a, 0)
-  const b = mk(N, { seed: 5, sheepCount: 10 })
-  const r2 = cross(b, 0)
-  ok('SC-2', 'stressed pen = penPoints (100), calm pen = penCalmPoints (200)', r1.through && r1.gained === 100 && r2.gained === 200, `${r1.gained} / ${r2.gained}`)
-}
-{ // SC-3 combo 200,400,600 then 200
-  const s = mk(N, { seed: 5, sheepCount: 10 })
-  const g = []
-  g.push(cross(s, 0).gained); steps(s, 1); g.push(cross(s, 1).gained); steps(s, 1); g.push(cross(s, 2).gained)
-  steps(s, 3); g.push(cross(s, 3).gained)
-  ok('SC-3', 'three calm crossings in the window score 200, 400, 600; a late fourth 200', g.join() === '200,400,600,200', g.join())
-}
-{ // SC-4 cap
-  const s = mk(N, { seed: 5, sheepCount: 10, comboMax: 2 })
-  const g = []
-  for (let i = 0; i < 5; i++) { g.push(cross(s, i).gained); steps(s, 0.5) }
-  ok('SC-4', 'multiplier never exceeds comboMax (2)', g.join() === '200,400,400,400,400', g.join())
-}
-function winRun(over, tweak) {
-  const s = mk(N, { seed: 7, sheepCount: 6, ...over })
-  for (let i = 0; i < 6; i++) { if (i === 5 && tweak) tweak(s); cross(s, i); if (i < 5) steps(s, 0.5) }
-  return s
-}
-{ // SC-5 total = sum of lines; flock line only when all penned
-  const s = winRun({})
-  const sc = s.score(), sum = sc.lines.reduce((n, l) => n + l.points, 0)
-  const part = mk(N, { seed: 7, sheepCount: 6 }); cross(part, 0); part.finishRun()
-  const psc = part.score()
-  ok('SC-5', 'won total = sum of card lines; full-flock line only when every sheep is penned',
-    sc.won && sum === sc.total && sc.lines.some((l) => l.key === 'flock') && !psc.lines.some((l) => l.key === 'flock') && psc.lines.reduce((n, l) => n + l.points, 0) === psc.total,
-    `total ${sc.total} = Σ ${sum}; partial ${psc.total}`)
-}
-{ // SC-6 injury: no clean line, no 3rd star, no reduction, combo reset
-  const s = mk(N, { seed: 7, sheepCount: 6 })
-  cross(s, 0); steps(s, 0.5); cross(s, 1); steps(s, 0.5); const third = cross(s, 2).gained
-  const g = s.gate
-  s.sheep[5].pos = { x: g.x - g.nx * 5, y: g.y - g.ny * 5 }
-  const before = s.points
-  s.injureAtGate()
-  const after = s.points, comboAfter = s.score().combo
-  const next = cross(s, 3).gained
-  steps(s, 0.3); cross(s, 4)
-  const sc = s.score()
-  ok('SC-6', 'injury: total not reduced, combo back to ×1, no clean-run line, no third star, run still wins',
-    third === 600 && after === before && comboAfter === 1 && next === 200 && sc.won && !sc.lines.some((l) => l.key === 'clean') && sc.stars < 3 && s.injuries === 1,
-    `third ${third}, next ${next}, stars ${sc.stars}, won ${sc.won}`)
-}
-{ // SC-7 time bonus
-  const s = winRun({}, (sim) => { sim.run.t = sim.par() - 20.5 })
-  const over = winRun({}, (sim) => { sim.run.t = sim.par() + 5 })
-  const tb = (x) => (x.score().lines.find((l) => l.key === 'time') || { points: 0 }).points
-  ok('SC-7', '20 s under par pays 400; over par pays nothing', tb(s) === 400 && tb(over) === 0 && over.score().stars === 1, `${tb(s)} / ${tb(over)}`)
-}
-{ // SC-8 par read-out
-  const s = mk(N, { seed: 7, sheepCount: 6 })
-  const a = s.score().parLeft; steps(s, 2); const b = s.score().parLeft
+const lastPen = (sim) => sim.scoreEvents.filter((e) => e.kind === 'pen').pop()
+{ // the real gate path pays the same tiers
+  const a = mkc(N, { seed: 5, sheepCount: 10, penCalmStress: 0 }), b = mkc(N, { seed: 5, sheepCount: 10 })
+  const r1 = cross(a, 0), r2 = cross(b, 0)
+  ok('SC-2b', 'through the real gate: a worked-up sheep pays 50 (RUSHED), an untroubled one 500 (PERFECT)', r1.through && r1.gained === 50 && r2.gained === 500, `${r1.gained} / ${r2.gained}`)
+  const s = mkc(N, { seed: 7, sheepCount: 6 })
+  const p0 = s.score().parLeft; steps(s, 2); const p1 = s.score().parLeft
   s.run.t = s.par() + 4
-  ok('SC-8', 'parLeft counts down and goes negative past par', Math.abs(a - b - 2) < 0.05 && s.score().parLeft < 0 && Math.abs(a - 63) < 0.01, `${a.toFixed(2)} → ${b.toFixed(2)} → ${s.score().parLeft.toFixed(1)}`)
-}
-{ // SC-11 awards on / off
-  const has = (s, n) => s.score().awards.includes(n)
-  const calm = winRun({}), stressed = winRun({ penCalmStress: 0 })
-  const A1 = has(calm, 'Not a Hair Out of Place') && !has(stressed, 'Not a Hair Out of Place')
-  const broken = mk(N, { seed: 7, sheepCount: 6 }); for (let i = 0; i < 6; i++) { cross(broken, i); if (i < 5) steps(broken, i === 2 ? 4 : 0.5) }
-  const A2 = has(calm, 'One Stream') && !has(broken, 'One Stream')
-  const loud = winRun({}, (sim) => { sim.run.commands = 40 })
-  const A3 = has(calm, 'Quiet Hand') && !has(loud, 'Quiet Hand')
-  const onl = winRun({}, (sim) => { sim.run.onLine = sim.run.t }), offl = winRun({}, (sim) => { sim.run.onLine = 0 })
-  const A4 = has(onl, 'Straight as a Die') && !has(offl, 'Straight as a Die')
-  const photo = winRun({}, (sim) => { sim.run.t = sim.par() - 1 })
-  const A5 = has(photo, 'Photo Finish') && !has(calm, 'Photo Finish')
-  const pts = calm.score().lines.find((l) => l.key === 'award').points === 300 * calm.score().awards.length
-  ok('SC-11', 'each of the five awards is earned when met and absent when not; 300 each', A1 && A2 && A3 && A4 && A5 && pts, [A1, A2, A3, A4, A5, pts].join())
-  // quiet hand counting: repeats free, reseed recall free
-  const q = mk(N, { seed: 7, sheepCount: 6 })
+  ok('SC-par', 'parLeft counts down and goes negative past par', Math.abs(p0 - p1 - 2) < 0.05 && s.score().parLeft < 0 && Math.abs(p0 - 63) < 0.01, `${p0.toFixed(2)} → ${p1.toFixed(2)} → ${s.score().parLeft.toFixed(1)}`)
+  const q = mkc(N, { seed: 7, sheepCount: 6 })
   q.setCommand('that_ll_do'); q.setCommand('away'); q.setCommand('away'); q.setCommand('walk_on'); q.setCommand('easy'); q.setCommand('walk_on')
-  ok('SC-11b', 'command count: repeats are free, an impulse counts', q.run.commands === 4, `commands ${q.run.commands}`)
-  ok('SC-9', '3 stars: under par, clean, all calm; 2 stars when not calm', calm.score().stars === 3 && stressed.score().stars === 2, `${calm.score().stars} / ${stressed.score().stars}`)
+  ok('SC-cmd', 'command count: repeats are free, an impulse counts; a full flank and a lie-down are noted', q.run.commands === 4 && q.run.fullFlanks === 1 && q.run.lieDowns === 0, `commands ${q.run.commands}, full flanks ${q.run.fullFlanks}`)
 }
-{ // SC-12 assault
-  const s = mk(N, { seed: 7, sheepCount: 6 })
+{ // assault: wolves score; a mortar kill is a strike (owner Q96) and takes no points; survivors still win
+  const s = mkc(N, { seed: 7, sheepCount: 6 })
   N.assaultReset(s)
   const b0 = s.points
   N.wolfAward(s, 10, 10)
   const b1 = s.points
   const v = s.sheep[0]
   N.explode(s, v.pos.x, v.pos.y)
-  const b2 = s.points
+  const b2 = s.points, strikes = s.run.strikes
   for (let i = 1; i < 6; i++) { if (!s.sheep[i].down) cross(s, i) }
   const sc = s.score()
-  ok('SC-12', 'a routed wolf adds wolfPoints; a sheep lost to a mortar changes nothing; survivors still win', b1 - b0 === 300 && b2 === b1 && v.down && sc.won && sc.lines.some((l) => l.key === 'wolf'), `wolf +${b1 - b0}, kill ${b2 - b1}, won ${sc.won}`)
+  ok('SC-11a', 'assault: a routed wolf adds wolfPoints; a shell that kills is ONE strike and takes no points; survivors still win', b1 - b0 === 300 && b2 === b1 && v.down && v.cond === 0 && strikes === 1 && sc.won && sc.lines.some((l) => l.key === 'wolf') && !sc.endMults.some((m) => m.key === 'clean'), `wolf +${b1 - b0}, kill ${b2 - b1} pts, strikes ${strikes}, won ${sc.won}`)
 }
-{ // SC-13 / 14
+{ // SC-19 + old keys
   const hit = []
-  for (const f of ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'sheep-defaults.json.js', '2d.html', '3d.html', '3d-assault.html', 'index.html'].concat(fs.existsSync(path.join(WEB, 'lib/sheep-score-ui.js')) ? ['lib/sheep-score-ui.js'] : [])) {
+  for (const f of ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'lib/sheep-score-ui.js', 'sheep-defaults.json.js', '2d.html', '3d.html', '3d-assault.html', 'index.html']) {
     const txt = fs.readFileSync(path.join(WEB, f), 'utf8')
     for (const k of ['w_time', 'w_line', 'w_cohesion', 'w_calm', 'injuryWeight']) if (txt.includes(k)) hit.push(f + ':' + k)
   }
-  ok('SC-13', 'old penalty keys appear nowhere under web/', hit.length === 0, hit.join(' ') || 'none')
-  ok('SC-14', 'both sim libs load in plain node; lever assertions pass', N.assertLevers().length === 0, 'assertLevers → 0 errors')
+  ok('SC-old', 'the pre-v14 penalty keys appear nowhere under web/', hit.length === 0, hit.join(' ') || 'none')
+  const stars = []
+  for (const f of ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'lib/sheep-score-ui.js', '2d.html', '3d.html', '3d-assault.html']) { const txt = fs.readFileSync(path.join(WEB, f), 'utf8'); if (/[★☆]|\.stars\b|\bstars:/.test(txt)) stars.push(f) }
+  ok('VH-11', 'no score star (glyph or `stars` field) anywhere under web/', stars.length === 0, stars.join(' ') || 'none')
+  ok('SC-19', 'both sim libs load in plain node; lever assertions pass', N.assertLevers().length === 0, 'assertLevers → 0 errors')
 }
-
-// ---------------- FO ----------------
-{ // FO-1 replay: with drive gates and specials off, the flock and dog physics must replay the recorded run exactly.
-  // The golden file was recorded when POC-v14 shipped, from a build verified position-for-position against the pre-v14 sim.
+{ // FO-3: the new kinds at about their chance, never two of a kind, and the v14 specials on the same sheep as with the new kinds off
+  let nb = 0, nl = 0, ny = 0, dup = 0, moved = 0
+  for (let seed = 1; seed <= 400; seed++) {
+    const o = mkc(N, { seed, sheepCount: 30, specials: true, blackChance: 0, bellChance: 0, yearlingChance: 0 }), n = mkc(N, { seed, sheepCount: 30, specials: true })
+    const cnt = (k) => n.sheep.filter((s) => s.kind === k).length
+    if (cnt('black')) nb++; if (cnt('bell')) nl++; if (cnt('yearling')) ny++
+    for (const k of ['black', 'bell', 'yearling', 'golden', 'ram', 'lamb']) if (cnt(k) > 1) dup++
+    for (let i = 0; i < o.sheep.length; i++) if (o.sheep[i].kind !== 'ewe' && n.sheep[i].kind !== o.sheep[i].kind) moved++
+  }
+  ok('FO-3', '400 seeds: each new kind at about its chance (0.3), never two of a kind, golden ewe / ram / lamb on the same sheep as before', dup === 0 && moved === 0 && [nb, nl, ny].every((x) => x > 90 && x < 150), `black ${(nb / 4).toFixed(0)} %, bellwether ${(nl / 4).toFixed(0)} %, yearling ${(ny / 4).toFixed(0)} %, duplicates ${dup}, moved ${moved}`)
+}
+{ // SC-18 / FO-1 replay: with drive gates, specials and side objectives off, the flock and dog physics must replay the recorded run exactly.
+  // The golden file was recorded when POC-v14 shipped — POC-v15 scoring (condition, strikes, a bust) must not move a single sheep.
   const digest = {}
   for (const seed of [3, 1337, 90210]) {
-    const a = mk(N, { seed, sheepCount: 40, obstacleFreq: 3 })
+    const a = mkc(N, { seed, sheepCount: 40, obstacleFreq: 3 })
     const cmds = ['away', 'walk_on', 'come_by', 'easy', 'lie_down', 'walk_on']
     for (let k = 0; k < 60 * 40; k++) {
       if (k % 240 === 0) a.setCommand(cmds[(k / 240) % 6])
@@ -171,22 +473,22 @@ function winRun(over, tweak) {
   if (UPDATE) { fs.writeFileSync(GOLDEN, JSON.stringify({ note: 'sha256 of sheep + dog positions after 40 s; see test/sim.test.js FO-1', node: process.version, digest }, null, 2) + '\n'); console.log('golden-replay.json re-recorded') }
   const gold = fs.existsSync(GOLDEN) ? JSON.parse(fs.readFileSync(GOLDEN, 'utf8')) : null
   const same = !!gold && Object.keys(digest).every((k) => gold.digest[k] === digest[k])
-  ok('FO-1', 'gates 0 + specials off: 3 seeds × 40 s replay the recorded run exactly', same, gold ? (same ? 'matches golden-replay.json' : `differs from golden (recorded on node ${gold.node}, running ${process.version})`) : 'golden-replay.json missing — run with --update')
+  ok('SC-18', 'scoring does not touch behavior: 3 seeds × 40 s replay the run recorded at POC-v14 exactly', same, gold ? (same ? 'matches golden-replay.json' : `differs from golden (recorded on node ${gold.node}, running ${process.version})`) : 'golden-replay.json missing — run with --update')
   // and with them ON the course layout (gate, obstacles, flock start) is unchanged
   let layout = true
   for (const seed of [3, 1337, 90210, 42]) {
-    const a = mk(N, { seed, sheepCount: 40, obstacleFreq: 3, driveGateMax: 2, driveGateChance: 1, specials: true, lambChance: 0 }), b = mk(N, { seed, sheepCount: 40, obstacleFreq: 3 })
+    const a = mkc(N, { seed, sheepCount: 40, obstacleFreq: 3, driveGateMax: 2, driveGateChance: 1, specials: true, lambChance: 0, sideObjectiveCount: 2 }), b = mkc(N, { seed, sheepCount: 40, obstacleFreq: 3 })
     if (a.gate.x !== b.gate.x || a.gate.y !== b.gate.y) layout = false
     for (let i = 0; i < 40; i++) if (a.sheep[i].pos.x !== b.sheep[i].pos.x || a.sheep[i].pos.y !== b.sheep[i].pos.y) layout = false
     const real = a.obstacles.filter((o) => o.kind !== 'hurdle')
     if (real.length !== b.obstacles.length || real.some((o, i) => o.x !== b.obstacles[i].x)) layout = false
   }
-  ok('FO-1b', 'with gates + specials ON a seed still lays the same gate, obstacles and flock', layout, '')
+  ok('FO-1', 'with gates + specials + side objectives ON a seed still lays the same gate, obstacles and flock', layout, '')
 }
-{ // FO-2 placement over 200 seeds
+{ // G-1 placement over 200 seeds
   let bad = 0, gates = 0, seedsWith = 0
   for (let seed = 1; seed <= 200; seed++) {
-    const s = mk(N, { seed, obstacleRandom: true, driveGateMax: 2, specials: true })
+    const s = mkc(N, { seed, obstacleRandom: true, driveGateMax: 2, specials: true })
     const r = s.playRect(), g = s.gate
     if (s.driveGates.length) seedsWith++
     gates += s.driveGates.length
@@ -198,37 +500,37 @@ function winRun(over, tweak) {
       if (s.sheep.some((q) => Math.hypot(q.pos.x - h.x, q.pos.y - h.y) < h.r + 2)) bad++
     }
   }
-  ok('FO-2', '200 seeds: no drive gate on the fence, an obstacle, the pen approach or a sheep', bad === 0 && gates > 0, `${gates} gates on ${seedsWith}/200 seeds, ${bad} violations`)
+  ok('G-1', '200 seeds: no drive gate on the fence, an obstacle, the pen approach or a sheep', bad === 0 && gates > 0, `${gates} gates on ${seedsWith}/200 seeds, ${bad} violations`)
 }
 function gateSim(over) {
   for (let seed = 1; seed < 400; seed++) {
-    const s = mk(N, { seed, sheepCount: 4, driveGateMax: 1, driveGateChance: 1, ...over })
+    const s = mkc(N, { seed, sheepCount: 4, driveGateMax: 1, driveGateChance: 1, ...over })
     if (s.driveGates.length) return s
   }
 }
 const putAt = (s, i, dg, side) => { s.sheep[i].pos = { x: dg.x + dg.nx * side, y: dg.y + dg.ny * side }; s.sheep[i].vel = { x: 0, y: 0 } }
-{ // FO-3 / FO-4
+{ // G-2 / G-3
   const s = gateSim({}), dg = s.driveGates[0]
   for (let i = 0; i < 4; i++) putAt(s, i, dg, -14 - i * 3)
   s.step(DT)
   const p0 = s.points
   putAt(s, 0, dg, 14); s.step(DT); const g1 = s.points - p0
   putAt(s, 0, dg, -14); s.step(DT); putAt(s, 0, dg, 14); s.step(DT); const g2 = s.points - p0
-  ok('FO-3', 'a sheep through the gap scores driveGatePoints once; again scores nothing', g1 === 100 && g2 === 100, `${g1} then ${g2}`)
+  ok('G-2', 'a sheep through the gap scores driveGatePoints (50) once; again scores nothing', g1 === 50 && g2 === 50, `${g1} then ${g2}`)
   for (let i = 1; i < 4; i++) { putAt(s, i, dg, 14 + i * 3); s.step(DT) }
   const g3 = s.points - p0
   steps(s, 0.2)
-  ok('FO-4', 'last working sheep through → driveGateBonus once, gate done', g3 === 400 + 500 && dg.done && s.points - p0 === g3, `gained ${g3}, done ${dg.done}`)
+  ok('G-3', 'last working sheep through → gate cleared: multiplier +1 for the rest of the run, no flat bonus, announced once', g3 === 200 && dg.done && s.points - p0 === g3 && s.run.gateMult === 1 && s.score().mult === 2 && s.scoreEvents.filter((e) => e.kind === 'gate' && e.cleared).length === 1, `gained ${g3}, done ${dg.done}, multiplier ×${s.score().mult}`)
   const off = gateSim({}); const d2 = off.driveGates[0]
   off.sheep[0].pos = { x: d2.x + d2.tx * (d2.half + 20) - d2.nx * 14, y: d2.y + d2.ty * (d2.half + 20) - d2.ny * 14 }; off.step(DT)
   const q0 = off.points
   off.sheep[0].pos = { x: d2.x + d2.tx * (d2.half + 20) + d2.nx * 14, y: d2.y + d2.ty * (d2.half + 20) + d2.ny * 14 }; off.step(DT)
-  ok('FO-3b', 'crossing the line OUTSIDE the gap scores nothing', off.points === q0, `${off.points - q0}`)
+  ok('G-2b', 'crossing the line OUTSIDE the gap scores nothing', off.points === q0, `${off.points - q0}`)
 }
-{ // FO-5 nothing inside a panel during a driven run
+{ // G-4 nothing inside a panel during a driven run
   let worst = Infinity, n = 0
   for (const seed of [2, 9, 14, 23, 31, 57]) {
-    const s = mk(N, { seed, sheepCount: 40, driveGateMax: 2, driveGateChance: 1 })
+    const s = mkc(N, { seed, sheepCount: 40, driveGateMax: 2, driveGateChance: 1 })
     const hs = s.obstacles.filter((o) => o.kind === 'hurdle'); if (!hs.length) continue
     n++
     const cmds = ['away', 'walk_on', 'come_by', 'walk_on']
@@ -241,33 +543,33 @@ const putAt = (s, i, dg, side) => { s.sheep[i].pos = { x: dg.x + dg.nx * side, y
       }
     }
   }
-  ok('FO-5', 'no sheep or dog is ever inside a hurdle panel (40 s driven runs)', worst >= -1e-6 && n > 0, `closest edge distance ${worst.toFixed(2)} px over ${n} courses`)
+  ok('G-4', 'no sheep or dog is ever inside a hurdle panel (40 s driven runs)', worst >= -1e-6 && n > 0, `closest edge distance ${worst.toFixed(2)} px over ${n} courses`)
 }
 function kindSim(kind, over) {
   for (let seed = 1; seed < 600; seed++) {
-    const s = mk(N, { seed, sheepCount: 12, specials: true, ...over })
+    const s = mkc(N, { seed, sheepCount: 12, specials: true, ...over })
     if (s.sheep.some((q) => q.kind === kind)) return s
   }
 }
-{ // FO-6 golden
+{ // K-1 golden
   const a = kindSim('golden', { penCalmStress: 0 }); const gi = a.sheep.findIndex((q) => q.kind === 'golden')
   const r1 = cross(a, gi).gained
   const b = kindSim('golden', {}); const gj = b.sheep.findIndex((q) => q.kind === 'golden'); const other = b.sheep.findIndex((q) => q.kind === 'ewe')
   cross(b, other); steps(b, 0.5); const r2 = cross(b, gj).gained
-  ok('FO-6', 'golden ewe: stressed alone = 500; calm at ×2 = 2000', r1 === 500 && r2 === 2000, `${r1} / ${r2} (${lastEv(b).label})`)
+  ok('K-1', 'golden ewe is worth ×5 and it stacks: RUSHED alone = 250; PERFECT second in a chain (×3) = 7500', r1 === 250 && r2 === 7500, `${r1} / ${r2} (${lastPen(b).label})`)
 }
-{ // FO-7 / FO-8 lamb
+{ // K-2 / K-3 lamb
   const s = kindSim('lamb', {}); const li = s.sheep.findIndex((q) => q.kind === 'lamb'), m = s.sheep[li].mother
   let far = 0
   for (let k = 0; k < 60 * 30; k++) { s.step(DT); far = Math.max(far, Math.hypot(s.sheep[li].pos.x - s.sheep[m].pos.x, s.sheep[li].pos.y - s.sheep[m].pos.y)) }
-  ok('FO-7', 'lamb stays close to its mother over 30 s of grazing', far < s.p.idleCohRadius, `max distance ${far.toFixed(1)} px (limit ${s.p.idleCohRadius})`)
+  ok('K-2', 'lamb stays close to its mother over 30 s of grazing', far < s.p.idleCohRadius, `max distance ${far.toFixed(1)} px (limit ${s.p.idleCohRadius})`)
   const a = kindSim('lamb', { penCalmStress: 0 }); const la = a.sheep.findIndex((q) => q.kind === 'lamb')
-  cross(a, a.sheep[la].mother); steps(a, 0.5); const r1 = cross(a, la).gained, lab = lastEv(a).label
+  cross(a, a.sheep[la].mother); steps(a, 0.5); const r1 = cross(a, la).gained, lab = lastPen(a).label
   const b = kindSim('lamb', { penCalmStress: 0 }); const lb = b.sheep.findIndex((q) => q.kind === 'lamb')
   const r2 = cross(b, lb).gained
-  ok('FO-8', 'lamb right behind its mother = 300 before the stream multiplier; alone = 100', r1 === 600 && /\+300 ×2/.test(lab) && r2 === 100, `${lab} → ${r1}; alone ${r2}`)
+  ok('K-3', 'lamb right behind its mother is worth ×3 (RUSHED: 150); alone ×1 (50)', r1 === 150 && /LAMB \+150/.test(lab) && r2 === 50, `${lab} → ${r1}; alone ${r2}`)
 }
-{ // FO-9 ram
+{ // K-4 ram
   const s = kindSim('ram', {}); const ri = s.sheep.findIndex((q) => q.kind === 'ram'), ram = s.sheep[ri]
   const e = s.sheep.findIndex((q) => q.kind === 'ewe')
   // stress scale: same geometry, ram vs ewe
@@ -282,19 +584,19 @@ function kindSim(kind, over) {
   s.dog.pos = { x: 500 - 50, y: 400 }; s.dog.vel = { x: 60, y: 0 }; s.dog.command = 'walk_on'; s.flee(ri, DT)
   s.dog.command = 'lie_down'; s.dog.vel = { x: 0, y: 0 }
   let t = 0; while (ram.stand && t < 5) { s.flee(ri, DT); t += DT }
-  ok('FO-9', 'ram feels less pressure, stands and faces an advancing dog inside ramStandDist, gives way past ramStandRelease or after a lie-down',
+  ok('K-4', 'ram feels less pressure, stands and faces an advancing dog inside ramStandDist, gives way past ramStandRelease or after a lie-down',
     Math.abs(sr / se - 0.6) < 1e-6 && stood && facesDog && released && Math.abs(t - 2) < 0.05, `stress ${sr.toFixed(3)} vs ${se.toFixed(3)}; stood ${stood}; faces ${facesDog}; released ${released}; lie-down release after ${t.toFixed(2)} s`)
   const a = kindSim('ram', { penCalmStress: 0 }); const r = cross(a, a.sheep.findIndex((q) => q.kind === 'ram')).gained
-  ok('FO-9b', 'ram is worth 3× (300 stressed)', r === 300, `${r}`)
+  ok('K-4b', 'ram is worth ×3 (RUSHED: 150)', r === 150, `${r}`)
   // frequency sanity over 400 seeds
   const c = { golden: 0, lamb: 0, ram: 0 }
-  for (let seed = 1; seed <= 400; seed++) { const q = mk(N, { seed, sheepCount: 20, specials: true }); for (const k of Object.keys(c)) { const n = q.sheep.filter((x) => x.kind === k).length; if (n > 1) c[k] = NaN; c[k] += n } }
-  ok('FO-Q83', 'each kind rolls independently, at most one of each (400 seeds)', Math.abs(c.golden / 400 - 0.35) < 0.08 && Math.abs(c.lamb / 400 - 0.35) < 0.08 && Math.abs(c.ram / 400 - 0.25) < 0.08, `golden ${(c.golden / 4).toFixed(0)} % · lamb ${(c.lamb / 4).toFixed(0)} % · ram ${(c.ram / 4).toFixed(0)} %`)
+  for (let seed = 1; seed <= 400; seed++) { const q = mkc(N, { seed, sheepCount: 20, specials: true }); for (const k of Object.keys(c)) { const n = q.sheep.filter((x) => x.kind === k).length; if (n > 1) c[k] = NaN; c[k] += n } }
+  ok('K-Q83', 'each v14 kind rolls independently, at most one of each (400 seeds)', Math.abs(c.golden / 400 - 0.35) < 0.08 && Math.abs(c.lamb / 400 - 0.35) < 0.08 && Math.abs(c.ram / 400 - 0.25) < 0.08, `golden ${(c.golden / 4).toFixed(0)} % · lamb ${(c.lamb / 4).toFixed(0)} % · ram ${(c.ram / 4).toFixed(0)} %`)
 }
 
 // ---------------- RM5 / RM6 ----------------
 {
-  const s = mk(N, { seed: 21, mode: 'waves', driveGateMax: 2, driveGateChance: 1, specials: true })
+  const s = mkc(N, { seed: 21, mode: 'waves', driveGateMax: 2, driveGateChance: 1, specials: true })
   const n0 = s.sheep.length, c0 = s.run.clock
   steps(s, 5); const c1 = s.run.clock
   const g = cross(s, 0); const c2 = s.run.clock
@@ -306,20 +608,20 @@ function kindSim(kind, over) {
   const pts = s.points
   ok('RM-7', 'full pen → next wave: +waveGrowth sheep, score kept, gate unmoved, obstacles re-laid, no drive gate',
     s.run.wave === 1 && s.sheep.length === 10 && s.sheep.every((q) => !q.through) && s.gate === gate && gate.x === gx && gate.y === gy && s.driveGates.length === 0 && !s.obstacles.some((o) => o.kind === 'hurdle') && pts > 0 && !s.run.finished,
-    `wave ${s.run.wave}, flock ${s.sheep.length}, points ${pts}, flock/clean lines ${s.score().lines.filter((l) => l.key === 'flock' || l.key === 'clean').map((l) => l.points).join('/')}`)
+    `wave ${s.run.wave}, flock ${s.sheep.length}, points ${pts}, wave multipliers +${(s.score().lines.find((l) => l.key === 'mult') || { points: 0 }).points}`)
   s.run.clock = 0.05; steps(s, 0.2)
   const sc = s.score()
-  ok('RM-8', 'run ends at clock zero; score shows waves cleared, no stars, no time bonus', s.run.finished && sc.wave === 1 && sc.stars === 0 && !sc.lines.some((l) => l.key === 'time') && sc.total === pts, `finished ${s.run.finished}, wave ${sc.wave}`)
+  ok('RM-8', 'run ends at clock zero; score shows waves cleared, no rank, no time bonus', s.run.finished && sc.wave === 1 && sc.rank === null && sc.percent === null && !sc.lines.some((l) => l.key === 'time') && sc.total === pts, `finished ${s.run.finished}, wave ${sc.wave}`)
   // determinism
-  const run = () => { const q = mk(N, { seed: 77, mode: 'waves', specials: true }); const out = []; for (let w = 0; w < 3; w++) { steps(q, 1); out.push(q.sheep.map((x) => x.pos.x.toFixed(3) + ',' + x.pos.y.toFixed(3) + x.kind).join(';')); const n = q.sheep.length; for (let i = 0; i < n; i++) cross(q, i) } return out.join('|') }
+  const run = () => { const q = mkc(N, { seed: 77, mode: 'waves', specials: true }); const out = []; for (let w = 0; w < 3; w++) { steps(q, 1); out.push(q.sheep.map((x) => x.pos.x.toFixed(3) + ',' + x.pos.y.toFixed(3) + x.kind).join(';')); const n = q.sheep.length; for (let i = 0; i < n; i++) cross(q, i) } return out.join('|') }
   ok('RM-9', 'same seed lays the same flocks wave for wave', run() === run(), '3 waves compared')
-  const capped = mk(N, { seed: 3, mode: 'waves', waveSheepStart: 38, waveGrowth: 5 }); for (let w = 0; w < 2; w++) { const n = capped.sheep.length; for (let i = 0; i < n; i++) cross(capped, i) }
+  const capped = mkc(N, { seed: 3, mode: 'waves', waveSheepStart: 38, waveGrowth: 5 }); for (let w = 0; w < 2; w++) { const n = capped.sheep.length; for (let i = 0; i < n; i++) cross(capped, i) }
   ok('RM-7b', 'flock size is capped at waveSheepMax', capped.sheep.length === 40, `${capped.sheep.length}`)
-  const c = mk(N, { seed: 7, sheepCount: 6 })
+  const c = mkc(N, { seed: 7, sheepCount: 6 })
   ok('RM-10', 'mode `course` is unaffected (herd size from the slider, par clock)', c.sheep.length === 6 && c.score().mode === 'course', '')
 }
 
 let fails = 0
-for (const r of results) { if (!r.pass) fails++; console.log(`${r.pass ? 'PASS' : 'FAIL'}  ${r.id.padEnd(7)} ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`) }
+for (const r of results) { if (!r.pass) fails++; console.log(`${r.pass ? 'PASS' : 'FAIL'}  ${r.id.padEnd(8)} ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`) }
 console.log(`\n${results.length - fails}/${results.length} passed`)
 process.exit(fails ? 1 : 0)

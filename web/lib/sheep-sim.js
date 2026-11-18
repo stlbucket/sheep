@@ -208,26 +208,61 @@ const SETTINGS = [
   { key: 'trotRest', category: 'Trot', label: 'trot rest', type: 'float', default: 6, min: 0, max: 30, step: 0.5, unit: 's', description: 'T6: after dropping out of a trot (time limit, decay or fence) a sheep cannot be recruited or lead again for this long — stops a tight column re-recruiting its own drop-outs.', exposed: true },
   { key: 'trotWindDown', category: 'Trot', label: 'trot wind-down', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'T7: an unpressured sheep leaving the trot keeps walking on its line while its pace eases from trot to a stand over this long; `calm delay` later it is grazing. Felt pressure or a fence cancels it. 0 = drops straight out.', exposed: true },
 
-  // Scoring — COUNT-UP (POC-v14, owner 2026-11-16): the score starts at 0 and only climbs. Points are
-  // EVENTS (a sheep through the gate, a bonus), never per-second penalties; see spec/POC-v14/scoring.md.
-  { key: 'penPoints', category: 'Scoring', label: 'points per sheep', type: 'int', default: 100, min: 0, max: 1000, step: 10, unit: 'pts', description: 'SC2: points for a sheep through the pen gate (owner Q75: 100).', exposed: true },
-  { key: 'penCalmPoints', category: 'Scoring', label: 'points per calm sheep', type: 'int', default: 200, min: 0, max: 2000, step: 10, unit: 'pts', description: 'SC3: points when that sheep WALKS through — stress below `calm stress`, not trotting, not panicking.', exposed: true },
-  { key: 'penCalmStress', category: 'Scoring', label: 'calm stress', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC3: a crossing counts as calm while the sheep\'s stress is below this.', exposed: true },
-  { key: 'comboWindow', category: 'Scoring', label: 'stream window', type: 'float', default: 2.5, min: 0, max: 10, step: 0.1, unit: 's', description: 'SC4: longest gap between two crossings that keeps the stream multiplier climbing.', exposed: true },
-  { key: 'comboMax', category: 'Scoring', label: 'stream multiplier cap', type: 'int', default: 5, min: 1, max: 20, step: 1, unit: '×', description: 'SC4: highest stream multiplier.', exposed: true },
-  { key: 'fullFlockBonus', category: 'Scoring', label: 'full-flock bonus', type: 'int', default: 1000, min: 0, max: 10000, step: 50, unit: 'pts', description: 'SC5: bonus for penning every sheep (per wave in wave mode).', exposed: true },
-  { key: 'cleanRunBonus', category: 'Scoring', label: 'clean-run bonus', type: 'int', default: 500, min: 0, max: 10000, step: 50, unit: 'pts', description: 'SC5: extra when no sheep was injured.', exposed: true },
-  { key: 'parBase', category: 'Scoring', label: 'par base', type: 'float', default: 45, min: 0, max: 300, step: 5, unit: 's', description: 'SC6: par time before the per-sheep allowance.', exposed: true },
-  { key: 'parPerSheep', category: 'Scoring', label: 'par per sheep', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'SC6: par time added per sheep.', exposed: true },
-  { key: 'parPointsPerSec', category: 'Scoring', label: 'time bonus rate', type: 'int', default: 20, min: 0, max: 500, step: 5, unit: 'pts/s', description: 'SC6: bonus points per whole second under par on a won run.', exposed: true },
-  { key: 'awardPoints', category: 'Scoring', label: 'award bonus', type: 'int', default: 300, min: 0, max: 5000, step: 50, unit: 'pts', description: 'SC10: bonus per named award.', exposed: true },
-  { key: 'quietHandBase', category: 'Scoring', label: 'quiet hand base', type: 'float', default: 6, min: 0, max: 60, step: 1, unit: 'cmds', description: 'SC10 Quiet Hand: command allowance before the per-sheep part.', exposed: true },
-  { key: 'quietHandPerSheep', category: 'Scoring', label: 'quiet hand per sheep', type: 'float', default: 0.5, min: 0, max: 5, step: 0.1, unit: 'cmds', description: 'SC10 Quiet Hand: extra commands allowed per sheep.', exposed: true },
-  { key: 'lineOnDist', category: 'Scoring', label: 'on-line distance', type: 'float', default: 60, min: 10, max: 300, step: 5, unit: 'px', description: 'SC10 Straight as a Die: the flock centre counts as ON the ideal line within this distance of it.', exposed: true },
-  { key: 'lineAwardShare', category: 'Scoring', label: 'line award share', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC10 Straight as a Die: share of the run the flock must spend on the line.', exposed: true },
-  { key: 'photoFinishSecs', category: 'Scoring', label: 'photo finish window', type: 'float', default: 3, min: 0, max: 30, step: 0.5, unit: 's', description: 'SC10 Photo Finish: won within this many seconds either side of par.', exposed: true },
-  { key: 'starCalmShare', category: 'Scoring', label: 'third-star calm share', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: 'SC9: share of the penned sheep that must have been calm for the third star.', exposed: true },
-  { key: 'wolfPoints', category: 'Scoring', label: 'wolf points', type: 'int', default: 300, min: 0, max: 5000, step: 50, unit: 'pts', description: 'SC11 (assault): points per wolf routed or killed.', exposed: true },
+  // Scoring — COUNT-UP (POC-v14), reworked in POC-v15 (owner interview 2026-11-17): three tiers × a sheep's
+  // condition, an uncapped quality-fed chain, three strikes, end bonuses that MULTIPLY, four jackpots, and a
+  // verdict (rank, percent of a reference run, category grades). Points are still EVENTS and the total never
+  // drops; see .claude/sheep/implemented/POC-v15/scoring.md + verdict-and-hud.md.
+  { key: 'penPoints', category: 'Scoring', label: 'RUSHED sheep', type: 'int', default: 50, min: 0, max: 1000, step: 10, unit: 'pts', description: "SC12: a sheep that trots, bolts or is worked up through the pen gate.", exposed: true },
+  { key: 'penCalmPoints', category: 'Scoring', label: 'CALM sheep', type: 'int', default: 200, min: 0, max: 2000, step: 10, unit: 'pts', description: "SC12: a sheep that WALKS through with stress below `calm stress`.", exposed: true },
+  { key: 'penPerfectPoints', category: 'Scoring', label: 'PERFECT sheep', type: 'int', default: 500, min: 0, max: 5000, step: 10, unit: 'pts', description: "SC12: a sheep that walks through with stress below `perfect stress`. Also the per-sheep basis of the flock value (SC14).", exposed: true },
+  { key: 'penCalmStress', category: 'Scoring', label: 'calm stress', type: 'float', default: 0.15, min: 0, max: 1, step: 0.05, unit: '—', description: "SC12: a walking sheep is CALM while its stress is below this.", exposed: true },
+  { key: 'penPerfectStress', category: 'Scoring', label: 'perfect stress', type: 'float', default: 0.03, min: 0, max: 1, step: 0.01, unit: '—', description: "SC12: a walking sheep is PERFECT while its stress is below this.", exposed: true },
+  { key: 'penStressMemory', category: 'Scoring', label: 'stress memory', type: 'float', default: 3, min: 0, max: 20, step: 0.5, unit: 's', description: "SC12: a sheep's tier is read from its stress SMOOTHED over about this long (or its stress this instant, whichever is higher) — the dog is usually out of reach by the gate, so the instant value alone would call nearly every walker PERFECT. 0 = the instant value only.", exposed: true },
+  { key: 'condPanicDrain', category: 'Scoring', label: 'condition drain, panic', type: 'float', default: 0.1, min: 0, max: 1, step: 0.01, unit: '/s', description: "SC13: condition a sheep loses per second while panicking.", exposed: true },
+  { key: 'condTrotDrain', category: 'Scoring', label: 'condition drain, trot', type: 'float', default: 0.02, min: 0, max: 1, step: 0.005, unit: '/s', description: "SC13: condition a sheep loses per second while trotting.", exposed: true },
+  { key: 'condRecover', category: 'Scoring', label: 'condition recovery', type: 'float', default: 0.01, min: 0, max: 1, step: 0.005, unit: '/s', description: "SC13: condition a sheep regains per second while grazing (idle).", exposed: true },
+  { key: 'condFloor', category: 'Scoring', label: 'condition floor', type: 'float', default: 0.2, min: 0, max: 1, step: 0.05, unit: '—', description: "SC13: lowest condition a standing sheep can reach.", exposed: true },
+  { key: 'comboWindow', category: 'Scoring', label: 'chain window', type: 'float', default: 1.5, min: 0, max: 10, step: 0.1, unit: 's', description: "SC15: longest gap between two crossings that keeps the chain alive, at ×1.", exposed: true },
+  { key: 'comboWindowMin', category: 'Scoring', label: 'chain window (long chain)', type: 'float', default: 0.4, min: 0, max: 10, step: 0.1, unit: 's', description: "SC15: the window once the chain has reached `chain tighten at`.", exposed: true },
+  { key: 'comboTightenAt', category: 'Scoring', label: 'chain tighten at', type: 'int', default: 30, min: 2, max: 100, step: 1, unit: '×', description: "SC15: chain value at which the window has shrunk to its minimum.", exposed: true },
+  { key: 'strikeMax', category: 'Scoring', label: 'strikes', type: 'int', default: 3, min: 0, max: 10, step: 1, unit: '—', description: "SC16: strikes that end the run (0 = a run cannot bust).", exposed: true },
+  { key: 'strikePanics', category: 'Scoring', label: 'panics per strike', type: 'int', default: 5, min: 0, max: 200, step: 1, unit: '—', description: "SC16: every this-many panics is a strike (0 = panics never strike).", exposed: true },
+  { key: 'panicRearm', category: 'Scoring', label: 'panic re-arm', type: 'float', default: 5, min: 0, max: 60, step: 0.5, unit: 's', description: "SC16: shortest gap before the same sheep's next panic or fence slam counts again.", exposed: true },
+  { key: 'fenceSlamSpeed', category: 'Scoring', label: 'fence slam speed', type: 'float', default: 100, min: 20, max: 300, step: 5, unit: 'px/s', description: "SC16 (owner Q96): a sheep reaching the fence with more than this speed INTO it is a slam — a strike.", exposed: true },
+  { key: 'strikeCooldown', category: 'Scoring', label: 'strike cooldown', type: 'float', default: 3, min: 0, max: 30, step: 0.5, unit: 's', description: "SC16: one incident, one strike — a second strike inside this long of the last is not counted.", exposed: true },
+  { key: 'parBase', category: 'Scoring', label: 'par base', type: 'float', default: 45, min: 0, max: 300, step: 5, unit: 's', description: "SC17: par time before the per-sheep allowance.", exposed: true },
+  { key: 'parPerSheep', category: 'Scoring', label: 'par per sheep', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: "SC17: par time added per sheep.", exposed: true },
+  { key: 'parPointsPerSec', category: 'Scoring', label: 'time bonus rate', type: 'int', default: 10, min: 0, max: 500, step: 5, unit: 'pts/s', description: "SC17: flat points per whole second under par on a won run, added AFTER the multipliers — a tie-breaker.", exposed: true },
+  { key: 'multFullFlock', category: 'Scoring', label: 'full flock ×', type: 'float', default: 1.5, min: 1, max: 10, step: 0.1, unit: '×', description: "SC18: end multiplier for penning the whole flock (scaled by the share penned on an unfinished run, SC20).", exposed: true },
+  { key: 'multClean', category: 'Scoring', label: 'clean run ×', type: 'float', default: 1.5, min: 1, max: 10, step: 0.1, unit: '×', description: "SC18: end multiplier for a won run with no strikes.", exposed: true },
+  { key: 'multAllCalm', category: 'Scoring', label: 'all calm ×', type: 'float', default: 2, min: 1, max: 10, step: 0.1, unit: '×', description: "SC18: end multiplier when no sheep was penned RUSHED.", exposed: true },
+  { key: 'multAwardCommon', category: 'Scoring', label: 'common award ×', type: 'float', default: 1.05, min: 1, max: 10, step: 0.05, unit: '×', description: "SC19: end multiplier per common award.", exposed: true },
+  { key: 'multAwardRare', category: 'Scoring', label: 'rare award ×', type: 'float', default: 1.1, min: 1, max: 10, step: 0.05, unit: '×', description: "SC19: end multiplier per rare award.", exposed: true },
+  { key: 'multAwardLegendary', category: 'Scoring', label: 'legendary award ×', type: 'float', default: 1.25, min: 1, max: 10, step: 0.05, unit: '×', description: "SC19: end multiplier per legendary award.", exposed: true },
+  { key: 'multOneGo', category: 'Scoring', label: 'one go ×', type: 'float', default: 1.5, min: 1, max: 20, step: 0.5, unit: '×', description: "SC22: end multiplier for penning the whole flock in a single unbroken chain.", exposed: true },
+  { key: 'perfectFileMin', category: 'Scoring', label: 'perfect file length', type: 'int', default: 20, min: 2, max: 500, step: 1, unit: '—', description: "SC21: crossings in one chain, none RUSHED, that make a PERFECT FILE — the chain's points are paid again when it ends.", exposed: true },
+  { key: 'frenzyEvery', category: 'Scoring', label: 'frenzy every', type: 'int', default: 25, min: 0, max: 100, step: 1, unit: '×', description: "SC23: each time the chain passes a multiple of this a frenzy opens (0 = never).", exposed: true },
+  { key: 'frenzySecs', category: 'Scoring', label: 'frenzy length', type: 'float', default: 4, min: 0, max: 60, step: 0.5, unit: 's', description: "SC23: how long a frenzy lasts when it opens.", exposed: true },
+  { key: 'frenzyExtend', category: 'Scoring', label: 'frenzy extension', type: 'float', default: 0.5, min: 0, max: 10, step: 0.1, unit: 's', description: "SC23: time each crossing during a frenzy adds to it.", exposed: true },
+  { key: 'frenzyMax', category: 'Scoring', label: 'frenzy cap', type: 'float', default: 6, min: 0, max: 120, step: 0.5, unit: 's', description: "SC23: most time a frenzy can hold.", exposed: true },
+  { key: 'finisherPoints', category: 'Scoring', label: 'last-sheep bonus', type: 'int', default: 500, min: 0, max: 10000, step: 50, unit: 'pts', description: "SC24: bonus for the crossing that fills the pen, times the multiplier at that moment — full if PERFECT, half if CALM, none if RUSHED.", exposed: true },
+  { key: 'quietHandBase', category: 'Scoring', label: 'quiet hand base', type: 'float', default: 6, min: 0, max: 60, step: 1, unit: 'cmds', description: "SC19 Quiet Hand: command allowance before the per-sheep part.", exposed: true },
+  { key: 'quietHandPerSheep', category: 'Scoring', label: 'quiet hand per sheep', type: 'float', default: 0.5, min: 0, max: 5, step: 0.1, unit: 'cmds', description: "SC19 Quiet Hand: extra commands allowed per sheep.", exposed: true },
+  { key: 'lineOnDist', category: 'Scoring', label: 'on-line distance', type: 'float', default: 60, min: 10, max: 300, step: 5, unit: 'px', description: "SC19 Straight as a Die: the flock centre counts as ON the ideal line within this distance of it.", exposed: true },
+  { key: 'lineAwardShare', category: 'Scoring', label: 'line award share', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: "SC19 Straight as a Die: share of the run the flock must spend on the line.", exposed: true },
+  { key: 'photoFinishSecs', category: 'Scoring', label: 'photo finish window', type: 'float', default: 3, min: 0, max: 30, step: 0.5, unit: 's', description: "SC19 Photo Finish: won within this many seconds either side of par.", exposed: true },
+  { key: 'fullPurseShare', category: 'Scoring', label: 'full purse share', type: 'float', default: 0.9, min: 0, max: 1, step: 0.05, unit: '—', description: "SC19 Full Purse: the flock's mean condition never fell below this.", exposed: true },
+  { key: 'wolfPoints', category: 'Scoring', label: 'wolf points', type: 'int', default: 300, min: 0, max: 5000, step: 50, unit: 'pts', description: "SC11 (assault): points per wolf routed or killed.", exposed: true },
+  { key: 'rankFarmhand', category: 'Scoring', label: 'rank: Farmhand', type: 'float', default: 0.01, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins (below it: Lost Tourist).", exposed: true },
+  { key: 'rankDrover', category: 'Scoring', label: 'rank: Drover', type: 'float', default: 0.05, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'rankShepherd', category: 'Scoring', label: 'rank: Shepherd', type: 'float', default: 0.15, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'rankHeadShepherd', category: 'Scoring', label: 'rank: Head Shepherd', type: 'float', default: 0.4, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'rankChampion', category: 'Scoring', label: 'rank: Trial Champion', type: 'float', default: 1, min: 0, max: 100, step: 0.05, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'rankOneMan', category: 'Scoring', label: 'rank: One Man and His Dog', type: 'float', default: 10, min: 0, max: 1000, step: 0.5, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'gradeA', category: 'Scoring', label: 'grade A from', type: 'float', default: 0.9, min: 0, max: 1, step: 0.01, unit: '—', description: "VH9: category value (0–1) at which the grade is A.", exposed: true },
+  { key: 'gradeStep', category: 'Scoring', label: 'grade step', type: 'float', default: 0.18, min: 0.01, max: 1, step: 0.01, unit: '—', description: "VH9: each lower grade (B, C, D, E) begins this much further down; below E is F.", exposed: true },
+  { key: 'gradeCalmCredit', category: 'Scoring', label: 'calm grade credit', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: "VH9 Calm: what a CALM sheep counts for beside a PERFECT one (1) and a RUSHED one (0).", exposed: true },
+  { key: 'safetyPanicCost', category: 'Scoring', label: 'safety cost per panic', type: 'float', default: 0.02, min: 0, max: 1, step: 0.005, unit: '—', description: "VH9 Safety: lost per panic, on top of a third per strike.", exposed: true },
   { key: 'lineNorm', category: 'Scoring', label: 'line norm', type: 'float', default: 150, min: 20, max: 400, step: 5, unit: 'px', description: 'Path deviation that counts as "fully off-line".', exposed: false },
   { key: 'T_straggle', category: 'Scoring', label: 'straggle time', type: 'float', default: 3.0, min: 0, max: 6, step: 0.5, unit: 's', description: 'Seconds outside the blob before a sheep counts as a straggler.', exposed: true },
   { key: 'splitMinSize', category: 'Scoring', label: 'split min size', type: 'int', default: 3, min: 2, max: 8, step: 1, unit: '—', description: 'Min cluster size to count as a real sub-flock.', exposed: true },
@@ -238,8 +273,8 @@ const SETTINGS = [
   { key: 'driveGateChance', category: 'Objectives', label: 'drive gate chance', type: 'float', default: 0.5, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO1: chance each possible drive gate is present on a course.', exposed: true, onChange: 'respawn' },
   { key: 'driveGateWidth', category: 'Objectives', label: 'drive gate gap', type: 'float', default: 90, min: 40, max: 200, step: 5, unit: 'px', description: 'FO1: gap between the two hurdle panels.', exposed: true, onChange: 'respawn' },
   { key: 'driveGatePanel', category: 'Objectives', label: 'drive gate panel', type: 'float', default: 50, min: 20, max: 120, step: 5, unit: 'px', description: 'FO1/FO3: length of each solid hurdle panel.', exposed: true, onChange: 'respawn' },
-  { key: 'driveGatePoints', category: 'Objectives', label: 'drive gate points', type: 'int', default: 100, min: 0, max: 1000, step: 10, unit: 'pts', description: 'FO2: points per sheep through the gap (once per sheep per gate, either way).', exposed: true },
-  { key: 'driveGateBonus', category: 'Objectives', label: 'drive gate bonus', type: 'int', default: 500, min: 0, max: 10000, step: 50, unit: 'pts', description: 'FO2: bonus when every sheep still being worked has been through the same gate.', exposed: true },
+  { key: 'driveGatePoints', category: 'Objectives', label: 'drive gate points', type: 'int', default: 50, min: 0, max: 1000, step: 10, unit: 'pts', description: "FO2: points per sheep through the gap (once per sheep per gate, either way).", exposed: true },
+  { key: 'driveGateMult', category: 'Objectives', label: 'drive gate multiplier', type: 'float', default: 1, min: 0, max: 10, step: 0.5, unit: '×', description: "FO7 (POC-v15): when every sheep still being worked has been through a gate, the multiplier on every later crossing rises by this for the rest of the run.", exposed: true },
   { key: 'specials', category: 'Objectives', label: 'special sheep', type: 'boolean', default: true, unit: '—', description: 'FO4–FO6: whether a course may carry a golden ewe, a lamb with its mother and a stubborn ram (each rolls independently, at most one of each).', exposed: true, onChange: 'respawn' },
   { key: 'goldenChance', category: 'Objectives', label: 'golden ewe chance', type: 'float', default: 0.35, min: 0, max: 1, step: 0.05, unit: '—', description: 'FO4: chance a course has a golden ewe.', exposed: true, onChange: 'respawn' },
   { key: 'goldenMult', category: 'Objectives', label: 'golden ewe worth', type: 'float', default: 5, min: 1, max: 20, step: 0.5, unit: '×', description: 'FO4: her worth as a multiple of an ordinary sheep (stacks with calm and the stream multiplier, owner Q81).', exposed: true },
@@ -253,6 +288,21 @@ const SETTINGS = [
   { key: 'ramStandDist', category: 'Objectives', label: 'ram stand distance', type: 'float', default: 60, min: 0, max: 200, step: 5, unit: 'px', description: 'FO6 (owner Q84): an advancing dog inside this distance makes the ram stop and face him.', exposed: true },
   { key: 'ramStandRelease', category: 'Objectives', label: 'ram release distance', type: 'float', default: 110, min: 0, max: 300, step: 5, unit: 'px', description: 'FO6: the ram gives way again once the dog is beyond this distance.', exposed: true },
   { key: 'ramStandWait', category: 'Objectives', label: 'ram stand wait', type: 'float', default: 2, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6: a dog lying down this long also makes a standing ram give way (and he will not stand again for as long).', exposed: true },
+  { key: 'blackChance', category: 'Objectives', label: 'black sheep chance', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: "FO8: chance a course has a black sheep.", exposed: true, onChange: 'respawn' },
+  { key: 'blackMult', category: 'Objectives', label: 'black sheep worth', type: 'float', default: 2, min: 1, max: 20, step: 0.5, unit: '×', description: "FO8: her worth as a multiple of an ordinary sheep.", exposed: true },
+  { key: 'blackThreatScale', category: 'Objectives', label: 'black sheep nerves', type: 'float', default: 1.5, min: 1, max: 4, step: 0.1, unit: '×', description: "FO8: how much more of the dog's pressure she feels — she startles sooner.", exposed: true },
+  { key: 'blackSpookRadius', category: 'Objectives', label: 'black sheep spook radius', type: 'float', default: 70, min: 0, max: 300, step: 5, unit: 'px', description: "FO8: while she panics, sheep inside this distance of her are spooked too.", exposed: true },
+  { key: 'blackSpookThreat', category: 'Objectives', label: 'black sheep spook', type: 'float', default: 0.6, min: 0, max: 2, step: 0.05, unit: '—', description: "FO8: threat a sheep right beside her takes while she panics (fades to 0 at the radius).", exposed: true },
+  { key: 'bellChance', category: 'Objectives', label: 'bellwether chance', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: "FO9: chance a course has a bellwether.", exposed: true, onChange: 'respawn' },
+  { key: 'bellMult', category: 'Objectives', label: 'bellwether worth', type: 'float', default: 3, min: 1, max: 20, step: 0.5, unit: '×', description: "FO9: her worth when she is the FIRST sheep through the pen gate.", exposed: true },
+  { key: 'bellRadius', category: 'Objectives', label: 'bellwether reach', type: 'float', default: 120, min: 0, max: 400, step: 5, unit: 'px', description: "FO9: alert sheep inside this distance of her follow her.", exposed: true },
+  { key: 'bellWeight', category: 'Objectives', label: 'bellwether pull', type: 'float', default: 4, min: 0, max: 20, step: 0.5, unit: '—', description: "FO9: how many ordinary neighbours she counts for in a nearby sheep's cohesion and alignment.", exposed: true },
+  { key: 'yearlingChance', category: 'Objectives', label: 'yearling chance', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: "FO10: chance a course has a skittish yearling.", exposed: true, onChange: 'respawn' },
+  { key: 'yearlingMult', category: 'Objectives', label: 'yearling worth', type: 'float', default: 3, min: 1, max: 20, step: 0.5, unit: '×', description: "FO10: her worth when penned CALM or PERFECT.", exposed: true },
+  { key: 'yearlingFlightScale', category: 'Objectives', label: 'yearling flight distance', type: 'float', default: 1.6, min: 1, max: 4, step: 0.1, unit: '×', description: "FO10: her flee radius as a multiple of the flock's.", exposed: true },
+  { key: 'yearlingSize', category: 'Objectives', label: 'yearling size', type: 'float', default: 0.8, min: 0.3, max: 1.5, step: 0.05, unit: '×', description: "FO10: her drawn size beside an ordinary sheep.", exposed: true },
+  { key: 'sideObjectiveCount', category: 'Objectives', label: 'side objectives', type: 'int', default: 2, min: 0, max: 4, step: 1, unit: '—', description: "FO11: side objectives a course states (0 = none). None in wave mode.", exposed: true, onChange: 'respawn' },
+  { key: 'multSideObjective', category: 'Objectives', label: 'side objective ×', type: 'float', default: 1.25, min: 1, max: 10, step: 0.1, unit: '×', description: "FO11: end multiplier per side objective met on a won run.", exposed: true },
 
   // Modes (POC-v14 replay-modes.md): course / daily are the same game with a different best-score key; waves is the arcade clock.
   { key: 'mode', category: 'Modes', label: 'mode', type: 'enum', options: ['course', 'daily', 'waves'], default: 'course', unit: '—', description: 'RM4/RM5: `course` = one flock against par · `daily` = the same, on the seed for today\'s date · `waves` = a countdown clock, a little time per sheep penned, and a new larger flock every time the pen fills.', exposed: true, onChange: 'respawn' },
@@ -262,6 +312,9 @@ const SETTINGS = [
   { key: 'waveSheepStart', category: 'Modes', label: 'wave first flock', type: 'int', default: 8, min: 1, max: 150, step: 1, unit: '—', description: 'RM5: flock size of the first wave (the `herd size` slider is ignored in wave mode).', exposed: true, onChange: 'respawn' },
   { key: 'waveGrowth', category: 'Modes', label: 'wave growth', type: 'int', default: 2, min: 0, max: 20, step: 1, unit: '—', description: 'RM5 (owner Q89): extra sheep each wave.', exposed: true },
   { key: 'waveSheepMax', category: 'Modes', label: 'wave flock cap', type: 'int', default: 40, min: 1, max: 150, step: 1, unit: '—', description: 'RM5: largest flock a wave can reach.', exposed: true },
+  { key: 'historyMax', category: 'Modes', label: 'history length', type: 'int', default: 20, min: 0, max: 200, step: 1, unit: 'runs', description: "RC1: finished runs kept in the saved history.", exposed: true },
+  { key: 'bandSmallMax', category: 'Modes', label: 'small flock up to', type: 'int', default: 30, min: 1, max: 150, step: 1, unit: 'sheep', description: "RC2: largest flock that counts as SMALL for the saved bests.", exposed: true },
+  { key: 'bandMediumMax', category: 'Modes', label: 'medium flock up to', type: 'int', default: 80, min: 1, max: 150, step: 1, unit: 'sheep', description: "RC2: largest flock that counts as MEDIUM (larger is LARGE).", exposed: true },
 
   // Debug (render toggles — never exported)
   { key: 'debug.eye', category: 'Debug', label: 'flee cone + R_flee', type: 'boolean', default: true, unit: '—', description: 'Draw the dog\'s gaze cone and flee radius.', exposed: true, export: false },
@@ -381,11 +434,40 @@ const LEVERS = [
     params: { obstacleFreq: [0, 2, 12], obstacleRangeMax: [0, 24, 60], obstacleGroupMax: [1, 3, 5], obstacleRadiusMin: [14, 20, 30], obstacleRadiusMax: [30, 46, 70], obstacleMinGap: [90, 60, 36] } },
   { key: 'pastureStrictness', domain: 'pasture-builder', label: 'Strictness', blurb: 'How much the course asks for before it pays (POC-v14: re-pointed from the old penalty weights at the count-up bonuses) — how calm is calm, how tight is a stream, how generous is par.', respawn: false,
     ends: { 0: 'generous — bonuses come easily', 1: 'championship trial — every bonus is earned' },
-    params: { penCalmStress: [0.6, 0.3, 0.15], comboWindow: [4, 2.5, 1.5], parBase: [70, 45, 30], parPerSheep: [5, 3, 2] } },
+    params: { penCalmStress: [0.3, 0.15, 0.08], penPerfectStress: [0.06, 0.03, 0.015], comboWindow: [2.5, 1.5, 1], comboWindowMin: [0.7, 0.4, 0.25], parBase: [70, 45, 30], parPerSheep: [5, 3, 2] } }, // stress + window anchors retuned 2026-11-17 from measured driven runs
 ]
 const LEVER_DOMAINS = [
   { key: 'dog-behavior', title: 'Dog' }, { key: 'sheep-behavior', title: 'Sheep' }, { key: 'pasture-builder', title: 'Pasture' },
 ]
+// POC-v15 scoring vocabulary (pure data — the sim decides, the pages only draw).
+// SC19: named awards and their rarity · VH7: shepherd ranks, lowest first ·
+// FO11: the side-objective pool (`needs` = what the course must have).
+const AWARDS = [
+  { name: 'Quiet Hand', rarity: 'common' }, { name: 'Straight as a Die', rarity: 'common' }, { name: 'Photo Finish', rarity: 'common' }, { name: 'Gatekeeper', rarity: 'common' },
+  { name: 'Not a Hair Out of Place', rarity: 'rare' }, { name: 'Never Sat', rarity: 'rare' }, { name: 'Steady Away', rarity: 'rare' }, { name: 'Full Purse', rarity: 'rare' },
+  { name: 'Sunday Stroll', rarity: 'legendary' }, { name: 'Nobody Ran', rarity: 'legendary' }, { name: 'Not a Word Wasted', rarity: 'legendary' },
+]
+const RANKS = ['Lost Tourist', 'Farmhand', 'Drover', 'Shepherd', 'Head Shepherd', 'Trial Champion', 'One Man and His Dog']
+const RANK_KEYS = ['rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan']
+const JACKPOTS = [
+  { id: 'file', label: 'Perfect file' }, { id: 'onego', label: 'One go' }, { id: 'frenzy', label: 'Frenzy' }, { id: 'finisher', label: 'Last sheep' },
+]
+const SPECIAL_KINDS = [
+  { id: 'golden', label: 'Golden ewe' }, { id: 'lamb', label: 'Lamb' }, { id: 'ram', label: 'Stubborn ram' },
+  { id: 'black', label: 'Black sheep' }, { id: 'bell', label: 'Bellwether' }, { id: 'yearling', label: 'Skittish yearling' },
+]
+const SIDE_OBJECTIVES = [
+  { id: 'last_golden', needs: 'golden', label: 'Save the best for last', hint: 'pen the golden ewe last' },
+  { id: 'lead_bell', needs: 'bell', label: 'Lead them in', hint: 'pen the bellwether first' },
+  { id: 'gates', needs: 'gate', label: 'Through the gates', hint: 'take the whole flock through every drive gate' },
+  { id: 'no_rush', label: 'No rush', hint: 'pen no sheep RUSHED' },
+  { id: 'long_file', label: 'Long file', hint: 'one chain of at least half the flock' },
+  { id: 'few_words', label: 'Few words', hint: 'win within the Quiet Hand command allowance' },
+  { id: 'on_feet', label: 'On your feet', hint: 'win without a lie-down' },
+  { id: 'spotless', label: 'Spotless', hint: 'win with no strikes' },
+]
+const SIDE_OBJECTIVES_AT_WIN = new Set(['no_rush', 'few_words', 'on_feet', 'spotless']) // still open at a win → met
+
 // Everything a lever does NOT own, with the reason — the ownership assertion
 // requires levered ∪ not-levered === SETTINGS exactly (no key unclaimed).
 const LEVER_NOT_LEVERED = {
@@ -397,9 +479,13 @@ const LEVER_NOT_LEVERED = {
   parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg',
     'walkSpeed', 'trotSlowSpeed', 'trotDriveDelay', 'trotPressMin', 'trotPressFrac', 'trotTurnWindow', 'trotTurnProb', 'trotMaxDur', 'trotRest', 'trotWindDown', 'gateConeGrow', 'gateConeDeg', 'gateConeMax'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
   obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge'], // owner 2026-11-14 — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
-  scoring: ['penPoints', 'penCalmPoints', 'comboMax', 'fullFlockBonus', 'cleanRunBonus', 'parPointsPerSec', 'awardPoints', 'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'starCalmShare', 'wolfPoints'], // POC-v14 point values — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
-  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateBonus', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait'], // POC-v14 field objectives
-  modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax'], // POC-v14 replay modes — a mode switch and the arcade clock
+  scoring: ['penPoints', 'penCalmPoints', 'penPerfectPoints', 'penStressMemory', 'condPanicDrain', 'condTrotDrain', 'condRecover', 'condFloor', 'comboTightenAt', 'strikeMax', 'strikePanics', 'panicRearm', 'fenceSlamSpeed', 'strikeCooldown', 'parPointsPerSec',
+    'multFullFlock', 'multClean', 'multAllCalm', 'multAwardCommon', 'multAwardRare', 'multAwardLegendary', 'multOneGo', 'perfectFileMin', 'frenzyEvery', 'frenzySecs', 'frenzyExtend', 'frenzyMax', 'finisherPoints',
+    'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'fullPurseShare', 'wolfPoints', 'rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan',
+    'gradeA', 'gradeStep', 'gradeCalmCredit', 'safetyPanicCost'], // POC-v14 / v15 point values, rates and verdict bands — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
+  objectives: ['driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait',
+    'blackChance', 'blackMult', 'blackThreatScale', 'blackSpookRadius', 'blackSpookThreat', 'bellChance', 'bellMult', 'bellRadius', 'bellWeight', 'yearlingChance', 'yearlingMult', 'yearlingFlightScale', 'yearlingSize', 'sideObjectiveCount', 'multSideObjective'], // POC-v14 field objectives + POC-v15 (FO7–FO11)
+  modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax', 'historyMax', 'bandSmallMax', 'bandMediumMax'], // POC-v14 replay modes + POC-v15 records — a mode switch and the arcade clock
   // plus every `debug.*` render toggle
 }
 const SETTING_BY_KEY = Object.fromEntries(SETTINGS.map((e) => [e.key, e]))
@@ -695,19 +781,30 @@ class FlockSim {
 
   // Fresh count-up scoring state for a new run (called on reseed, via spawn).
   // POC-v14: `points` only ever grows; `tally` splits it into the card's
-  // lines; `scoreEvents` is a queue the PAGES drain to draw their pops (the
-  // sim never reads it). lineDev / strag / split / stress still accumulate —
-  // as statistics for the awards and the card, no longer as penalties.
+  // lines; `scoreEvents` is a queue the PAGES drain to draw their pops and
+  // banners (the sim never reads it). POC-v15 adds the chain record, strikes,
+  // condition statistics, jackpots, end multipliers and the side objectives.
   resetRun() {
-    this.run = { t: 0, lineDev: 0, onLine: 0, strag: 0, split: 0, stress: 0, won: false, finished: false,
+    this.run = { t: 0, lineDev: 0, onLine: 0, strag: 0, split: 0, stress: 0, won: false, finished: false, bust: false,
       combo: 1, comboT: 0, comboLive: false, comboBest: 1, breaks: 0, crossings: 0, calmPenned: 0, commands: 0,
-      awards: [], wave: 0, waveInjuries: 0, clock: this.p.waveClock }
+      chain: { n: 0, rushed: 0, points: 0 }, chains: 0, longest: 0, frenzyT: 0, frenzyStep: 0, gateMult: 0,
+      tiers: { rushed: 0, calm: 0, perfect: 0 },
+      strikes: 0, panics: 0, slams: 0, lastStrikeT: -1e9, lieDowns: 0, fullFlanks: 0, trotEver: false,
+      value: 0, valueStart: 0, condMean: 1, condMin: 1, draining: false,
+      awards: [], awardList: [], jackpots: [], endMults: [], endMult: 1, playPoints: 0, specials: [], reference: 0,
+      wave: 0, waveInjuries: 0, waveStrikes: 0, waveRushed: 0, wavePoints: 0, clock: this.p.waveClock }
     this.points = 0
     this.tally = {}
     this.scoreEvents = []
+    this.sideObjectives = []
   }
 
   tallyAdd(kind, points) { if (points) this.tally[kind] = (this.tally[kind] || 0) + points }
+
+  pushEvent(ev) {
+    this.scoreEvents.push(ev)
+    if (this.scoreEvents.length > 256) this.scoreEvents.shift() // nobody draining (headless) → bounded
+  }
 
   // Add points for something that happened at (x, y) — the one way points
   // enter the total apart from a pen crossing. Also used by lib/assault-sim.js.
@@ -716,44 +813,170 @@ class FlockSim {
     if (!(points > 0)) return
     this.points += points
     this.tallyAdd(kind, points)
-    this.scoreEvents.push({ kind, points, mult: 1, x, y, label: label || '+' + points })
-    if (this.scoreEvents.length > 256) this.scoreEvents.shift() // nobody draining (headless) → bounded
+    this.pushEvent({ kind, points, mult: 1, x, y, label: label || '+' + points })
   }
+
+  // An announcement with no points of its own (a strike, a frenzy opening, a
+  // cleared drive gate, a side objective changing state) — the pages banner it.
+  note(kind, label, x, y, extra) { this.pushEvent(Object.assign({ kind, points: 0, mult: 1, x, y, label }, extra || {})) }
+
+  jackpot(name) { if (!this.run.jackpots.includes(name)) this.run.jackpots.push(name) }
 
   par() { return this.p.parBase + this.p.parPerSheep * this.sheep.length }
+  quietAllowance() { return this.p.quietHandBase + this.p.quietHandPerSheep * this.sheep.length }
 
-  // SC5 (owner Q76): an injury subtracts nothing but ends the stream combo.
-  breakCombo() {
-    const run = this.run
-    if (run.comboLive) run.breaks++
-    run.combo = 1; run.comboLive = false
+  // What a sheep's kind is worth UNCONDITIONALLY (the conditional kinds — lamb,
+  // bellwether, yearling — are settled at the crossing). Feeds the flock value
+  // and the reference run.
+  kindWorth(s) {
+    const p = this.p
+    return s.kind === 'golden' ? p.goldenMult : s.kind === 'ram' ? p.ramMult : s.kind === 'black' ? p.blackMult : 1
   }
 
-  // SC2–SC4 + FO4–FO6: a sheep has just crossed into the pen.
+  // SC14: what the sheep still in the pasture could pay, each walked in PERFECT at its present condition.
+  flockValue() {
+    let v = 0
+    for (const s of this.sheep) if (!s.through && !s.down) v += this.p.penPerfectPoints * s.cond * this.kindWorth(s)
+    return v
+  }
+
+  // SC15: the chain's window — comboWindow at ×1, tightening to comboWindowMin at comboTightenAt.
+  comboWindowNow() {
+    const p = this.p, at = Math.max(2, p.comboTightenAt)
+    const u = Math.max(0, Math.min(1, (this.run.combo - 1) / (at - 1)))
+    return p.comboWindow + (p.comboWindowMin - p.comboWindow) * u
+  }
+
+  // The chain is over (its window lapsed, a strike, or the run ended). SC21: a
+  // chain of perfectFileMin+ crossings with no RUSHED sheep pays its points again.
+  endChain(lapse) {
+    const run = this.run, p = this.p, c = run.chain
+    if (!run.comboLive) return
+    run.comboLive = false; run.combo = 1; run.frenzyStep = 0
+    if (lapse) run.breaks++
+    run.chain = { n: 0, rushed: 0, points: 0 }
+    if (c.n >= p.perfectFileMin && c.rushed === 0 && c.points > 0) {
+      this.jackpot('file')
+      this.award('file', c.points, this.gate.x, this.gate.y, 'PERFECT FILE +' + c.points)
+    }
+  }
+
+  // SC16: a strike — announced, ends the chain and any frenzy, and the
+  // strikeMax-th ends the run (a bust). One incident, one strike: a second
+  // inside strikeCooldown of the last is not counted. Returns whether it counted.
+  // Also called by lib/assault-sim.js (a mortar kill, owner Q96).
+  strike(reason, x, y) {
+    const p = this.p, run = this.run
+    if (run.finished || run.t - run.lastStrikeT < p.strikeCooldown) return false
+    run.lastStrikeT = run.t; run.strikes++
+    this.endChain(true); run.frenzyT = 0
+    this.setObjective('spotless', 'lost')
+    const last = p.strikeMax > 0 && run.strikes >= p.strikeMax
+    this.note('strike', last ? 'STRIKE ' + run.strikes + ' — BUST' : 'STRIKE ' + run.strikes, x, y, { reason, n: run.strikes, bust: last })
+    if (last) { run.bust = true; this.finishRun() }
+    return true
+  }
+
+  // SC16 (owner Q96): a sheep has reached the fence at speed.
+  fenceSlam(s) {
+    const run = this.run
+    if (run.finished || run.t - s.slamAt < this.p.panicRearm) return
+    s.slamAt = run.t; run.slams++
+    this.strike('slam', s.pos.x, s.pos.y)
+  }
+
+  // FO11: a side objective changes state once, from 'open'.
+  setObjective(id, state) {
+    for (const o of this.sideObjectives) if (o.id === id && o.state === 'open') {
+      o.state = state
+      this.note('objective', (state === 'met' ? '✓ ' : '✗ ') + o.label, this.gate.x, this.gate.y, { id, state })
+    }
+  }
+
+  // FO11: each course states sideObjectiveCount side objectives, drawn on
+  // their own PRNG stream from those the course makes possible. None in waves.
+  rollSideObjectives(seed) {
+    this.sideObjectives = []
+    const p = this.p, count = Math.round(p.sideObjectiveCount)
+    if (p.mode === 'waves' || count <= 0 || this.sheep.length < 4) return
+    const has = (k) => this.sheep.some((s) => s.kind === k)
+    const pool = SIDE_OBJECTIVES.filter((o) => o.needs === 'golden' ? has('golden') : o.needs === 'bell' ? has('bell') : o.needs === 'gate' ? this.driveGates.length > 0 : true)
+    const rnd = makePRNG((seed ^ 0x51ed270b) >>> 0)
+    for (let i = 0; i < count && pool.length; i++) {
+      const o = pool.splice(Math.floor(rnd() * pool.length) % pool.length, 1)[0]
+      this.sideObjectives.push({ id: o.id, label: o.label, hint: o.hint, state: 'open' })
+    }
+  }
+
+  // The course is laid (flock, drive gates, specials): fix what scoring measures the run against.
+  startCourseScoring(seed) {
+    const run = this.run
+    run.reference = this.referenceScore()
+    run.value = run.valueStart = this.flockValue()
+    this.rollSideObjectives(seed)
+  }
+
+  // SC12–SC15, SC23, SC24 + FO4–FO10: a sheep has just crossed into the pen.
   onPenned(s) {
     const p = this.p, run = this.run, g = this.gate
     s.penT = run.t
     if (run.finished) return
-    const calm = s.stress < p.penCalmStress && !s.trot && !s.panic
-    run.combo = run.comboLive ? Math.min(Math.max(1, Math.round(p.comboMax)), run.combo + 1) : 1
-    run.comboLive = true; run.comboT = 0; run.crossings++
+    const felt = Math.max(s.stress, s.stressAvg) // how worked up it is: this instant, or lately (penStressMemory)
+    const rushed = s.trot || s.panic || felt >= p.penCalmStress
+    const tier = rushed ? 'rushed' : felt < p.penPerfectStress ? 'perfect' : 'calm'
+    const base = tier === 'rushed' ? p.penPoints : tier === 'perfect' ? p.penPerfectPoints : p.penCalmPoints
+    const first = run.crossings === 0
+    // SC15: the chain — PERFECT +2, CALM +1, RUSHED holds; no cap
+    if (run.comboLive) run.combo += tier === 'perfect' ? 2 : tier === 'calm' ? 1 : 0
+    else { run.comboLive = true; run.combo = 1; run.chains++; run.chain = { n: 0, rushed: 0, points: 0 } }
+    run.comboT = 0; run.crossings++
     if (run.combo > run.comboBest) run.comboBest = run.combo
-    if (calm) run.calmPenned++
-    const base = calm ? p.penCalmPoints : p.penPoints
+    run.tiers[tier]++
+    if (!rushed) run.calmPenned++
+    // SC23: a live frenzy doubles this crossing and is extended by it; passing a multiple of frenzyEvery opens one
+    const frenzy = run.frenzyT > 0
+    if (frenzy) run.frenzyT = Math.min(p.frenzyMax, run.frenzyT + p.frenzyExtend)
+    const fstep = p.frenzyEvery > 0 ? Math.floor(run.combo / p.frenzyEvery) : 0
+    if (fstep > run.frenzyStep) {
+      run.frenzyStep = fstep; run.frenzyT = Math.max(run.frenzyT, p.frenzySecs)
+      this.jackpot('frenzy'); this.note('frenzy', 'FRENZY — crossings pay double', g.x, g.y)
+    }
     let k = 1, tag = ''
     if (s.kind === 'golden') { k = p.goldenMult; tag = 'GOLDEN ' }
     else if (s.kind === 'ram') { k = p.ramMult; tag = 'RAM ' }
+    else if (s.kind === 'black') { k = p.blackMult; tag = 'BLACK SHEEP ' }
+    else if (s.kind === 'bell') { if (first) { k = p.bellMult; tag = 'BELLWETHER ' } }
+    else if (s.kind === 'yearling') { if (!rushed) { k = p.yearlingMult; tag = 'YEARLING ' } }
     else if (s.kind === 'lamb') {
       const m = this.sheep[s.mother]
       if (m && m.through && run.t - m.penT <= p.comboWindow) { k = p.lambMult; tag = 'LAMB ' }
     }
-    const worth = Math.round(base * k), total = worth * run.combo
-    this.tallyAdd('pen', Math.min(p.penPoints, base)); this.tallyAdd('calm', base - Math.min(p.penPoints, base))
-    this.tallyAdd('special', worth - base); this.tallyAdd('stream', total - worth)
+    // SC13: tier × condition (owner Q90), then the kind, the multiplier and a frenzy
+    const plain = Math.round(base * s.cond), worth = Math.round(base * s.cond * k)
+    const mult = run.combo + run.gateMult, total = worth * mult * (frenzy ? 2 : 1)
+    this.tallyAdd('pen', plain); this.tallyAdd('special', worth - plain)
+    this.tallyAdd('stream', worth * (mult - 1)); this.tallyAdd('frenzy', total - worth * mult)
     this.points += total
-    this.scoreEvents.push({ kind: 'pen', points: total, mult: run.combo, x: g.x, y: g.y, label: tag + '+' + worth + (run.combo > 1 ? ' ×' + run.combo : '') })
-    if (this.scoreEvents.length > 256) this.scoreEvents.shift()
+    run.chain.n++; run.chain.points += total
+    if (rushed) run.chain.rushed++
+    if (run.chain.n > run.longest) run.longest = run.chain.n
+    if (s.kind !== 'ewe') run.specials.push(s.kind)
+    this.pushEvent({ kind: 'pen', tier, frenzy, points: total, mult, x: g.x, y: g.y, label: tag + '+' + worth + (mult > 1 ? ' ×' + mult : '') + (frenzy ? ' ×2' : '') })
     if (p.mode === 'waves') run.clock = Math.min(p.waveClockMax, run.clock + p.waveSecsPerSheep) // RM5
+    let penned = 0, down = 0
+    for (const b of this.sheep) { if (b.through) penned++; else if (b.down) down++ }
+    const full = penned >= this.sheep.length - down
+    // FO11: side objectives that are settled at a crossing
+    if (first) this.setObjective('lead_bell', s.kind === 'bell' ? 'met' : 'lost')
+    if (s.kind === 'golden') this.setObjective('last_golden', full ? 'met' : 'lost')
+    if (rushed) this.setObjective('no_rush', 'lost')
+    if (run.chain.n >= Math.ceil(this.sheep.length / 2)) this.setObjective('long_file', 'met')
+    // SC24: the crossing that fills the pen
+    if (full) {
+      const f = tier === 'perfect' ? 1 : tier === 'calm' ? 0.5 : 0
+      const pts = Math.round(p.finisherPoints * mult * f)
+      if (pts > 0) { this.jackpot('finisher'); this.award('finisher', pts, g.x, g.y, 'LAST SHEEP +' + pts) }
+    }
   }
 
   // Working-flock centroid — drives all dog steering. Excludes penned (through)
@@ -914,7 +1137,7 @@ class FlockSim {
                   bark: ['barkMult', 'barkDur', 'barkDecay'],
                   lean: ['leanMult', 'leanDur', 'leanDecay'] }[f] || []
       d.impulse = { name: f, mult: p[K[0]], dur: p[K[1]], decay: p[K[2]], t: 0 }
-      this.run.commands++ // SC10 Quiet Hand: an impulse is a command too
+      this.countCommand(cmd) // SC19 Quiet Hand: an impulse is a command too
       return
     }
     const was = d.command + '|' + d.flankEasy + '|' + d.lieSide
@@ -957,7 +1180,17 @@ class FlockSim {
     d.stallT = 0; d.driveT = 0 // fresh command → fresh stall watch + spool-up (E2)
     d.fwdEMA = this.p.stallSpeed * 3 // seeded optimistic so spool-up can't false-trip
     d.command = cmd
-    if (was !== cmd + '|' + d.flankEasy + '|' + d.lieSide) this.run.commands++ // SC10 Quiet Hand — repeats of the live command are free
+    if (was !== cmd + '|' + d.flankEasy + '|' + d.lieSide) { // SC19 Quiet Hand — repeats of the live command are free
+      this.countCommand(cmd)
+      if (cmd === 'lie_down') { this.run.lieDowns++; this.setObjective('on_feet', 'lost') }                 // Never Sat
+      if ((cmd === 'come_by' || cmd === 'away') && !d.flankEasy) this.run.fullFlanks++                       // Steady Away
+    }
+  }
+
+  countCommand() {
+    const run = this.run
+    run.commands++
+    if (run.commands > this.quietAllowance()) this.setObjective('few_words', 'lost')
   }
 
   playRect() {
@@ -987,6 +1220,7 @@ class FlockSim {
     // what they were before either existed.
     this.placeDriveGates(this.seed)
     this.assignSpecials(this.seed)
+    this.startCourseScoring(this.seed) // POC-v15: reference run, flock value, side objectives
     this.courseRev++
     if (this.dog) {
       this.dog.avoidSide = 0
@@ -994,6 +1228,7 @@ class FlockSim {
       this.setCommand('that_ll_do') // a new course starts at heel — a bare reseed() used to
     }                               // inherit the previous drive (bit the v5 P6 harness)
     this.run.commands = 0           // …and that recall is not the player's
+    this.blackPanic = null          // FO8: where a panicking black sheep stands (last tick), or null
   }
 
   // FO1–FO3 (POC-v14): optional DRIVE GATES — a pair of short hurdle panels
@@ -1045,7 +1280,7 @@ class FlockSim {
 
   // FO2: a sheep that crosses the gap segment (either way, owner Q82) scores
   // once per gate; when every sheep still being worked has been through the
-  // same gate it pays its bonus and is done.
+  // same gate it is cleared: the multiplier rises for the rest of the run (FO7).
   updateDriveGates() {
     const p = this.p
     for (const dg of this.driveGates) {
@@ -1066,7 +1301,11 @@ class FlockSim {
       if (!scored) continue
       let all = true, working = 0
       for (const s of this.sheep) if (!s.through && !s.down) { working++; if (!dg.passed.has(s)) { all = false; break } }
-      if (all && working > 0) { dg.done = true; this.award('gate', p.driveGateBonus, dg.x, dg.y, 'DRIVE GATE +' + Math.round(p.driveGateBonus)) }
+      if (all && working > 0) { // FO7 (POC-v15): a cleared gate feeds the multiplier for the rest of the run
+        dg.done = true; this.run.gateMult += p.driveGateMult
+        this.note('gate', 'DRIVE GATE — multiplier +' + p.driveGateMult, dg.x, dg.y, { cleared: true })
+        if (this.driveGates.every((g) => g.done)) this.setObjective('gates', 'met')
+      }
     }
   }
 
@@ -1077,6 +1316,7 @@ class FlockSim {
   assignSpecials(seed) {
     const p = this.p, n = this.sheep.length
     for (const s of this.sheep) { s.kind = 'ewe'; s.mother = -1 }
+    this.bellIdx = -1
     if (!p.specials || n < 4) return
     const rnd = makePRNG((seed ^ 0x2545f491) >>> 0)
     const golden = rnd() < p.goldenChance, ram = rnd() < p.ramChance, lamb = rnd() < p.lambChance
@@ -1096,6 +1336,12 @@ class FlockSim {
         this.pushOut(s.pos, 3)
       }
     }
+    // FO8–FO10 (POC-v15): black sheep, bellwether, skittish yearling — drawn
+    // strictly AFTER every v14 draw, so a seed keeps its golden ewe, ram and lamb.
+    const black = rnd() < p.blackChance, bell = rnd() < p.bellChance, yearling = rnd() < p.yearlingChance
+    if (black) { const i = pick(); if (i >= 0) this.sheep[i].kind = 'black' }
+    if (bell) { const i = pick(); if (i >= 0) { this.sheep[i].kind = 'bell'; this.bellIdx = i } }
+    if (yearling) { const i = pick(); if (i >= 0) this.sheep[i].kind = 'yearling' }
   }
 
   // RM5 (POC-v14): the pen has filled in wave mode — empty it, keep the score,
@@ -1112,7 +1358,8 @@ class FlockSim {
     const n = Math.min(Math.max(p.waveSheepStart, p.waveSheepMax), p.waveSheepStart + p.waveGrowth * run.wave)
     this.spawn(n, true)
     this.assignSpecials(ws)
-    run.waveInjuries = this.injuries
+    run.waveInjuries = this.injuries; run.waveStrikes = run.strikes; run.waveRushed = run.tiers.rushed; run.wavePoints = this.points
+    this.blackPanic = null
     this.dog.avoidSide = 0
     this.courseRev++
   }
@@ -1572,6 +1819,11 @@ class FlockSim {
         standCool: 0,                      //   …seconds before he may stand again
         penT: 0,                           // run time at which it crossed into the pen
         lost: false,                       // killed by the assault — out of the flock (SC11)
+        stressAvg: 0,                      // POC-v15 SC12: stress smoothed over penStressMemory — what its tier is read from
+        cond: 1,                           // POC-v15 SC13: condition 0–1 — drains under panic / trot, recovers grazing; scales its payout
+        wasPanic: false,                   //   panic flag last tick (a panic is counted on its onset)
+        panicAt: -1e9,                     //   run time of its last counted panic
+        slamAt: -1e9,                      //   run time of its last counted fence slam
     })
   }
 
@@ -1637,13 +1889,16 @@ class FlockSim {
       })
     }
     const k = Math.min(p.cohN, cand.length)
-    if (k === 0) return { x: 0, y: 0 }
-    let cx = 0, cy = 0
+    const bw = a.idle ? null : this.bellFor(i) // FO9: an alert sheep near the bellwether goes where she goes
+    if (k === 0 && !bw) return { x: 0, y: 0 }
+    let cx = 0, cy = 0, w = k
     for (let t = 0; t < k; t++) {
       const b = this.sheep[cand[t].j]
       cx += b.pos.x; cy += b.pos.y
     }
-    const to = { x: cx / k - a.pos.x, y: cy / k - a.pos.y }
+    if (bw) { cx += bw.pos.x * p.bellWeight; cy += bw.pos.y * p.bellWeight; w += p.bellWeight }
+    if (!(w > 0)) return { x: 0, y: 0 }
+    const to = { x: cx / w - a.pos.x, y: cy / w - a.pos.y }
     const d = vec2.len(to)
     if (d < 1e-6) return { x: 0, y: 0 }
     const mag = Math.min(d / p.cohScale, 1)   // proportional within cohScale, capped
@@ -1664,8 +1919,28 @@ class FlockSim {
       const b = this.sheep[n.j]
       vx += b.vel.x; vy += b.vel.y; c++
     }
-    if (c === 0) return { x: 0, y: 0 }
+    const bw = this.bellFor(i) // FO9
+    if (bw) { vx += bw.vel.x * p.bellWeight; vy += bw.vel.y * p.bellWeight; c += p.bellWeight }
+    if (!(c > 0)) return { x: 0, y: 0 }
     return vec2.norm({ x: vx, y: vy })
+  }
+
+  // FO9: the bellwether, if this sheep is within her reach (and is not her).
+  bellFor(i) {
+    const j = this.bellIdx
+    if (!(j >= 0) || j === i) return null
+    const b = this.sheep[j], p = this.p
+    if (!b || b.kind !== 'bell' || b.through || b.down || !(p.bellWeight > 0)) return null
+    return vec2.dist(this.sheep[i].pos, b.pos) < p.bellRadius ? b : null
+  }
+
+  // FO8: the spook a panicking black sheep puts on this one — { x, y } unit away from her, t = threat — or null.
+  spookOn(a) {
+    const b = this.blackPanic, p = this.p
+    if (!b || a.kind === 'black') return null
+    const dx = a.pos.x - b.x, dy = a.pos.y - b.y, d = Math.hypot(dx, dy)
+    if (d >= p.blackSpookRadius || d < 1e-6) return null
+    return { x: dx / d, y: dy / d, t: p.blackSpookThreat * (1 - d / p.blackSpookRadius) }
   }
 
   // Dog steering: command → target + facing + intensity, then arrive-seek toward
@@ -1976,11 +2251,12 @@ class FlockSim {
     const easy = d.command === 'easy'
     const driving = d.command === 'walk_on' || easy
     const lying = d.command === 'lie_down'
-    const Rc = p.R_flee * (driving ? 1 + (easy ? p.easyConeExt : p.driveConeExt) : 1)
+    const Rf = p.R_flee * (a.kind === 'yearling' ? p.yearlingFlightScale : 1) // FO10: she moves off from much further away
+    const Rc = Rf * (driving ? 1 + (easy ? p.easyConeExt : p.driveConeExt) : 1)
     // D3 (POC-v9): lie-down's block BEAM reaches lieConeExt beyond the normal
     // eye (+15 %) at lieConeDeg width (40°); the ambient FLANKS keep the short
     // postureRange reach, so off-beam gate relief survives.
-    const Rp = p.R_flee * p.postureRange, Rb = p.R_flee * (1 + p.lieConeExt)
+    const Rp = Rf * p.postureRange, Rb = Rf * (1 + p.lieConeExt)
     const reach = lying ? Math.max(Rp, Rb) : Rc
     // FO6 (owner Q84): the stubborn ram. An advancing dog inside ramStandDist
     // makes him stop and face the dog; he gives way once the dog is beyond
@@ -1995,8 +2271,11 @@ class FlockSim {
       } else if (dist < p.ramStandDist && dist > 1e-6 && a.standCool <= 0 &&
                  (d.vel.x * to.x + d.vel.y * to.y) / dist > p.stallSpeed) { a.stand = true; a.standLie = 0 }
     }
+    const sp = this.blackPanic ? this.spookOn(a) : null // FO8: spooked by a panicking black sheep
     if (dist >= reach || dist < 1e-6) {
-      a.stress = 0; if (a.protest > 0) a.protest -= dt; return { x: 0, y: 0 }
+      if (a.protest > 0) a.protest -= dt
+      if (sp) { a.stress = sp.t; if (sp.t > p.panicThreshold) a.panic = true; return { x: sp.x * sp.t, y: sp.y * sp.t } }
+      a.stress = 0; return { x: 0, y: 0 }
     }
     const dir = { x: to.x / dist, y: to.y / dist }            // flee away from dog
     // D4 (POC-v10): an offset down swings the whole directional term — the eye
@@ -2014,7 +2293,7 @@ class FlockSim {
       const gb = smoothstep(Rb, 0, dist)                      // beam fades out at its extended reach
       T = gp * p.ambient * p.lieDownIntensity + gb * Math.pow(cosT, coneKFromDeg(p.lieConeDeg)) * block
     } else {
-      const gA = smoothstep(p.R_flee, 0, dist)                // ambient floor: 1 at contact → 0 at R_flee
+      const gA = smoothstep(Rf, 0, dist)                      // ambient floor: 1 at contact → 0 at R_flee
       const gC = smoothstep(Rc, 0, dist)                      // eye cone: 1 at contact → 0 at the (extended) reach
       const kEye = easy ? coneKFromDeg(p.easyConeDeg) : p.coneK // E6: easy's tight cone
       const eye = p.ambient * gA + (1 - p.ambient) * gC * Math.pow(cosT, kEye) // = g·eye of v6 when Rc = R_flee
@@ -2024,6 +2303,8 @@ class FlockSim {
     // the pressure fades by how deep the sight line cuts into the obstacle.
     if (T > 0 && p.obstacleCover > 0 && this.obstacles.length) T *= 1 - p.obstacleCover * this.coverBetween(d.pos, a.pos)
     if (a.kind === 'ram') T *= p.ramFleeScale // FO6: he feels less of the dog
+    else if (a.kind === 'black') T *= p.blackThreatScale // FO8: she feels more of him
+    if (sp) T += sp.t
     a.stress = T
     if (a.stand) return { x: 0, y: 0 }        //   …and standing, yields nothing
     const hold = a.boldness * p.boldnessTheta
@@ -2296,10 +2577,12 @@ class FlockSim {
       s.through = true
       this.onPenned(s) // POC-v14: the count-up score is paid here
     } else {
-      if (s.pos.x < r.x0) { s.pos.x = r.x0; if (s.vel.x < 0) s.vel.x = 0 }
-      if (s.pos.x > r.x1) { s.pos.x = r.x1; if (s.vel.x > 0) s.vel.x = 0 }
-      if (s.pos.y < r.y0) { s.pos.y = r.y0; if (s.vel.y < 0) s.vel.y = 0 }
-      if (s.pos.y > r.y1) { s.pos.y = r.y1; if (s.vel.y > 0) s.vel.y = 0 }
+      let into = 0 // speed INTO the fence at the moment of contact (SC16 fence slam) — read only, the clamp is unchanged
+      if (s.pos.x < r.x0) { into = Math.max(into, -s.vel.x); s.pos.x = r.x0; if (s.vel.x < 0) s.vel.x = 0 }
+      if (s.pos.x > r.x1) { into = Math.max(into, s.vel.x); s.pos.x = r.x1; if (s.vel.x > 0) s.vel.x = 0 }
+      if (s.pos.y < r.y0) { into = Math.max(into, -s.vel.y); s.pos.y = r.y0; if (s.vel.y < 0) s.vel.y = 0 }
+      if (s.pos.y > r.y1) { into = Math.max(into, s.vel.y); s.pos.y = r.y1; if (s.vel.y > 0) s.vel.y = 0 }
+      if (into > p.fenceSlamSpeed) this.fenceSlam(s)
     }
 
     // stable facing: track heading only when actually moving (no flicker at rest)
@@ -2572,8 +2855,8 @@ class FlockSim {
     }
     if (best >= 0) {
       const s = this.sheep[best]
-      s.down = true; s.vel = { x: 0, y: 0 }; s.stress = 1; this.injuries++
-      this.breakCombo() // SC5 (owner Q76)
+      s.down = true; s.vel = { x: 0, y: 0 }; s.stress = 1; s.cond = 0; this.injuries++
+      this.strike('injury', s.pos.x, s.pos.y) // SC16: a sheep going down is a strike
     }
   }
 
@@ -2616,11 +2899,12 @@ class FlockSim {
     run.lineDev += Math.min(dev / p.lineNorm, 1) * dt        // line: 0..1/s off-path (a statistic now)
     if (dev <= p.lineOnDist) run.onLine += dt                // SC10 Straight as a Die
 
-    // SC4: the stream lapses when no sheep has crossed for comboWindow
+    // SC15: the chain lapses when no sheep has crossed for its (tightening) window; SC23: a frenzy runs down
     if (run.comboLive) {
       run.comboT += dt
-      if (run.comboT > p.comboWindow) { run.comboLive = false; run.combo = 1; run.breaks++ }
+      if (run.comboT > this.comboWindowNow()) this.endChain(true)
     }
+    if (run.frenzyT > 0) run.frenzyT = Math.max(0, run.frenzyT - dt)
 
     // cohesion is judged over the flock still being worked — exclude penned
     // (succeeded) and down (already penalized) so spanning the gate isn't a "split"
@@ -2645,87 +2929,211 @@ class FlockSim {
       run.strag += (stragglers / active.length) * dt       // cohesion: straggler fraction
     }
 
-    let sum = 0
-    for (const s of this.sheep) sum += s.stress
-    run.stress += this.sheep.length ? (sum / this.sheep.length) * dt : 0 // calm: mean-stress integral
+    // SC13 / SC14 / SC16: condition, flock value and panic onsets — one pass over the flock.
+    // Condition is READ by scoring only; nothing here changes how a sheep moves.
+    let sum = 0, cs = 0, val = 0, delta = 0, hit = null
+    for (const s of this.sheep) {
+      sum += s.stress
+      if (s.down) s.cond = 0
+      else if (!s.through) {
+        s.stressAvg = p.penStressMemory > 0 ? s.stressAvg + (s.stress - s.stressAvg) * Math.min(1, dt / p.penStressMemory) : s.stress
+        const c0 = s.cond
+        if (s.panic) s.cond -= p.condPanicDrain * dt
+        else if (s.trot) s.cond -= p.condTrotDrain * dt
+        else if (s.idle) s.cond += p.condRecover * dt
+        s.cond = Math.max(Math.min(c0, p.condFloor), Math.min(1, s.cond))
+        delta += s.cond - c0
+        if (s.trot) run.trotEver = true
+        if (s.panic && !s.wasPanic && run.t - s.panicAt >= p.panicRearm) {
+          s.panicAt = run.t; run.panics++
+          if (p.strikePanics > 0 && run.panics % p.strikePanics === 0) hit = s
+        }
+        s.wasPanic = s.panic
+        val += p.penPerfectPoints * s.cond * this.kindWorth(s)
+      }
+      cs += s.cond
+    }
+    const n = this.sheep.length
+    run.stress += n ? (sum / n) * dt : 0 // calm: mean-stress integral
+    run.value = val
+    run.condMean = n ? cs / n : 1
+    if (run.condMean < run.condMin) run.condMin = run.condMean
+    run.draining = delta < -1e-9
+    if (hit) { this.strike('panic', hit.pos.x, hit.pos.y); if (run.finished) return }
 
-    if (this.driveGates.length) this.updateDriveGates()    // FO2
+    if (this.driveGates.length) this.updateDriveGates()    // FO2 / FO7
 
     // The pen is full when every sheep still on its feet is in it: an injured
     // (down) sheep — or one lost to the assault (SC11) — never scores, and no
-    // longer holds the run open (SC5 / SC9 need a won run with an injury).
+    // longer holds the run open.
     let penned = 0, down = 0
     for (const s of this.sheep) { if (s.through) penned++; else if (s.down) down++ }
-    const full = this.sheep.length > 0 && penned >= this.sheep.length - down
+    const full = n > 0 && penned >= n - down
     if (p.mode === 'waves') {                              // RM5 / RM6
       if (full) {
-        const g = this.gate
-        if (penned > 0) {
-          this.award('flock', p.fullFlockBonus, g.x, g.y, 'FULL FLOCK +' + Math.round(p.fullFlockBonus))
-          if (this.injuries === run.waveInjuries) this.award('clean', p.cleanRunBonus, g.x, g.y, 'CLEAN +' + Math.round(p.cleanRunBonus))
-        }
+        if (penned > 0) this.payWave()
         this.nextWave()
       }
       run.clock -= dt
-      if (run.clock <= 0) { run.clock = 0; run.finished = true }
+      if (run.clock <= 0) { run.clock = 0; this.finishRun() }
       return
     }
-    if (full) this.finishCourse(penned)
+    if (full) { run.won = penned > 0; this.finish(penned) }
   }
 
-  // The whole flock is in: pay the end-of-run bonuses (SC5, SC6, SC10).
-  finishCourse(penned) {
+  // RM5 + SC18 (owner-default Q98): a wave's pen has filled — its own play points take the end multipliers.
+  payWave() {
     const p = this.p, run = this.run, g = this.gate
-    run.finished = true
-    run.won = penned > 0
-    if (!run.won) return
-    this.award('flock', p.fullFlockBonus, g.x, g.y, 'FULL FLOCK +' + Math.round(p.fullFlockBonus))
-    if (this.injuries === 0) this.award('clean', p.cleanRunBonus, g.x, g.y, 'CLEAN RUN +' + Math.round(p.cleanRunBonus))
-    const par = this.par(), under = Math.floor(Math.max(0, par - run.t))
-    this.award('time', under * p.parPointsPerSec, g.x, g.y, 'UNDER PAR +' + Math.round(under * p.parPointsPerSec))
-    const give = (name) => { run.awards.push(name); this.award('award', p.awardPoints, g.x, g.y, name + ' +' + Math.round(p.awardPoints)) }
-    if (run.calmPenned >= penned) give('Not a Hair Out of Place')
-    if (run.breaks === 0 && penned >= 2) give('One Stream')
-    if (run.commands <= p.quietHandBase + p.quietHandPerSheep * this.sheep.length) give('Quiet Hand')
-    if (run.t > 0 && run.onLine / run.t >= p.lineAwardShare) give('Straight as a Die')
-    if (Math.abs(par - run.t) <= p.photoFinishSecs) give('Photo Finish')
+    let m = p.multFullFlock
+    if (run.strikes === run.waveStrikes) m *= p.multClean
+    if (run.tiers.rushed === run.waveRushed) m *= p.multAllCalm
+    this.award('mult', (this.points - run.wavePoints) * (m - 1), g.x, g.y, 'WAVE ×' + (+m.toFixed(2)))
   }
 
-  finishRun() { this.run.finished = true }
+  // The player (or a bust, or the wave clock) ends the run without a full pen.
+  finishRun() {
+    if (this.run.finished) return
+    let penned = 0
+    for (const s of this.sheep) if (s.through) penned++
+    this.finish(penned)
+  }
 
-  // The score read-out (pure). `lines` sum to `total`; `stars` per SC9.
+  // The run is over — won (run.won set by the caller) or not. Close the chain
+  // (its PERFECT FILE must be paid before anything multiplies), settle awards
+  // and side objectives, then pay the end multipliers (SC18–SC20, SC22) and,
+  // on a win, the small time bonus (SC17).
+  finish(penned) {
+    const p = this.p, run = this.run, g = this.gate
+    if (run.finished) return
+    const oneGo = run.won && penned >= 2 && run.chains === 1 && run.breaks === 0 && run.comboLive && run.chain.n === penned
+    this.endChain(false)
+    run.finished = true
+    if (p.mode === 'waves') { run.playPoints = this.points; return }
+    if (run.won) {
+      const give = (name) => {
+        const a = AWARDS.find((x) => x.name === name)
+        const mult = a.rarity === 'legendary' ? p.multAwardLegendary : a.rarity === 'rare' ? p.multAwardRare : p.multAwardCommon
+        run.awards.push(name); run.awardList.push({ name, rarity: a.rarity, mult })
+      }
+      const par = this.par(), allow = this.quietAllowance()
+      if (run.commands <= allow) give('Quiet Hand')
+      if (run.t > 0 && run.onLine / run.t >= p.lineAwardShare) give('Straight as a Die')
+      if (Math.abs(par - run.t) <= p.photoFinishSecs) give('Photo Finish')
+      if (this.driveGates.length > 0 && this.driveGates.every((d) => d.done)) give('Gatekeeper')
+      if (run.tiers.rushed === 0 && run.strikes === 0) give('Not a Hair Out of Place')
+      if (run.lieDowns === 0) give('Never Sat')
+      if (run.fullFlanks === 0) give('Steady Away')
+      if (run.condMin >= p.fullPurseShare) give('Full Purse')
+      if (run.tiers.perfect === penned) give('Sunday Stroll')
+      if (!run.trotEver && run.panics === 0) give('Nobody Ran')
+      if (run.commands <= allow / 2) give('Not a Word Wasted')
+      if (oneGo) { this.jackpot('onego'); this.note('onego', 'ONE GO — the whole flock in one chain', g.x, g.y) }
+    }
+    for (const o of this.sideObjectives.slice())
+      if (o.state === 'open') this.setObjective(o.id, run.won && SIDE_OBJECTIVES_AT_WIN.has(o.id) ? 'met' : 'lost')
+    run.playPoints = this.points
+    run.endMults = this.endMultipliers(penned, oneGo)
+    run.endMult = run.endMults.reduce((m, e) => m * e.mult, 1)
+    this.award('mult', run.playPoints * (run.endMult - 1), g.x, g.y, 'RUN ×' + (+run.endMult.toFixed(2)))
+    if (run.won) {
+      const under = Math.floor(Math.max(0, this.par() - run.t))
+      this.award('time', under * p.parPointsPerSec, g.x, g.y, 'UNDER PAR +' + Math.round(under * p.parPointsPerSec))
+    }
+  }
+
+  // SC18–SC20, SC22, FO11: the multipliers a finished run has earned, each its own card line.
+  endMultipliers(penned, oneGo) {
+    const p = this.p, run = this.run, n = this.sheep.length, list = []
+    const add = (key, label, mult) => { if (mult > 0 && Math.abs(mult - 1) > 1e-9) list.push({ key, label, mult }) }
+    if (run.won) add('flock', 'Full flock', p.multFullFlock)
+    else if (penned > 0 && n > 0) add('flock', `Part of the flock (${penned}/${n})`, 1 + (p.multFullFlock - 1) * penned / n) // SC20
+    if (run.won && run.strikes === 0) add('clean', 'Clean run', p.multClean)
+    if (penned > 0 && run.tiers.rushed === 0 && (run.won || penned >= n / 2)) add('calm', 'All calm', p.multAllCalm)
+    if (run.won) {
+      if (oneGo) add('onego', 'One go', p.multOneGo)
+      for (const a of run.awardList) add('award', a.name, a.mult)
+      for (const o of this.sideObjectives) if (o.state === 'met') add('objective', o.label, p.multSideObjective)
+    }
+    return list
+  }
+
+  // VH7 / VH8 (owner Q104): the REFERENCE run this course is measured against —
+  // every sheep penned CALM at full condition in one chain, flock full, no
+  // strikes; no jackpots, drive gates, awards or side objectives. Closed form.
+  referenceScore() {
+    const p = this.p, n = this.sheep.length
+    if (p.mode === 'waves' || n === 0) return 0
+    let k = 0
+    for (const s of this.sheep) k += this.kindWorth(s)
+    return Math.round(p.penCalmPoints * (k / n) * n * (n + 1) / 2 * p.multFullFlock * p.multClean * p.multAllCalm)
+  }
+
+  // VH7: the named rank for the run so far. A bust ranks no higher than Farmhand. null where there is no reference (waves).
+  rank() {
+    const p = this.p, run = this.run
+    if (!(run.reference > 0)) return null
+    const pct = this.points / run.reference, thr = [0].concat(RANK_KEYS.map((k) => p[k]))
+    let i = 0
+    for (let j = 1; j < thr.length; j++) if (pct >= thr[j]) i = j
+    if (run.bust) i = Math.min(i, 1)
+    const next = !run.bust && i + 1 < thr.length ? { name: RANKS[i + 1], points: Math.max(0, Math.ceil(thr[i + 1] * run.reference - this.points)) } : null
+    return { index: i, name: RANKS[i], percent: pct, next }
+  }
+
+  grade(v) {
+    const p = this.p, L = ['A', 'B', 'C', 'D', 'E']
+    for (let i = 0; i < L.length; i++) if (v >= p.gradeA - p.gradeStep * i) return L[i]
+    return 'F'
+  }
+
+  // VH9: four category values in 0–1 with their letter grades.
+  categories() {
+    const p = this.p, run = this.run, n = this.sheep.length, c = run.crossings
+    const tier = c ? (run.tiers.perfect + p.gradeCalmCredit * run.tiers.calm) / c : 0
+    const calm = c ? (tier + run.condMin) / 2 : run.condMin * 0.5
+    const flow = n ? Math.min(1, run.longest / n) : 0
+    const cmd = run.commands > 0 ? Math.min(1, this.quietAllowance() / run.commands) : 1
+    const control = (cmd + (run.t > 0 ? run.onLine / run.t : 0)) / 2
+    const safety = Math.max(0, 1 - (p.strikeMax > 0 ? run.strikes / p.strikeMax : 0) - p.safetyPanicCost * run.panics)
+    const out = {}
+    for (const [k, v] of [['calm', calm], ['flow', flow], ['control', control], ['safety', safety]]) out[k] = { value: v, grade: this.grade(v) }
+    return out
+  }
+
+  // The score read-out (pure). `lines` sum to `total`.
   score() {
     const p = this.p, run = this.run, t = this.tally, waves = p.mode === 'waves'
     let penned = 0
     for (const s of this.sheep) if (s.through) penned++
-    const par = this.par()
+    const par = this.par(), T = run.tiers
     const L = (key, label) => ({ key, label, points: t[key] || 0 })
     const lines = [
-      L('pen', `Sheep penned (${run.crossings})`),
-      L('calm', `Calm bonus (${run.calmPenned} calm)`),
+      L('pen', `Sheep penned (${T.perfect} perfect · ${T.calm} calm · ${T.rushed} rushed)`),
       L('special', 'Special sheep'),
-      L('stream', `Stream bonus (best ×${run.comboBest})`),
+      L('stream', `Chain (best ×${run.comboBest})`),
+      L('frenzy', 'Frenzy'),
       L('gate', 'Drive gates'),
       L('wolf', 'Wolves routed'),
-      L('flock', waves ? `Full flock (${run.wave} wave${run.wave === 1 ? '' : 's'})` : 'Full flock'),
-      L('clean', waves ? 'Clean waves' : 'Clean run'),
+      L('file', 'Perfect file'),
+      L('finisher', 'Last sheep'),
+      L('mult', waves ? `Wave multipliers (${run.wave} wave${run.wave === 1 ? '' : 's'})` : `Run multiplier ×${+run.endMult.toFixed(2)}`),
       L('time', `Time bonus (${Math.floor(Math.max(0, par - run.t))}s under par)`),
-      L('award', `Awards (${run.awards.length})`),
     ].filter((l) => l.points > 0 || l.key === 'pen')
-    let stars = 0
-    if (!waves && run.won) {
-      stars = 1
-      if (run.t <= par) {
-        stars = 2
-        if (this.injuries === 0 && run.crossings > 0 && run.calmPenned / run.crossings >= p.starCalmShare) stars = 3
-      }
-    }
+    const rank = this.rank(), win = run.comboLive ? this.comboWindowNow() : 0
     return {
-      total: this.points, lines, stars, awards: run.awards.slice(),
-      penned, calmPenned: run.calmPenned, combo: run.comboLive ? run.combo : 1, comboBest: run.comboBest,
+      total: this.points, lines, awards: run.awards.slice(), awardList: run.awardList.slice(),
+      penned, calmPenned: run.calmPenned, tiers: { rushed: T.rushed, calm: T.calm, perfect: T.perfect },
+      combo: run.comboLive ? run.combo : 1, comboLive: run.comboLive, comboBest: run.comboBest, longest: run.longest,
+      mult: (run.comboLive ? run.combo : 1) + run.gateMult, gateMult: run.gateMult,
+      comboT: run.comboT, comboWindowNow: win, windowLeft: run.comboLive && win > 0 ? Math.max(0, 1 - run.comboT / win) : 0,
+      frenzyT: run.frenzyT, strikes: run.strikes, strikeMax: Math.round(p.strikeMax), panics: run.panics, bust: run.bust,
+      flockValue: run.value, valueStart: run.valueStart, condMean: run.condMean, condMin: run.condMin, draining: run.draining,
+      playPoints: run.playPoints, endMults: run.endMults.slice(), endMult: run.endMult, jackpots: run.jackpots.slice(),
+      objectives: this.sideObjectives.map((o) => ({ id: o.id, label: o.label, hint: o.hint, state: o.state })), specials: run.specials.slice(),
+      reference: run.reference, percent: rank ? rank.percent : null, rank, categories: this.categories(),
       par, parLeft: par - run.t, mode: p.mode, wave: run.wave, clock: run.clock,
       won: run.won, finished: run.finished,
-      raw: { t: run.t, lineDev: run.lineDev, onLine: run.onLine, strag: run.strag, split: run.split, stress: run.stress, injuries: this.injuries, commands: run.commands, crossings: run.crossings },
+      raw: { t: run.t, lineDev: run.lineDev, onLine: run.onLine, strag: run.strag, split: run.split, stress: run.stress, injuries: this.injuries, commands: run.commands, crossings: run.crossings, slams: run.slams },
     }
   }
 
@@ -2737,6 +3145,8 @@ class FlockSim {
     this.updateGateCone(dt)            // G5 gate cone (POC-v13) → integrate + overlays read it
     for (let i = 0; i < this.sheep.length; i++) this.integrate(i, dt)
     for (const s of this.sheep) s.gatePull = s.gatePullNext // G3 column reads last tick's pull
+    this.blackPanic = null             // FO8: a panicking black sheep spooks her neighbours NEXT tick
+    for (const s of this.sheep) if (s.kind === 'black' && s.panic && !s.through && !s.down) { this.blackPanic = { x: s.pos.x, y: s.pos.y }; break }
     this.updateCrush(dt)               // gate crush → injury
     this.updateScore(dt)               // count-up scoring bookkeeping (POC-v14)
     this.ticks++

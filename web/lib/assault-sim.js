@@ -374,12 +374,14 @@ function explode(sim, x, y) {
   // Owner Q66 (2026-11-14): a large ROCK between the blast and a sheep shields
   // it from that blast entirely (kill, stun and panic). Tree stands do not.
   const rocks = (sim.obstacles || []).filter((o) => o.kind === 'rocks'), at = { x, y }
+  let kills = 0
   for (const s of sim.sheep) {
     if (s.down || s.through) continue
     const dx = s.pos.x - x, dy = s.pos.y - y, d = Math.hypot(dx, dy)
     if (d <= BLAST.panic && rocks.some((o) => distToSeg(o, at, s.pos) < o.r - 1)) continue
     if (d <= BLAST.kill) {
       s.down = true; s.lost = true; s.vel = { x: 0, y: 0 }; s.stress = 1; s.trot = false // lost: out of the flock for the sim's full-pen test (SC11)
+      s.cond = 0; kills++
       sim.injuries++; a.dead++; a.killed.add(s); a.stunned.delete(s); a.panicked.delete(s)
     } else if (d <= BLAST.stun) {
       a.stunned.set(s, { left: BLAST.stunFor, x: s.pos.x, y: s.pos.y }); a.panicked.delete(s)
@@ -387,5 +389,6 @@ function explode(sim, x, y) {
       a.panicked.set(s, { left: BLAST.panicFor, dx: dx / d, dy: dy / d, power: 1 - 0.5 * (d - BLAST.stun) / (BLAST.panic - BLAST.stun) })
     }
   }
+  if (kills && sim.strike) sim.strike('mortar', x, y) // POC-v15 SC16 (owner Q96): a shell that kills is a strike — one per blast
   assaultEmit('onBlast', x, y)
 }

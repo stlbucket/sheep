@@ -76,7 +76,7 @@
   }
   body.panels-hidden #side-levers { display: none; }
   /* floating stage chrome: camera picker (top-left), stress meter (top-centre) */
-  #cam-bar { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; flex-wrap: wrap; z-index: 5; }
+  #cam-bar { position: absolute; top: 110px; left: 8px; display: flex; gap: 4px; flex-wrap: wrap; z-index: 5; max-width: 46%; } /* top is set by lib/sheep-score-ui.js: directly under the score block (POC-v15 VH1) */
   #cam-bar button, #cam-bar span {
     font: inherit;
     font-size: 12px;
@@ -849,6 +849,8 @@ for (const im of [woolMesh, headMesh, legMesh]) {
 }
 woolMesh.receiveShadow = true
 const C_GOLD = new THREE.Color(0xf5c230), C_RAM = new THREE.Color(0xb39a7c) // POC-v14 FO4 / FO6
+const C_BLACK = new THREE.Color(0x2a2a30), C_BELL = new THREE.Color(0x8fc4f0), C_YEARLING = new THREE.Color(0xf3d2b4) // POC-v15 FO8–FO10
+const KIND_COL = { golden: C_GOLD, ram: C_RAM, black: C_BLACK, bell: C_BELL, yearling: C_YEARLING }
 const C_WOOL = new THREE.Color(0xf4f2ea), C_ALARM = new THREE.Color(0xdc463c), C_DOWN = new THREE.Color(0x7a1f1f), C_CHAR = new THREE.Color(0x2b2622)
 const PEN_WALK = 26 // px/s — the render-only stroll from the settle line to a paddock slot
 const sheepRS = new WeakMap() // per-sheep render state, keyed by the sim's sheep object (a reseed makes new ones)
@@ -859,7 +861,7 @@ function updateSheep(dt, time) {
   const { pos, scale, qYaw, qRoll, q, qT, mBody, mLegs, mLocal, mOut, col } = tmp
   for (let i = 0; i < n; i++) {
     const s = sim.sheep[i]
-    const KS = SC * (s.kind === 'lamb' ? 0.62 : s.kind === 'ram' ? 1.28 : 1) // POC-v14: a lamb is small, a ram is big
+    const KS = SC * (s.kind === 'lamb' ? 0.62 : s.kind === 'ram' ? 1.28 : s.kind === 'yearling' ? params.yearlingSize : s.kind === 'bell' ? 1.12 : 1) // a lamb is small, a ram is big; POC-v15: a yearling is slight, the bellwether a little larger
     scale.set(KS, KS, KS)
     let st = sheepRS.get(s)
     if (!st) { st = { yaw: s.facing, phase: (i * 2.399) % 6.283, amp: 0, graze: 0, roll: 0, seed: (i * 0.618034) % 1, slot: null, x: 0, y: 0 }; sheepRS.set(s, st) }
@@ -904,7 +906,7 @@ function updateSheep(dt, time) {
       legMesh.setMatrixAt(i * 4 + k, mOut.multiplyMatrices(mLegs, mLocal))
     }
     if (s.down) col.copy(assault.killed.has(s) ? C_CHAR : C_DOWN) // §A: mortar kills are charred, crush injuries stay red
-    else col.copy(s.kind === 'golden' ? C_GOLD : s.kind === 'ram' ? C_RAM : C_WOOL).lerp(C_ALARM, clamp01(s.stress)) // stress tint, same read-out as the 2D page
+    else col.copy(KIND_COL[s.kind] || C_WOOL).lerp(C_ALARM, clamp01(s.stress) * (s.kind === 'black' ? 0.6 : 1)) // stress tint, same read-out as the 2D page
     woolMesh.setColorAt(i, col)
   }
   woolMesh.count = headMesh.count = n; legMesh.count = n * 4
@@ -1717,7 +1719,7 @@ setCam(CAMS.includes(query.get('cam')) ? query.get('cam') : 'orbit')
 // POC-v14: the score face. `project` maps a sim point to stage px through the live camera.
 const popV = new V3()
 ScoreUI.init({
-  page: 'assault-3d', stage, badge: 'low', // clear of the camera bar and the stress meter
+  page: 'assault-3d', stage, below: document.getElementById('cam-bar'), // POC-v15 VH1: the score block owns the upper left; the camera bar sits directly under it
   project: (x, y) => {
     popV.set(x, 12, y).project(camera)
     return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }
