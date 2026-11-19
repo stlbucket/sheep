@@ -38,6 +38,7 @@ const PadUI = (() => {
     body.score-closed #score-btn { display: inline-flex; }
     #stage > #score-btn { position: absolute; z-index: 5; transform: translateX(-50%); height: var(--cs-h, 24px); padding: 0 10px; min-width: var(--cs-w, 68px);
       font: inherit; font-size: 12px; color: #eafff0; background: rgba(22, 74, 40, 0.82); border: 1px solid #3f8a58; border-radius: 999px; }
+    #stage > #menu-btn.by-pause, #stage > #score-btn.by-pause { transform: none; min-width: 0; padding: 0; }
     #stage > #score-btn:hover { background: rgba(31, 110, 58, 0.9); }
     #controls .aux { align-items: flex-start; }
     #menu-col { display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; }
@@ -71,6 +72,24 @@ const PadUI = (() => {
     const stage = document.getElementById('stage'), hud = document.getElementById('score-hud')
     const row = document.querySelector('#center-stack .aux'), wide = document.getElementById('cam-bar') || row
     if (!stage || !row) return
+    // owner 2026-11-18: where the page has its own pause button beside the pad (the 3D pages, drawer closed), the three stack
+    // there — main menu above pause, `scoring` below it — and both take pause's size and type
+    const pause = document.getElementById('pause-btn'), scoreBtn = document.getElementById('score-btn')
+    const pr = pause && document.body.classList.contains('drawer-closed') ? pause.getBoundingClientRect() : null
+    const both = [menu, scoreBtn].filter(Boolean)
+    if (pr && pr.width > 0) {
+      const sb = stage.getBoundingClientRect(), px = sb.left + stage.clientLeft, py = sb.top + stage.clientTop
+      const pcs = getComputedStyle(pause), gap = parseFloat(getComputedStyle(pause.parentElement).getPropertyValue('--pad-g')) || 6
+      for (const b of both) {
+        b.classList.add('by-pause')
+        b.style.left = (pr.left - px).toFixed(1) + 'px'; b.style.width = pr.width.toFixed(1) + 'px'; b.style.height = pr.height.toFixed(1) + 'px'
+        b.style.fontSize = pcs.fontSize; b.style.borderRadius = pcs.borderRadius
+      }
+      menu.style.top = (pr.top - py - pr.height - gap).toFixed(1) + 'px'
+      if (scoreBtn) scoreBtn.style.top = (pr.bottom - py + gap).toFixed(1) + 'px'
+      return
+    }
+    for (const b of both) { b.classList.remove('by-pause'); b.style.width = b.style.height = b.style.fontSize = b.style.borderRadius = '' }
     const s = stage.getBoundingClientRect(), r = row.getBoundingClientRect(), w = wide.getBoundingClientRect()
     const ox = s.left + stage.clientLeft, oy = s.top + stage.clientTop // absolute children sit in the stage's padding box
     let edge = 8
@@ -80,14 +99,14 @@ const PadUI = (() => {
     }
     menu.style.left = ((edge + (w.left - ox)) / 2).toFixed(1) + 'px'
     menu.style.top = (r.top - oy).toFixed(1) + 'px'
-    const score = document.getElementById('score-btn')            // `see scoring` sits directly under it
+    const score = scoreBtn                                         // `scoring` sits directly under it
     if (score) { score.style.left = menu.style.left; score.style.top = (r.top - oy + (menu.offsetHeight || 24) + 4).toFixed(1) + 'px' }
   }
   function addMenu() {
     const menu = document.createElement('a'); menu.id = 'menu-btn'; menu.href = 'index.html'; menu.textContent = 'main menu'
     menu.title = 'back to the main menu — pick a version'
-    // owner 2026-11-18: once a finished run's scoring card has been closed, a `see scoring` button under the main menu button brings it back
-    const score = document.createElement('button'); score.id = 'score-btn'; score.type = 'button'; score.textContent = 'see scoring'
+    // owner 2026-11-18: once a finished run's scoring card has been closed, a `scoring` button brings it back (2D: under the main menu button · 3D: under pause)
+    const score = document.createElement('button'); score.id = 'score-btn'; score.type = 'button'; score.textContent = 'scoring'
     score.title = 'show the scoring for the run you just finished'
     score.addEventListener('click', () => { if (typeof ScoreUI !== 'undefined' && ScoreUI.reopen) ScoreUI.reopen() })
     const stage = document.getElementById('stage'), aux2d = document.querySelector('#controls .aux')
@@ -97,6 +116,7 @@ const PadUI = (() => {
       place(); requestAnimationFrame(place); setTimeout(place, 400) // again once the score block and the mode buttons have laid out
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(place).observe(stage)
       window.addEventListener('resize', place)
+      if (typeof MutationObserver !== 'undefined') new MutationObserver(place).observe(document.body, { attributes: true, attributeFilter: ['class'] }) // the drawer opening / closing moves pause
     } else if (aux2d) {
       const col = document.createElement('span'); col.id = 'menu-col'
       col.appendChild(menu); col.appendChild(score)

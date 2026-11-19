@@ -266,7 +266,7 @@ const ScoreUI = (() => {
       else if (what === 'replay') opts.restart()
       else if (what === 'history') showHistory()
       else if (what === 'collection') showCollection()
-      else { S.card.style.display = 'none'; closed(true) } // dismiss: look at the field (the card does not pop back up — `see scoring` under the main menu button brings it back)
+      else { S.card.style.display = 'none'; closed(true) } // dismiss: look at the field (the card does not pop back up — the `scoring` button brings it back)
     })
     panelEl.addEventListener('click', (ev) => { if (ev.target.closest('button[data-panel="close"]')) closePanel() })
     window.addEventListener('keydown', (ev) => {
@@ -537,7 +537,7 @@ const ScoreUI = (() => {
     a.big.textContent = fmt(a.total)
     S.card.classList.add('done')
   }
-  // the end card was dismissed with the run still finished: the page shows a `see scoring` button (lib/sheep-pad-ui.js) while this class is on
+  // the end card was dismissed with the run still finished: the page shows a `scoring` button (lib/sheep-pad-ui.js) while this class is on
   function closed(on) { document.body.classList.toggle('score-closed', !!on) }
   function reopen() {
     if (!S.card || !S.shown || !S.card.innerHTML) return

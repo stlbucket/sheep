@@ -127,11 +127,17 @@ async function runDemo(s, file) {
     for (const via of ['top', 'handler', 'dog']) { await cam(via); const away = await s.ev(pose); await cam('orbit'); back.push(via + ':' + (away !== home && (await s.ev(pose)) === home)) }
     ok(P, 'CAM-1', 'top / handler / dog, then orbit once: the camera is back on the starting view', back.every((b) => b.endsWith('true')), back.join(' '))
   }
-  { // owner 2026-11-18: a main menu button on every version, level with the reseed row
-    const m = await s.ev(`(() => { const q = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }; const a = document.getElementById('menu-btn'); return { menu: q('#menu-btn'), reseed: q('#reseed-btn'), hud: q('#score-hud'), cam: q('#cam-bar'), href: a && a.getAttribute('href'), text: a && a.textContent, inAux: !!(a && a.closest('.aux')) } })()`)
-    const level = m.menu && Math.abs(m.menu.t - m.reseed.t) <= 1.5 && Math.abs(m.menu.b - m.reseed.b) <= 1.5
-    const mid = file === '2d.html' ? m.inAux && m.menu.r <= m.reseed.l : m.menu.l > m.hud.r - 2 && m.menu.r < m.cam.l && Math.abs((m.menu.l + m.menu.r) / 2 - (m.hud.r + m.cam.l) / 2) <= 12
-    ok(P, 'MENU-1', file === '2d.html' ? 'a main menu button leads the reseed row and links to index.html' : 'a main menu button sits level with the reseed row, midway between the score block and the secondary buttons, and links to index.html', m.href === 'index.html' && m.text === 'main menu' && level && mid, JSON.stringify(m).slice(0, 300))
+  { // owner 2026-11-18: a main menu button on every version. 2D: leads the reseed row. 3D (later the same day): main menu above pause, `scoring` below it, both pause's size
+    const m = await s.ev(`(() => { const q = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }; const a = document.getElementById('menu-btn'), sc = document.getElementById('score-btn'); document.body.classList.add('score-closed'); const out = { menu: q('#menu-btn'), reseed: q('#reseed-btn'), pause: q('#pause-btn'), score: q('#score-btn'), href: a && a.getAttribute('href'), text: a && a.textContent, scoreText: sc && sc.textContent, inAux: !!(a && a.closest('.aux')) }; document.body.classList.remove('score-closed'); return out })()`)
+    if (file === '2d.html') {
+      const level = m.menu && Math.abs(m.menu.t - m.reseed.t) <= 1.5 && Math.abs(m.menu.b - m.reseed.b) <= 1.5
+      ok(P, 'MENU-1', 'a main menu button leads the reseed row and links to index.html; the scoring button says `scoring`', m.href === 'index.html' && m.text === 'main menu' && m.scoreText === 'scoring' && level && m.inAux && m.menu.r <= m.reseed.l, JSON.stringify(m).slice(0, 300))
+    } else {
+      const same = (a, b) => Math.abs(a.l - b.l) <= 1 && Math.abs(a.r - b.r) <= 1 && Math.abs((a.b - a.t) - (b.b - b.t)) <= 1
+      const above = m.menu && m.pause && same(m.menu, m.pause) && m.menu.b <= m.pause.t && m.pause.t - m.menu.b <= 8
+      const below = m.score && m.pause && same(m.score, m.pause) && m.score.t >= m.pause.b && m.score.t - m.pause.b <= 8
+      ok(P, 'MENU-1', 'main menu sits directly above pause and `scoring` directly below it, both the size of pause; main menu links to index.html', m.href === 'index.html' && m.text === 'main menu' && m.scoreText === 'scoring' && above && below, JSON.stringify(m).slice(0, 400))
+    }
   }
   const errs = s.errors.slice(errs0)
   ok(P, 'errors-demo', 'zero console errors across the demo session', errs.length === 0, errs.slice(0, 4).join(' | '))
