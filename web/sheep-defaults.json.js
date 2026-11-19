@@ -121,7 +121,7 @@ const SHEEP_DEFAULTS = {
   "obstacleCoverEdge": 8,
   "bullMax": 3,
   "bullChance": 0.4,
-  "bullRadius": 17,
+  "bullRadius": 13,
   "bullBerth": 14,
   "bullSpeed": 16,
   "bullTurnRate": 1.2,
