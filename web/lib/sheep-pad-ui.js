@@ -103,7 +103,7 @@ const PadUI = (() => {
     if (score) { score.style.left = menu.style.left; score.style.top = (r.top - oy + (menu.offsetHeight || 24) + 4).toFixed(1) + 'px' }
   }
   function addMenu() {
-    const menu = document.createElement('a'); menu.id = 'menu-btn'; menu.href = 'index.html'; menu.textContent = 'main menu'
+    const menu = document.createElement('a'); menu.id = 'menu-btn'; menu.href = 'index.html'; menu.textContent = 'home'
     menu.title = 'back to the main menu — pick a version'
     // owner 2026-11-18: once a finished run's scoring card has been closed, a `scoring` button brings it back (2D: under the main menu button · 3D: under pause)
     const score = document.createElement('button'); score.id = 'score-btn'; score.type = 'button'; score.textContent = 'scoring'

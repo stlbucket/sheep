@@ -131,12 +131,12 @@ async function runDemo(s, file) {
     const m = await s.ev(`(() => { const q = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }; const a = document.getElementById('menu-btn'), sc = document.getElementById('score-btn'); document.body.classList.add('score-closed'); const out = { menu: q('#menu-btn'), reseed: q('#reseed-btn'), pause: q('#pause-btn'), score: q('#score-btn'), href: a && a.getAttribute('href'), text: a && a.textContent, scoreText: sc && sc.textContent, inAux: !!(a && a.closest('.aux')) }; document.body.classList.remove('score-closed'); return out })()`)
     if (file === '2d.html') {
       const level = m.menu && Math.abs(m.menu.t - m.reseed.t) <= 1.5 && Math.abs(m.menu.b - m.reseed.b) <= 1.5
-      ok(P, 'MENU-1', 'a main menu button leads the reseed row and links to index.html; the scoring button says `scoring`', m.href === 'index.html' && m.text === 'main menu' && m.scoreText === 'scoring' && level && m.inAux && m.menu.r <= m.reseed.l, JSON.stringify(m).slice(0, 300))
+      ok(P, 'MENU-1', 'a main menu button leads the reseed row and links to index.html; the scoring button says `scoring`', m.href === 'index.html' && m.text === 'home' && m.scoreText === 'scoring' && level && m.inAux && m.menu.r <= m.reseed.l, JSON.stringify(m).slice(0, 300))
     } else {
       const same = (a, b) => Math.abs(a.l - b.l) <= 1 && Math.abs(a.r - b.r) <= 1 && Math.abs((a.b - a.t) - (b.b - b.t)) <= 1
       const above = m.menu && m.pause && same(m.menu, m.pause) && m.menu.b <= m.pause.t && m.pause.t - m.menu.b <= 8
       const below = m.score && m.pause && same(m.score, m.pause) && m.score.t >= m.pause.b && m.score.t - m.pause.b <= 8
-      ok(P, 'MENU-1', 'main menu sits directly above pause and `scoring` directly below it, both the size of pause; main menu links to index.html', m.href === 'index.html' && m.text === 'main menu' && m.scoreText === 'scoring' && above && below, JSON.stringify(m).slice(0, 400))
+      ok(P, 'MENU-1', 'main menu sits directly above pause and `scoring` directly below it, both the size of pause; main menu links to index.html', m.href === 'index.html' && m.text === 'home' && m.scoreText === 'scoring' && above && below, JSON.stringify(m).slice(0, 400))
     }
   }
   const errs = s.errors.slice(errs0)
@@ -379,6 +379,7 @@ async function runPhone(s, file) {
       try { await runPage(s, f, { wait: f === '2d.html' ? 2500 : 5000 }) } catch (e) { ok(f, 'crash', 'test run completed', false, e.message) }
       try { await runThrowing(s, f) } catch (e) { ok(f, 'crash-throw', 'storage-throws run completed', false, e.message) }
       if (f !== '2d.html') { try { await runPhone(s, f) } catch (e) { ok(f, 'crash-phone', 'phone-landscape run completed', false, e.message) } }
+      else { await s.send('Page.navigate', { url: WEB + 'index.html' }); await sleep(500) } // the storage-throws page cannot clear what the first run saved (it only mattered when 2d.html is run on its own)
       await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
     }
     for (const f of ['2d.html', '3d.html', '3d-competition.html']) { // POC-v16: demo mode, the competition course, no gates on the 3D pastures

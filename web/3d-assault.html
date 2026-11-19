@@ -150,7 +150,7 @@
   /* pause (owner 2026-11-18): a command-sized button. Drawer closed: just left of the pad, level with the easy row. Drawer open: in the pad's own flow. */
   #controls > #pause-btn { width: calc((100% - var(--pad-g) * 2) / 3); }
   body.drawer-closed #controls { position: relative; }
-  body.drawer-closed #controls > #pause-btn { position: absolute; right: calc(100% + 16px); top: 38px; /* = pad row 2 (the easy row): one 32px row + the 6px gap */ }
+  body.drawer-closed #controls > #pause-btn { position: absolute; right: calc(100% + 44px); top: 38px; /* = pad row 2 (the easy row): one 32px row + the 6px gap */ }
   #controls .pad {
     width: 100%;
     display: grid;
@@ -294,7 +294,7 @@
     body.drawer-closed #side-dog { padding: 0; background: none; border: none; pointer-events: none; }
     body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
     body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
-    body.drawer-closed #controls > #pause-btn { right: calc(100% + 6px); top: 33px; background: rgba(20, 26, 31, 0.42); }
+    body.drawer-closed #controls > #pause-btn { right: calc(100% + 20px); top: 33px; background: rgba(20, 26, 31, 0.42); }
     body.drawer-closed #controls > #pause-btn.active { background: rgba(47, 93, 58, 0.8); }
     #controls .pad { grid-template-rows: repeat(3, 30px); gap: 3px; }
     #controls button {
