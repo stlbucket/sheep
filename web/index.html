@@ -43,8 +43,8 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; }
   html { --il: 0px; --ir: 0px; --sb: env(safe-area-inset-bottom, 0px); }
-  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
-  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
+  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
+  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
   body {
     background: #14181c;
     color: #cdd6df;
@@ -53,7 +53,7 @@
     flex-direction: column;
     align-items: center;
     --py: 48px; --px: 16px;
-    /* NOTCH / DYNAMIC ISLAND (owner 2026-11-19, same as the game pages): the side gap is 45 % of the safe-area inset on the island side only
+    /* NOTCH / DYNAMIC ISLAND (owner 2026-11-19, same as the game pages): the side gap is 22 % of the safe-area inset (halved from the game pages' 45 %, owner: still too large here) on the island side only
        (html.island-left / .island-right, set by islandSide() in the head) and replaces the edge padding; top and bottom keep clear of the
        status bar and home bar when held upright (--sb is 0 in phone landscape, where the page ran under the home bar already) */
     padding: max(var(--py), env(safe-area-inset-top, 0px)) max(var(--px), var(--ir)) max(var(--py), var(--sb)) max(var(--px), var(--il));
