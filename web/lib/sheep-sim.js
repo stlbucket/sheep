@@ -275,6 +275,15 @@ const SETTINGS = [
   { key: 'driveGatePanel', category: 'Objectives', label: 'drive gate panel', type: 'float', default: 50, min: 20, max: 120, step: 5, unit: 'px', description: 'FO1/FO3: length of each solid hurdle panel.', exposed: true, onChange: 'respawn' },
   { key: 'driveGatePoints', category: 'Objectives', label: 'drive gate points', type: 'int', default: 50, min: 0, max: 1000, step: 10, unit: 'pts', description: "FO2: points per sheep through the gap (once per sheep per gate, either way).", exposed: true },
   { key: 'driveGateMult', category: 'Objectives', label: 'drive gate multiplier', type: 'float', default: 1, min: 0, max: 10, step: 0.5, unit: '×', description: "FO7 (POC-v15): when every sheep still being worked has been through a gate, the multiplier on every later crossing rises by this for the rest of the run.", exposed: true },
+  // Bulls (owner 2026-11-18, POC-v17): 0..bullMax large black bulls wander a pasture. To the sheep a bull is a rock with a wider berth; nothing moves the bull.
+  { key: 'bullMax', category: 'Obstacles', label: 'bulls (most)', type: 'int', default: 3, min: 0, max: 6, step: 1, unit: 'bulls', description: 'B1: the most bulls a pasture can have wandering in it. Each of these slots holds a bull with `bull chance`, so a field has 0..this many. 0 = no bulls (and a course identical to the pre-bull sim). Never on a competition course.', exposed: true, onChange: 'respawn' },
+  { key: 'bullChance', category: 'Obstacles', label: 'bull chance', type: 'float', default: 0.4, min: 0, max: 1, step: 0.05, unit: '—', description: 'B1: chance each of the `bulls (most)` slots holds a bull on a given course. At 0.4 with 3 slots: no bull on about 1 field in 5, one on 2 in 5, two on 3 in 10, three on 1 in 15.', exposed: true, onChange: 'respawn' },
+  { key: 'bullRadius', category: 'Obstacles', label: 'bull size', type: 'float', default: 17, min: 8, max: 40, step: 1, unit: 'px', description: 'B2: radius of the solid disc a bull occupies (he is drawn about twice this long). A sheep is 12 px long.', exposed: true, onChange: 'respawn' },
+  { key: 'bullBerth', category: 'Obstacles', label: 'bull berth', type: 'float', default: 14, min: 0, max: 80, step: 1, unit: 'px', description: 'B3: how much MORE room sheep give a bull than a rock — added to both `obstacle range` (push-off) and `look-ahead` (sidestep) for bulls only.', exposed: true },
+  { key: 'bullSpeed', category: 'Obstacles', label: 'bull pace', type: 'float', default: 16, min: 0, max: 60, step: 1, unit: 'px/s', description: 'B4: a bull\'s amble between grazing spots (a grazing sheep drifts at 15, a walking one does 60). 0 = the bulls stand where they were put.', exposed: true },
+  { key: 'bullTurnRate', category: 'Obstacles', label: 'bull turn rate', type: 'float', default: 1.2, min: 0.2, max: 6, step: 0.1, unit: 'rad/s', description: 'B4: how fast a bull swings round to face where he is going. He slows while he turns and only strides out once he is facing it.', exposed: true },
+  { key: 'bullGrazeMin', category: 'Obstacles', label: 'bull graze min', type: 'float', default: 3, min: 0, max: 60, step: 0.5, unit: 's', description: 'B4: shortest time a bull stands grazing before he ambles to a new spot.', exposed: true },
+  { key: 'bullGrazeMax', category: 'Obstacles', label: 'bull graze max', type: 'float', default: 10, min: 0, max: 120, step: 0.5, unit: 's', description: 'B4: longest time a bull stands grazing before he ambles to a new spot.', exposed: true },
   // Competition course (owner 2026-11-18): a clean field — no obstacles — with 4–6 drive gates on a REQUIRED path, taken in order, then the pen.
   { key: 'course', category: 'Objectives', label: 'course', type: 'enum', options: ['pasture', 'competition'], default: 'pasture', unit: '—', description: 'CC1: `pasture` = the open course (obstacles OR optional drive gates, never both) · `competition` = a clean field with numbered drive gates the whole flock must take in order before the pen opens. Set by the page, not a dial. No competition course in wave mode.', exposed: false, onChange: 'respawn' },
   { key: 'compGatesMin', category: 'Objectives', label: 'competition gates (min)', type: 'int', default: 4, min: 1, max: 8, step: 1, unit: '—', description: 'CC2: fewest gates on a competition course.', exposed: true, onChange: 'respawn' },
@@ -486,7 +495,7 @@ const LEVER_NOT_LEVERED = {
   judging: ['lineNorm', 'T_straggle', 'splitMinSize', 'clusterDist', 'crushThreshold', 'crushSustain'], // the parked fourth domain
   parked: ['easyConeDeg', 'easyConeExt', 'lieConeDeg', 'lieConeExt', 'trotGroupMin', 'trotAlignMin', 'trotMoveSpeed', 'trotTriggerProb', 'trotBoltProb', 'trotLeadCount', 'trotFollowR', 'trotSpeedMult', 'w_trot', 'trotDecayMin', 'trotDecayMax', 'trotDecayRamp', 'trotFenceStop', 'trotReverseDeg', 'flankEasySpeedFrac', 'downConeOffsetDeg',
     'walkSpeed', 'trotSlowSpeed', 'trotDriveDelay', 'trotPressMin', 'trotPressFrac', 'trotTurnWindow', 'trotTurnProb', 'trotMaxDur', 'trotRest', 'trotWindDown', 'gateConeGrow', 'gateConeDeg', 'gateConeMax'], // POC-v9 + v10 (owner 2026-08-24) — anchored at their defaults until a /sheep tune pass authors lever endpoints
-  obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge'], // owner 2026-11-14 — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
+  obstacles: ['obstacleRandom', 'obstacleLowShare', 'obstacleRockFrac', 'obstacleRockScale', 'w_obstacle', 'obstacleLook', 'r_obstacle', 'obstacleSplit', 'obstacleCover', 'obstacleCoverEdge', 'bullMax', 'bullChance', 'bullRadius', 'bullBerth', 'bullSpeed', 'bullTurnRate', 'bullGrazeMin', 'bullGrazeMax'], // owner 2026-11-14 (+ bulls, POC-v17) — a mode switch, the shape of the draw, and the feel dials; count / size / gaps belong to Pasture · Clutter (Q67)
   scoring: ['penPoints', 'penCalmPoints', 'penPerfectPoints', 'penStressMemory', 'condPanicDrain', 'condTrotDrain', 'condRecover', 'condFloor', 'comboTightenAt', 'strikeMax', 'strikePanics', 'panicRearm', 'fenceSlamSpeed', 'strikeCooldown', 'parPointsPerSec',
     'multFullFlock', 'multClean', 'multAllCalm', 'multAwardCommon', 'multAwardRare', 'multAwardLegendary', 'multOneGo', 'perfectFileMin', 'frenzyEvery', 'frenzySecs', 'frenzyExtend', 'frenzyMax', 'finisherPoints',
     'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'fullPurseShare', 'wolfPoints', 'rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan',
@@ -760,6 +769,7 @@ class FlockSim {
     this.ticks = 0
     this.sheep = []
     this.obstacles = []
+    this.bulls = []       // B1 (POC-v17): wandering bulls — moving solids, kept apart from the static obstacles
     this.driveGates = []  // FO1 (POC-v14)
     this.courseRev = 0    // bumps whenever the course furniture is re-laid (pages rebuild on it)
     this.reseed(params.seed)
@@ -1300,6 +1310,7 @@ class FlockSim {
     // their own streams, so a seed's gate, obstacles and flock are exactly
     // what they were before either existed.
     this.placeDriveGates(this.seed)
+    this.placeBulls(this.seed)         // POC-v17: after the flock and the gates, own stream → the rest of the course is unmoved
     this.assignSpecials(this.seed)
     this.startCourseScoring(this.seed) // POC-v15: reference run, flock value, side objectives
     this.courseRev++
@@ -1590,6 +1601,7 @@ class FlockSim {
     this.driveGates = []
     const n = Math.min(Math.max(p.waveSheepStart, p.waveSheepMax), p.waveSheepStart + p.waveGrowth * run.wave)
     this.spawn(n, true)
+    this.placeBulls(ws)
     this.assignSpecials(ws)
     run.waveInjuries = this.injuries; run.waveStrikes = run.strikes; run.waveRushed = run.tiers.rushed; run.wavePoints = this.points
     this.blackPanic = null
@@ -1694,6 +1706,133 @@ class FlockSim {
     }
   }
 
+  // Bulls (POC-v17, owner 2026-11-18): 0..bullMax large black bulls wander a
+  // pasture. To everything else a bull is one more solid disc — the sheep
+  // steer round him the way they do a rock (obstacleForce, with bullBerth
+  // more room), he is solid (pushOut), the dog goes round him (dogDetour) and
+  // cannot work sheep through him (coverBetween). Nothing acts on the bull:
+  // stepBulls reads no dog and no sheep state.
+  //
+  // Bulls live in their OWN list (`this.bulls`), not `this.obstacles`, so the
+  // obstacles-or-gates rule, the pages' static obstacle art and the assault's
+  // rock cover never see them; solids() is the union the four loops walk.
+  // Own PRNG streams (one for the layout, one for the wandering), and laid
+  // AFTER the flock and the drive gates — a seed's gate, obstacles, flock and
+  // gates are where they were, and bullMax 0 replays the pre-bull sim exactly.
+  placeBulls(seed) {
+    const p = this.p
+    this.bulls = []
+    this.bullRng = makePRNG((seed ^ 0x6c8e9cf5) >>> 0) // the wandering draws (stepBulls)
+    const max = this.isCompetition() ? 0 : Math.max(0, Math.round(p.bullMax)) // CC1: a competition field stays clean
+    if (!max) return
+    const rnd = makePRNG((seed ^ 0x2545f491) >>> 0)
+    const rad = p.bullRadius, area = this.bullRect(rad)
+    if (!area) return
+    for (let k = 0; k < max; k++) {
+      if (rnd() >= p.bullChance) continue
+      for (let tries = 0; tries < 60; tries++) {
+        const c = { x: area.x0 + rnd() * (area.x1 - area.x0), y: area.y0 + rnd() * (area.y1 - area.y0) }
+        if (!this.bullSpotOk(c, rad, null)) continue
+        if (this.sheep.some((s) => Math.hypot(s.pos.x - c.x, s.pos.y - c.y) < rad + p.r_obstacle + p.bullBerth)) continue // nobody starts inside his berth
+        const heading = rnd() * Math.PI * 2
+        this.bulls.push({ x: c.x, y: c.y, r: rad, kind: 'bull', group: -1000 - k, seed: Math.floor(rnd() * 4294967296),
+          heading, vx: 0, vy: 0, state: 'graze', wait: p.bullGrazeMin + rnd() * Math.max(0, p.bullGrazeMax - p.bullGrazeMin), tx: c.x, ty: c.y, left: 0 })
+        break
+      }
+    }
+  }
+
+  // Where a bull's centre may be: inside the fence with a lane left for a
+  // sheep to pass him along it (his berth + a body length). null on a field
+  // too small to hold one.
+  bullRect(rad) {
+    const p = this.p, r = this.playRect(), m = rad + p.r_obstacle + p.bullBerth + p.L
+    const a = { x0: r.x0 + m, y0: r.y0 + m, x1: r.x1 - m, y1: r.y1 - m }
+    return a.x1 > a.x0 && a.y1 > a.y0 ? a : null
+  }
+
+  // May a bull of radius `rad` stand at `c`? Off the pen gate's approach and
+  // the handler's post, not in a drive gate, clear of every static obstacle
+  // and of the other bulls (`self` excluded).
+  bullSpotOk(c, rad, self) {
+    const p = this.p, gt = this.gate
+    if (Math.hypot(c.x - gt.x, c.y - gt.y) < this.bullGateClear(rad)) return false
+    if (Math.hypot(c.x - this.home.x, c.y - this.home.y) < this.bullHomeClear(rad)) return false
+    for (const d of this.driveGates) if (Math.hypot(c.x - d.x, c.y - d.y) < d.half + p.driveGatePanel + rad) return false
+    for (const o of this.obstacles) if (Math.hypot(c.x - o.x, c.y - o.y) < o.r + rad + p.r_obstacle) return false
+    for (const b of this.bulls) if (b !== self && Math.hypot(c.x - b.x, c.y - b.y) < b.r + rad + p.obstacleMinGap) return false
+    return true
+  }
+  bullGateClear(rad) { const p = this.p; return Math.max(p.spawnGateClear, p.gateAttractR, 100) + rad + p.r_obstacle + p.bullBerth } // his berth never reaches the pen approach
+  bullHomeClear(rad) { return 50 + rad + this.p.L }
+
+  // B4: a bull does his own thing — stands grazing for bullGrazeMin..Max
+  // seconds, then ambles (bullSpeed) to a new spot whose straight line from
+  // where he stands is clear of the static obstacles, the pen approach and the
+  // handler's post. He turns at bullTurnRate and only strides out once he is
+  // facing his spot. The dog, the sheep and the wolves are not inputs here.
+  stepBulls(dt) {
+    const p = this.p, rnd = this.bullRng
+    for (const b of this.bulls) {
+      const area = this.bullRect(b.r)
+      b.vx = 0; b.vy = 0
+      if (!area) continue
+      if (b.state === 'graze') {
+        b.wait -= dt
+        if (b.wait > 0 || p.bullSpeed <= 0) continue
+        const from = { x: b.x, y: b.y }
+        let to = null
+        for (let t = 0; t < 12 && !to; t++) {
+          const c = { x: area.x0 + rnd() * (area.x1 - area.x0), y: area.y0 + rnd() * (area.y1 - area.y0) }
+          if (!this.bullSpotOk(c, b.r, b)) continue
+          if (distToSeg(this.gate, from, c) < this.bullGateClear(b.r) || distToSeg(this.home, from, c) < this.bullHomeClear(b.r)) continue
+          if (this.obstacles.some((o) => distToSeg(o, from, c) < o.r + b.r + p.L / 2)) continue
+          to = c
+        }
+        if (!to) { b.wait = p.bullGrazeMin; continue } // boxed in for now — graze on, look again later
+        b.tx = to.x; b.ty = to.y; b.state = 'walk'
+        b.left = 2 * Math.hypot(to.x - b.x, to.y - b.y) / p.bullSpeed + Math.PI / p.bullTurnRate // twice the trip + a full turn; then he gives up and grazes
+      }
+      const dx = b.tx - b.x, dy = b.ty - b.y, dist = Math.hypot(dx, dy)
+      b.left -= dt
+      if (dist < 1 || b.left <= 0 || p.bullSpeed <= 0) {
+        b.state = 'graze'; b.wait = p.bullGrazeMin + rnd() * Math.max(0, p.bullGrazeMax - p.bullGrazeMin)
+        continue
+      }
+      let diff = Math.atan2(dy, dx) - b.heading
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+      const turn = Math.max(-p.bullTurnRate * dt, Math.min(p.bullTurnRate * dt, diff))
+      b.heading += turn
+      const sp = Math.min(p.bullSpeed * Math.max(0, Math.cos(diff - turn)), dist / dt)
+      const ox = b.x, oy = b.y
+      b.x += Math.cos(b.heading) * sp * dt; b.y += Math.sin(b.heading) * sp * dt
+      // solid against the static obstacles and the other bulls; never out of his range
+      for (const o of this.obstacles) this.bullPush(b, o, o.r + b.r)
+      for (const o of this.bulls) if (o !== b) this.bullPush(b, o, o.r + b.r + p.L)
+      b.x = Math.max(area.x0, Math.min(area.x1, b.x)); b.y = Math.max(area.y0, Math.min(area.y1, b.y))
+      b.vx = (b.x - ox) / dt; b.vy = (b.y - oy) / dt
+    }
+  }
+  bullPush(b, o, R) {
+    let dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy)
+    if (d >= R) return
+    if (d < 1e-6) { dx = 1; dy = 0; d = 1 }
+    b.x = o.x + (dx / d) * R; b.y = o.y + (dy / d) * R
+  }
+
+  // Everything solid: the static obstacles plus the bulls. With no bulls it IS
+  // this.obstacles (no copy, no behavior change); otherwise a cached union,
+  // rebuilt only when either list is replaced or changes length.
+  solids() {
+    const o = this.obstacles, b = this.bulls
+    if (!b.length) return o
+    if (this._solO !== o || this._solB !== b || this._solN !== o.length || this._solM !== b.length) {
+      this._solO = o; this._solB = b; this._solN = o.length; this._solM = b.length
+      this._solids = o.concat(b)
+    }
+    return this._solids
+  }
+
   // Solid obstacles: move `pos` out of every disc (+pad) it is inside and,
   // if a velocity is given, drop its into-the-obstacle component (the fence
   // clamp's idea, on a circle). Two passes settle a point between two
@@ -1701,7 +1840,7 @@ class FlockSim {
   pushOut(pos, pad, vel) {
     let moved = false
     for (let pass = 0; pass < 2; pass++) {
-      for (const o of this.obstacles) {
+      for (const o of this.solids()) {
         let dx = pos.x - o.x, dy = pos.y - o.y, d = Math.hypot(dx, dy)
         const R = o.r + pad
         if (d >= R) continue
@@ -1726,26 +1865,29 @@ class FlockSim {
   obstacleForce(i) {
     const s = this.sheep[i], p = this.p
     let fx = 0, fy = 0, a = 0
-    if (!this.obstacles.length) return { x: 0, y: 0, a: 0 }
+    const solids = this.solids()
+    if (!solids.length) return { x: 0, y: 0, a: 0 }
     const sp = Math.hypot(s.vel.x, s.vel.y)
     const hx = sp > 1 ? s.vel.x / sp : 0, hy = sp > 1 ? s.vel.y / sp : 0
-    for (const o of this.obstacles) {
+    for (const o of solids) {
       const rx = o.x - s.pos.x, ry = o.y - s.pos.y
       const d = Math.hypot(rx, ry), edge = d - o.r
-      if (edge > Math.max(p.obstacleLook, p.r_obstacle)) continue
-      if (edge < p.r_obstacle && d > 1e-4) {
-        const k = smoothstep(p.r_obstacle, 0, Math.max(0, edge))
+      const berth = o.kind === 'bull' ? p.bullBerth : 0 // B3: a bull is a rock the sheep give more room
+      const range = p.r_obstacle + berth, look = p.obstacleLook + berth
+      if (edge > Math.max(look, range)) continue
+      if (edge < range && d > 1e-4) {
+        const k = smoothstep(range, 0, Math.max(0, edge))
         fx -= (rx / d) * k; fy -= (ry / d) * k
         if (k > a) a = k
       }
-      if (sp <= 1 || edge > p.obstacleLook) continue
+      if (sp <= 1 || edge > look) continue
       const along = rx * hx + ry * hy
       if (along <= 0) continue                    // behind it / already past
       const cross = hx * ry - hy * rx             // > 0: the centre lies to the +angle side of the heading
-      const reach = o.r + p.r_obstacle, lat = Math.abs(cross)
+      const reach = o.r + range, lat = Math.abs(cross)
       if (lat >= reach) continue                  // the heading already clears it
       const side = cross > 1e-3 ? 1 : cross < -1e-3 ? -1 : (i % 2 ? 1 : -1)
-      const k = smoothstep(p.obstacleLook, 0, Math.max(0, edge)) * (1 - 0.5 * lat / reach)
+      const k = smoothstep(look, 0, Math.max(0, edge)) * (1 - 0.5 * lat / reach)
       fx += hy * side * k; fy -= hx * side * k    // perpendicular to the heading, away from the centre
       if (k > a) a = k
     }
@@ -1757,7 +1899,7 @@ class FlockSim {
   // obstacleCoverEdge px so a sheep at the rim of a stand does not flicker.
   coverBetween(a, b) {
     let cover = 0
-    for (const o of this.obstacles) {
+    for (const o of this.solids()) {
       if (o.kind === 'hurdle') continue // a drive-gate panel hides nothing (FO3)
       const depth = o.r - distToSeg(o, a, b)
       if (depth <= 0) continue
@@ -1777,7 +1919,7 @@ class FlockSim {
     let side = d.avoidSide, out = dir, blocked = false
     for (let pass = 0; pass < 4; pass++) {
       let best = null, bestHit = Infinity
-      for (const o of this.obstacles) {
+      for (const o of this.solids()) {
         const rx = o.x - pos.x, ry = o.y - pos.y, R = o.r + pad
         const along = rx * out.x + ry * out.y
         if (along <= 0) continue
@@ -2425,7 +2567,7 @@ class FlockSim {
 
     // Obstacles: a target that falls inside a stand / rock moves to its edge,
     // and the heading below bends round whatever blocks the way there.
-    if (this.obstacles.length) this.pushOut(d.target, p.L + 2)
+    if (this.solids().length) this.pushOut(d.target, p.L + 2)
     // arrive-seek: slow within arriveR so the orbit doesn't jitter / overshoot
     const to = vec2.sub(d.target, d.pos)
     const dist = vec2.len(to)
@@ -2439,11 +2581,11 @@ class FlockSim {
                : d.flankEasy && (d.command === 'come_by' || d.command === 'away') ? p.dogVMax * p.flankEasySpeedFrac // C11 (POC-v10)
                : p.dogVMax
     const speed = dist < arriveR ? vmax * (dist / arriveR) : vmax
-    const dir = dist > 0.5 && this.obstacles.length ? this.dogDetour(d.pos, vec2.norm(to), dist) : vec2.norm(to)
+    const dir = dist > 0.5 && this.solids().length ? this.dogDetour(d.pos, vec2.norm(to), dist) : vec2.norm(to)
     d.vel = dist > 0.5 ? vec2.scale(dir, Math.min(speed, dist / dt))
                        : { x: 0, y: 0 }
     d.pos = vec2.add(d.pos, vec2.scale(d.vel, dt))
-    if (this.obstacles.length) this.pushOut(d.pos, p.L * 0.5, d.vel) // solid for the dog too
+    if (this.solids().length) this.pushOut(d.pos, p.L * 0.5, d.vel) // solid for the dog too
     const r = this.playRect()             // the dog stays in the field (no pen exit)
     d.pos.x = Math.max(r.x0, Math.min(r.x1, d.pos.x))
     d.pos.y = Math.max(r.y0, Math.min(r.y1, d.pos.y))
@@ -2551,7 +2693,7 @@ class FlockSim {
     }
     // Cover: a stand / rock between the dog and this sheep hides it from him —
     // the pressure fades by how deep the sight line cuts into the obstacle.
-    if (T > 0 && p.obstacleCover > 0 && this.obstacles.length) T *= 1 - p.obstacleCover * this.coverBetween(d.pos, a.pos)
+    if (T > 0 && p.obstacleCover > 0 && this.solids().length) T *= 1 - p.obstacleCover * this.coverBetween(d.pos, a.pos)
     if (a.kind === 'ram') T *= p.ramFleeScale // FO6: he feels less of the dog
     else if (a.kind === 'black') T *= p.blackThreatScale // FO8: she feels more of him
     if (sp) T += sp.t
@@ -2817,7 +2959,7 @@ class FlockSim {
     if (s.yieldT > 0) vmax = Math.max(vmax, p.trotSlowSpeed) // …but a yielding ram leaves at the slow trot
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
-    if (this.obstacles.length) this.pushOut(s.pos, 2, s.vel) // obstacles are solid
+    if (this.solids().length) this.pushOut(s.pos, 2, s.vel) // obstacles (and bulls) are solid
 
     // hard boundary clamp + zero the outward velocity component — EXCEPT
     // outward through the gate mouth (P6): a sheep carried past the wall line
@@ -3394,6 +3536,7 @@ class FlockSim {
     this.gcm = this.computeGCM()       // flock centroid → dog steering
     this.computeHull()                 // herd perimeter (same set) → flank track (C8)
     if (this.compPath) this.updateAim() // CC6: the dog's current objective (next gate / pen)
+    if (this.bulls.length) this.stepBulls(dt) // B4: the bulls wander on their own, before anyone reacts to them
     this.stepDog(dt)                   // dog moves first → sheep react to it
     this.updateTrot(dt)                // T1–T7 trot state (POC-v9, v13) → integrate reads it
     this.updateGateCone(dt)            // G5 gate cone (POC-v13) → integrate + overlays read it

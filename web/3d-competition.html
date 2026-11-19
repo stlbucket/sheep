@@ -983,6 +983,61 @@ function updateDog(dt, time) {
   dog.tail.rotation.x = d.atHeel ? Math.sin(time * 11) * 0.55 : 0 // a wag at heel
 }
 
+// ---- POC-v17: wandering bulls (sim.bulls) — large, black, horned; moving solids the sheep go round ------
+const BULL_HORN = lam(0xe9dfc6), BULL_NOSE = lam(0x3a3336)
+const bullHornGeo = new THREE.ConeGeometry(0.075, 0.5, 5)
+function buildBull() { // modelled at radius 1 (nose toward +x); root.scale = the bull's disc radius
+  const root = new THREE.Group(), body = new THREE.Group()
+  root.add(body)
+  const mesh = (geo, mat, parent, x, y, z, sx = 1, sy = sx, sz = sx) => {
+    const m = new THREE.Mesh(geo, mat)
+    m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true
+    parent.add(m)
+    return m
+  }
+  mesh(unitBox, BLACK, body, -0.08, 0.92, 0, 1.5, 0.72, 0.8)            // barrel
+  mesh(ico1, BLACK, body, 0.42, 1.24, 0, 0.5, 0.34, 0.42)               // shoulder hump
+  mesh(ico1, BLACK, body, -0.62, 1.0, 0, 0.36, 0.42, 0.4)               // rump
+  const head = new THREE.Group(); head.position.set(0.72, 1.08, 0); body.add(head)
+  mesh(unitBox, BLACK, head, 0.2, -0.02, 0, 0.5, 0.4, 0.48)             // neck
+  mesh(unitBox, BLACK, head, 0.52, -0.06, 0, 0.42, 0.42, 0.46)          // head
+  mesh(unitBox, BULL_NOSE, head, 0.78, -0.14, 0, 0.16, 0.24, 0.34)      // muzzle
+  for (const sgn of [1, -1]) {
+    const horn = mesh(bullHornGeo, BULL_HORN, head, 0.5, 0.22, sgn * 0.36)
+    horn.rotation.set(sgn * 1.05, 0, -0.35)                             // out to the side, tipped forward
+    mesh(ico0, BLACK, head, 0.38, 0.1, sgn * 0.27, 0.09, 0.07, 0.12)    // ear
+  }
+  const tail = new THREE.Group(); tail.position.set(-0.84, 1.18, 0); body.add(tail)
+  mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.75, 5).translate(0, -0.375, 0), BLACK, tail, 0, 0, 0)
+  mesh(ico0, BLACK, tail, 0, -0.8, 0, 0.07, 0.11, 0.07)                 // tuft
+  const legs = []
+  for (const [x, z] of [[0.48, 0.27], [0.48, -0.27], [-0.6, 0.27], [-0.6, -0.27]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 0.62, z); body.add(leg)
+    mesh(unitBox, BLACK, leg, 0, -0.31, 0, 0.2, 0.62, 0.2)
+    legs.push(leg)
+  }
+  return { root, head, tail, legs, yaw: 0, phase: 0, amp: 0, graze: 0 }
+}
+const bullPool = []
+function updateBulls(dt, time) {
+  const bulls = sim.bulls || []
+  while (bullPool.length < bulls.length) { const b = buildBull(); scene.add(b.root); bullPool.push(b) }
+  bullPool.forEach((bm, i) => {
+    const b = bulls[i]
+    bm.root.visible = !!b
+    if (!b) return
+    const speed = Math.hypot(b.vx, b.vy)
+    bm.yaw += angleDiff(b.heading, bm.yaw) * ease(10, dt)
+    bm.root.position.set(b.x, 0, b.y); bm.root.rotation.y = -bm.yaw; bm.root.scale.setScalar(b.r)
+    bm.amp += (Math.min(1, speed / 12) - bm.amp) * ease(6, dt)
+    bm.graze += ((b.state === 'graze' ? 1 : 0) - bm.graze) * ease(1.5, dt)
+    bm.phase += speed * 0.22 * dt
+    bm.head.rotation.z = -0.95 * bm.graze - 0.08 * bm.amp + (b.state === 'graze' ? Math.sin(time * 2.4 + i) * 0.05 : 0) // head down to graze
+    bm.legs.forEach((leg, k) => { leg.rotation.z = Math.sin(bm.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * 0.45 * bm.amp })
+    bm.tail.rotation.z = -0.12; bm.tail.rotation.x = Math.sin(time * 1.7 + i * 2.1) * 0.35 // a slow swish
+  })
+}
+
 // ---- the handler, at the dog's home post by the gate -------------------------
 function buildHandler() {
   const root = new THREE.Group()
@@ -1265,6 +1320,7 @@ function render3D(dt, time, fps) {
   if (sim.gate !== course.gate || courseSig() !== course.sig) rebuildCourse()
   updateSheep(dt, time)
   updateDog(dt, time)
+  updateBulls(dt, time) // POC-v17
   updateHandler(dt)
   updateOverlays()
   for (const f of course.flags) f.rotation.y = f.userData.base + Math.sin(time * 2.2 + f.position.x) * 0.25

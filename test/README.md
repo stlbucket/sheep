@@ -10,6 +10,8 @@ Two suites, both plain node scripts with no dependencies. Neither starts a web s
 
 Each check prints `PASS` or `FAIL` with the measured value, and the process exits 1 if any check fails. The criteria behind the check ids are in `.claude/sheep/implemented/POC-v15/` (SC, FO, VH, RC) and `.claude/sheep/implemented/POC-v14/` (RM, and the drive-gate `G-` and special-sheep `K-` checks carried forward), and `.claude/sheep/implemented/POC-v16/` (CC, EX, DM).
 
+The wandering-bull checks (`B-`, POC-v17) are specified in `.claude/sheep/implemented/POC-v17/bulls.md`. The sim helpers `mk` and `mkc` pin `bullMax: 0`, so a check gets bulls only when it asks for them.
+
 ## Sim suite
 
 - Sheep are penned by the harness, so no check depends on a scripted dog winning a course: `pen` sets a sheep's state and calls the sim's scoring entry directly (fully controlled), `cross` teleports it just outside the gate mouth and steps once (through the real gate path).

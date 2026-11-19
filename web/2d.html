@@ -501,6 +501,7 @@ function render(fps) {
   // obstacles — stands of trees / large rocks (solid; the flock parts round them)
   drawObstacles()
   drawDriveGates() // POC-v14 FO1: optional hurdle pairs worth bonus points
+  drawBulls()      // POC-v17: wandering bulls — moving solids the sheep go round
 
   // gate attraction area (POC-v9 V1) — under the sheep, like the dog's presence
   if (params.debug.gateAttract) drawGateAttract()
@@ -812,6 +813,32 @@ function drawDriveGates() {
     ctx.fillStyle = d.done ? '#7fd79a' : '#9fd0ff'
     ctx.font = '600 11px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText(d.done ? '✓' : d.passed.size ? String(d.passed.size) : '+', d.x, d.y)
+    ctx.restore()
+  }
+}
+
+// POC-v17: a bull from above — a large black body along his heading, head and
+// cream horns at the front; the faint disc under him is his collision circle.
+function drawBulls() {
+  for (const b of sim.bulls) {
+    const r = b.r
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+    ctx.rotate(b.heading)
+    ctx.strokeStyle = '#111114'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'  // tail
+    ctx.beginPath(); ctx.moveTo(-r * 0.85, 0); ctx.lineTo(-r * 1.12, r * 0.12 * Math.sin(sim.ticks / 40 + b.seed)); ctx.stroke()
+    ctx.fillStyle = '#17171a'; ctx.strokeStyle = '#050506'; ctx.lineWidth = 1.2
+    ctx.beginPath(); ctx.ellipse(-r * 0.08, 0, r * 0.82, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()   // barrel
+    ctx.fillStyle = '#222226'
+    ctx.beginPath(); ctx.ellipse(r * 0.3, 0, r * 0.3, r * 0.44, 0, 0, Math.PI * 2); ctx.fill()                   // shoulders
+    ctx.strokeStyle = '#e9dfc6'; ctx.lineWidth = 2.2                                                            // horns
+    for (const sgn of [1, -1]) { ctx.beginPath(); ctx.moveTo(r * 0.72, sgn * r * 0.2); ctx.quadraticCurveTo(r * 0.74, sgn * r * 0.52, r * 0.98, sgn * r * 0.5); ctx.stroke() }
+    ctx.fillStyle = '#17171a'; ctx.strokeStyle = '#050506'; ctx.lineWidth = 1.2
+    ctx.beginPath(); ctx.ellipse(r * 0.82, 0, r * 0.27, r * 0.24, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()   // head
+    ctx.fillStyle = '#3a3336'
+    ctx.beginPath(); ctx.ellipse(r * 1.02, 0, r * 0.1, r * 0.15, 0, 0, Math.PI * 2); ctx.fill()                  // muzzle
     ctx.restore()
   }
 }

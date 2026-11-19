@@ -72,6 +72,22 @@ async function runNoGates(s, file) {
   const g = await s.ev(`(() => { let n = 0; for (let k = 1; k <= 40; k++) { sim.reseed(k); n += sim.driveGates.length } return { gates: n, tuned: ScoreUI.tuned() } })()`)
   ok(file, 'EX-2', '40 courses on this page: no drive gates, and the page is not "tuned" for it', g.gates === 0 && !g.tuned, JSON.stringify(g))
 }
+// POC-v17 (.claude/sheep/implemented/POC-v17/bulls.md): B — wandering bulls are on the page, drawn, moving, and throw nothing
+async function runBulls(s, file) {
+  const comp = file === '3d-competition.html', errs0 = s.errors.length
+  await s.send('Page.navigate', { url: WEB + file + '?seed=1259' }); await sleep(file === '2d.html' ? 2500 : 5000)
+  const d = await s.ev(`(() => { let n = 0, most = 0; for (let k = 1; k <= 60; k++) { sim.reseed(k); n += sim.bulls.length; most = Math.max(most, sim.bulls.length) } return { n, most, tuned: ScoreUI.tuned() } })()`)
+  if (comp) ok(file, 'B-p1', '60 competition courses on this page: never a bull, and the page is not "tuned"', d.n === 0 && !d.tuned, JSON.stringify(d))
+  else ok(file, 'B-p1', '60 courses at the page defaults: bulls turn up (never more than 3), and the page is not "tuned" for them', d.n > 20 && d.most <= 3 && !d.tuned, JSON.stringify(d))
+  const a = await s.ev(`(() => { params.bullChance = 1; params.bullGrazeMin = 0; params.bullGrazeMax = 0.5; sim.reseed(1259); return sim.bulls.map((b) => [b.x, b.y]) })()`)
+  await sleep(6000)
+  const b = await s.ev(`sim.bulls.map((b) => [b.x, b.y])`)
+  await shot(s, file, 'bulls')
+  const moved = a.filter((p, i) => Math.hypot(p[0] - b[i][0], p[1] - b[i][1]) > 5).length
+  if (!comp) ok(file, 'B-p2', 'with every bull slot filled the page shows three bulls and they wander while it runs', a.length === 3 && moved >= 2, `${a.length} bulls, ${moved} moved in 6 s`)
+  const errs = s.errors.slice(errs0)
+  ok(file, 'errors-bulls', 'zero console errors with bulls on the field', errs.length === 0, errs.slice(0, 4).join(' | '))
+}
 // POC-v16: DM (demo mode) on a page; CC (the competition course) on 3d-competition.html
 async function runDemo(s, file) {
   const P = file, comp = file === '3d-competition.html', errs0 = s.errors.length
@@ -362,6 +378,11 @@ async function runPhone(s, file) {
     for (const f of ['2d.html', '3d.html', '3d-competition.html']) { // POC-v16: demo mode, the competition course, no gates on the 3D pastures
       if (only && only !== f) continue
       try { await runDemo(s, f) } catch (e) { ok(f, 'crash-demo', 'demo run completed', false, e.message) }
+      await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
+    }
+    for (const f of ['2d.html', '3d.html', '3d-assault.html', '3d-competition.html']) { // POC-v17: wandering bulls
+      if (only && only !== f) continue
+      try { await runBulls(s, f) } catch (e) { ok(f, 'crash-bulls', 'bulls run completed', false, e.message) }
       await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
     }
     if (!only || only === '3d-assault.html') { try { await runNoGates(s, '3d-assault.html') } catch (e) { ok('3d-assault.html', 'crash-ex', 'no-gates run completed', false, e.message) } }

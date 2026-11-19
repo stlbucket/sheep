@@ -32,7 +32,7 @@ const ok = (id, name, pass, detail) => { results.push({ id, name, pass: !!pass, 
 // A controlled course: no specials, no drive gates, no side objectives unless asked.
 function mk(over) {
   const p = c.buildParams(c.SETTINGS)
-  Object.assign(p, { seed: 42, randomSeedOnLoad: false, sheepCount: 30, specials: false, driveGateMax: 0, sideObjectiveCount: 0, mode: 'course', obstacleRandom: false, obstacleFreq: 0 }, over || {})
+  Object.assign(p, { seed: 42, randomSeedOnLoad: false, sheepCount: 30, specials: false, driveGateMax: 0, sideObjectiveCount: 0, mode: 'course', obstacleRandom: false, obstacleFreq: 0, bullMax: 0 }, over || {})
   const sim = new c.Sim(p)
   sim.step(DT)
   return sim
@@ -398,7 +398,7 @@ function winAll(sim, tier, gap) { let i = 0; for (const s of free(sim)) { pen(si
 // =====================================================================================
 function mkc(ctx, over = {}) {
   const p = ctx.buildParams(ctx.SETTINGS)
-  Object.assign(p, { obstacleRandom: false, obstacleFreq: 0, driveGateMax: 0, specials: false, sideObjectiveCount: 0 }, over)
+  Object.assign(p, { obstacleRandom: false, obstacleFreq: 0, driveGateMax: 0, specials: false, sideObjectiveCount: 0, bullMax: 0 }, over) // bullMax 0: the POC-v17 bulls are asked for by the checks that want them
   return new ctx.FlockSim(p)
 }
 const steps = (sim, secs) => { for (let i = 0; i < Math.round(secs / DT); i++) sim.step(DT) }
@@ -737,6 +737,87 @@ const comp = (seed, over) => mkc(N, Object.assign({ seed, course: 'competition',
   const pt = []
   for (const seed of [1074, 1296, 1555]) { const r = runAuto(mkc(N, { seed, sheepCount: 30 }), 400); if (r.sc.won && r.sc.penned === 30) pw++; pt.push((r.sc.won ? 'won ' : r.sc.bust ? 'bust ' : 'open ') + r.sc.raw.t.toFixed(0) + ' s') }
   ok('DM-3', 'on a pasture course it gathers a scattered flock of 30 and pens it (three seeds)', pw === 3, pt.join(' · '))
+  // POC-v17 (lives here for runAuto)
+  { // B-6: a field with bulls is still workable
+    let pw = 0
+    const pt = []
+    for (const seed of [1074, 1296, 1555]) { const r = runAuto(mkc(N, { seed, sheepCount: 30, bullMax: 3, bullChance: 1 }), 400); if (r.sc.won && r.sc.penned === 30) pw++; pt.push((r.sc.won ? 'won ' : r.sc.bust ? 'bust ' : 'open ') + r.sc.raw.t.toFixed(0) + ' s') }
+    ok('B-6', 'the demo handler still pens a flock of 30 on fields with bulls on them (three seeds, every bull slot filled)', pw === 3, pt.join(' · '))
+  }
+}
+
+// =====================================================================================
+// POC-v17 — wandering bulls (B): .claude/sheep/implemented/POC-v17/bulls.md
+// =====================================================================================
+{
+  const page = (seed, over) => mkc(N, Object.assign({ seed, sheepCount: 40, obstacleRandom: true, bullMax: 3 }, over || {})) // bulls at the page settings
+  { // B-1: how many, and where they are put
+    const hist = [0, 0, 0, 0]
+    let bad = 0, moved = 0, comp = 0
+    for (let seed = 1; seed <= 600; seed++) {
+      const q = page(seed), p = q.p, r = q.playRect(), n = q.bulls.length
+      if (n > 3) { bad++; continue }
+      hist[n]++
+      for (const b of q.bulls) {
+        const m = b.r + p.r_obstacle + p.bullBerth
+        if (b.kind !== 'bull' || b.x - m < r.x0 || b.x + m > r.x1 || b.y - m < r.y0 || b.y + m > r.y1) bad++
+        if (Math.hypot(b.x - q.gate.x, b.y - q.gate.y) < 100 + b.r) bad++
+        if (q.obstacles.some((o) => Math.hypot(o.x - b.x, o.y - b.y) < o.r + b.r)) bad++
+        if (q.sheep.some((x) => Math.hypot(x.pos.x - b.x, x.pos.y - b.y) < m)) bad++
+        if (q.bulls.some((o) => o !== b && Math.hypot(o.x - b.x, o.y - b.y) < o.r + b.r)) bad++
+      }
+      if (seed <= 200) {
+        const z = page(seed, { bullMax: 0 })
+        if (z.gate.x !== q.gate.x || z.gate.y !== q.gate.y || z.obstacles.length !== q.obstacles.length || z.obstacles.some((o, i) => o.x !== q.obstacles[i].x) || z.sheep.some((x, i) => x.pos.x !== q.sheep[i].pos.x || x.kind !== q.sheep[i].kind)) moved++
+        if (mkc(N, { seed, course: 'competition', sheepCount: 8, bullMax: 3, bullChance: 1 }).bulls.length) comp++
+      }
+    }
+    ok('B-1', '600 pastures at the page settings: 0–3 bulls, every count occurs, each clear of the fence lane, the pen approach, the obstacles, the flock and each other', bad === 0 && hist.every((h) => h > 0), `0/1/2/3 bulls on ${hist.join('/')} fields, ${bad} violations`)
+    ok('B-2', 'bulls move nothing else: the same seed lays the same gate, obstacles and flock with or without them; a competition course never has one', moved === 0 && comp === 0, `${moved} of 200 courses moved, ${comp} competition courses with a bull`)
+  }
+  { // B-3: a rock with a wider berth
+    const q = page(7, { sheepCount: 10, obstacleRandom: false, obstacleFreq: 0, bullMax: 0 }), p = q.p
+    const sh = q.sheep[0], at = { x: sh.pos.x, y: sh.pos.y }
+    const probe = (kind, edge, vel) => {
+      const o = { x: at.x + 17 + edge, y: at.y, r: 17, kind, group: 0, seed: 1 }
+      q.obstacles = kind === 'bull' ? [] : [o]; q.bulls = kind === 'bull' ? [o] : []
+      sh.vel = vel || { x: 0, y: 0 }
+      const f = q.obstacleForce(0); return Math.hypot(f.x, f.y)
+    }
+    const mid = p.r_obstacle + p.bullBerth / 2, far = p.obstacleLook + p.bullBerth / 2
+    const rockNear = probe('rocks', mid), bullNear = probe('bull', mid)
+    const rockFar = probe('rocks', far, { x: 40, y: 0 }), bullFar = probe('bull', far, { x: 40, y: 0 })
+    const rockIn = probe('rocks', 10), bullIn = probe('bull', 10)
+    const pos = { x: at.x + 17 + 5, y: at.y }; q.pushOut(pos, 2) // the bull is still the only solid
+    ok('B-3', 'sheep treat a bull as a rock with a wider berth: he pushes off and is sidestepped from further out, harder at the same distance, and is solid', rockNear === 0 && bullNear > 0 && rockFar === 0 && bullFar > 0 && bullIn > rockIn && rockIn > 0 && Math.hypot(pos.x - (at.x + 17 + 10), pos.y - at.y) >= 17 + 2 - 1e-6,
+      `push at ${mid} px: rock ${rockNear.toFixed(2)}, bull ${bullNear.toFixed(2)} · sidestep at ${far} px: rock ${rockFar.toFixed(2)}, bull ${bullFar.toFixed(2)} · at 10 px: rock ${rockIn.toFixed(2)}, bull ${bullIn.toFixed(2)}`)
+  }
+  { // B-4 / B-5: the bull does his own thing; the dog (and the flock) are not inputs
+    let same = true, walked = 0, out = 0, inside = 0, n = 0, runs = 0
+    for (const seed of [11, 23, 58, 104]) {
+      const mkb = () => page(seed, { bullChance: 1, obstacleRandom: false, obstacleFreq: 4 })
+      const a = mkb(), b = mkb(), p = a.p, r = a.playRect()
+      const start = a.bulls.map((x) => ({ x: x.x, y: x.y }))
+      const cmds = ['away', 'walk_on', 'come_by', 'easy', 'lie_down', 'walk_on']
+      for (let k = 0; k < 60 * 90; k++) {
+        if (k % 240 === 0) a.setCommand(cmds[(k / 240) % 6]) // a: the dog works the field · b: he stays at heel
+        a.step(DT); b.step(DT)
+        if (k % 6) continue
+        for (const x of a.bulls) {
+          const m = x.r + p.r_obstacle + p.bullBerth
+          if (x.x - m < r.x0 - 1e-6 || x.x + m > r.x1 + 1e-6 || x.y - m < r.y0 - 1e-6 || x.y + m > r.y1 + 1e-6 || Math.hypot(x.x - a.gate.x, x.y - a.gate.y) < 100 + x.r) out++
+          if (a.obstacles.some((o) => Math.hypot(o.x - x.x, o.y - x.y) < o.r + x.r - 1e-6)) out++
+          for (const q of a.sheep) if (!q.through && !q.down && Math.hypot(q.pos.x - x.x, q.pos.y - x.y) < x.r) inside++
+          if (Math.hypot(a.dog.pos.x - x.x, a.dog.pos.y - x.y) < x.r) inside++
+        }
+      }
+      runs++; n += a.bulls.length
+      if (a.bulls.length !== b.bulls.length || a.bulls.some((x, i) => x.x !== b.bulls[i].x || x.y !== b.bulls[i].y || x.heading !== b.bulls[i].heading)) same = false
+      a.bulls.forEach((x, i) => { if (Math.hypot(x.x - start[i].x, x.y - start[i].y) > 20) walked++ })
+    }
+    ok('B-4', 'the dog does not affect a bull: 90 s with the dog working the field and 90 s with him at heel leave every bull in exactly the same place', same && n > 0, `${n} bulls over ${runs} seeds`)
+    ok('B-5', 'bulls wander — and stay inside the fence lane, off the pen approach and out of the stands / rocks; no sheep or dog is ever inside one', walked >= n * 0.75 && out === 0 && inside === 0, `${walked}/${n} moved more than 20 px in 90 s, ${out} out of range, ${inside} overlaps`)
+  }
 }
 
 let fails = 0
