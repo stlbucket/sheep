@@ -31,8 +31,12 @@ No subcommand match → ask which the user meant; don't guess a new workflow.
 ├── implemented/<VERSION>/ finished versions (spec folder moves here when done)
 └── poc/                  params-<date>-<what>.json tuning snapshots (history only)
 
-web/                      the running prototype — open web/index.html
-├── index.html            home: pick a version
+web/                      the site (function-bucket.com forwards here)
+├── index.html            function-bucket homepage: links to the game and the music page
+├── bucket-music.html     the owner's bass résumé page (not part of the game)
+└── sheep/                the running prototype — open web/sheep/index.html
+    (everything below is inside web/sheep/)
+├── index.html            game menu: pick a version
 ├── 2d.html               the original canvas page (levers, capture, debug overlays)
 ├── 3d.html               the same sim through three.js
 ├── 3d-assault.html       3d.html + the wolf-mortar teams
@@ -50,20 +54,20 @@ and `verify`/`tune` running against the PoC at any time.
 ## Global invariants (every subcommand obeys these)
 
 1. **This is a design/sim side-project — no fnb DB/GraphQL/backend, ever.**
-2. **The PoC is plain HTML pages + plain `<script src>` libs under `web/`**
+2. **The PoC is plain HTML pages + plain `<script src>` libs under `web/sheep/`**
    (never a local `type=module` file — those cannot load from `file://`; the
    3D pages' *inline* module importing three.js from the CDN is the one
-   exception). Physics lives ONLY in `web/lib/` and is shared by every page
+   exception). Physics lives ONLY in `web/sheep/lib/` and is shared by every page
    *(amended by owner 2026-11-14: was one HTML file, one `<script>`)*,
-   **plus one defaults file** `web/sheep-defaults.json.js` — a pure JSON literal
+   **plus one defaults file** `web/sheep/sheep-defaults.json.js` — a pure JSON literal
    in a single `const SHEEP_DEFAULTS =` assignment *(amended by owner
    2026-07-13; POC-v3 course-and-flock Q2)*; runs from `file://` by
    double-click; lil-gui is the UMD build via CDN.
 3. **Section convention is the module boundary:** `§0 PARAMS · §1 SIM · §2 RENDER
    · §3 INPUT · §4 BOOTSTRAP`. **§1 SIM stays DOM-free** — no `canvas`,
    `document`, `window`, or GUI wiring; it takes `params` as data and exposes
-   state + `step(dt)`. That holds for the whole of `web/lib/sheep-sim.js` and
-   `web/lib/assault-sim.js` (both must load in plain node); §2–§4 are each
+   state + `step(dt)`. That holds for the whole of `web/sheep/lib/sheep-sim.js` and
+   `web/sheep/lib/assault-sim.js` (both must load in plain node); §2–§4 are each
    page's own inline script. §1 is the block that ports to Godot; protect it.
 4. **All tunables live in §0 `params`** and get lil-gui bindings when introduced.
    No magic numbers inside the sim.

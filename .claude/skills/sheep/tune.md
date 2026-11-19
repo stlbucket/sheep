@@ -38,7 +38,7 @@ activity, not a side effect.
 
 When a tuned value is adopted:
 
-1. **§0 `params` default** in `web/lib/sheep-sim.js` (and its lil-gui range if the
+1. **§0 `params` default** in `web/sheep/lib/sheep-sim.js` (and its lil-gui range if the
    good value sat outside the old slider bounds).
 2. **Appendix A inventory** (`settings-inspector.md`): default + range columns.
 3. **POC constants table** (`implemented/POC-v1/README.md` → Starting

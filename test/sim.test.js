@@ -1,7 +1,7 @@
 // Headless sim suite — scoring (SC), field objectives (FO), verdict (VH), wave mode (RM).
 //   node test/sim.test.js            run every check (exit 1 on any failure)
 //   node test/sim.test.js --update   re-record test/golden-replay.json (only after an INTENDED change to flock / dog physics)
-// Loads web/lib/sheep-sim.js and web/lib/assault-sim.js in a bare `vm` context: no DOM, no browser.
+// Loads web/sheep/lib/sheep-sim.js and web/sheep/lib/assault-sim.js in a bare `vm` context: no DOM, no browser.
 // Two ways of penning a sheep, so no check depends on a scripted dog winning a course:
 //   pen(sim, s, tier)  — POC-v15 checks: set the sheep's state, mark it through and call onPenned (fully controlled)
 //   cross(sim, i)      — POC-v14 checks: teleport it just outside the gate mouth and step once (through the real gate path)
@@ -9,7 +9,7 @@
 //           .claude/sheep/implemented/POC-v14/{field-objectives,replay-modes}.md (the G-, K- and RM- checks carried forward)
 //           .claude/sheep/implemented/POC-v16/competition-and-demo.md (CC competition course, EX obstacles-or-gates, DM demo handler)
 const fs = require('fs'), vm = require('vm'), path = require('path'), crypto = require('crypto')
-const WEB = path.join(__dirname, '..', 'web')
+const WEB = path.join(__dirname, '..', 'web', 'sheep')
 const GOLDEN = path.join(__dirname, 'golden-replay.json')
 const UPDATE = process.argv.includes('--update')
 function load(dir, defaultsDir, withAssault) {
@@ -252,7 +252,7 @@ function winAll(sim, tier, gap) { let i = 0; for (const s of free(sim)) { pen(si
   const files = ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'lib/sheep-score-ui.js', 'sheep-defaults.json.js', '2d.html', '3d.html', '3d-assault.html']
   const hits = []
   for (const f of files) { const t = fs.readFileSync(path.join(WEB, f), 'utf8'); for (const k of dead) if (t.includes(k)) hits.push(f + ':' + k) }
-  ok('SC-17', 'removed keys appear nowhere under web/', hits.length === 0, hits.join(' ') || 'none found')
+  ok('SC-17', 'removed keys appear nowhere under web/sheep/sheep/', hits.length === 0, hits.join(' ') || 'none found')
 }
 // ---------------- FO-2: gate multiplier
 {
@@ -442,10 +442,10 @@ const lastPen = (sim) => sim.scoreEvents.filter((e) => e.kind === 'pen').pop()
     const txt = fs.readFileSync(path.join(WEB, f), 'utf8')
     for (const k of ['w_time', 'w_line', 'w_cohesion', 'w_calm', 'injuryWeight']) if (txt.includes(k)) hit.push(f + ':' + k)
   }
-  ok('SC-old', 'the pre-v14 penalty keys appear nowhere under web/', hit.length === 0, hit.join(' ') || 'none')
+  ok('SC-old', 'the pre-v14 penalty keys appear nowhere under web/sheep/sheep/', hit.length === 0, hit.join(' ') || 'none')
   const stars = []
   for (const f of ['lib/sheep-sim.js', 'lib/assault-sim.js', 'lib/sheep-gui.js', 'lib/sheep-score-ui.js', '2d.html', '3d.html', '3d-assault.html']) { const txt = fs.readFileSync(path.join(WEB, f), 'utf8'); if (/[★☆]|\.stars\b|\bstars:/.test(txt)) stars.push(f) }
-  ok('VH-11', 'no score star (glyph or `stars` field) anywhere under web/', stars.length === 0, stars.join(' ') || 'none')
+  ok('VH-11', 'no score star (glyph or `stars` field) anywhere under web/sheep/sheep/', stars.length === 0, stars.join(' ') || 'none')
   ok('SC-19', 'both sim libs load in plain node; lever assertions pass', N.assertLevers().length === 0, 'assertLevers → 0 errors')
 }
 { // FO-3: the new kinds at about their chance, never two of a kind, and the v14 specials on the same sheep as with the new kinds off

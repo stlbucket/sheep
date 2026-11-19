@@ -14,12 +14,12 @@ Why it could score badly if ported as-is: the prototype pages look like a tuning
 
 | Existing page | Role on Reddit | Why |
 |---|---|---|
-| `web/3d-competition.html` (4–6 ordered gates, 8 sheep, pen shut until the gates are cleared) | **Daily game 1, "The Trial"** | Bite-sized (the demo handler finishes in 50–85 s and won 20 of 20 measured courses), legible goal (numbers on the gates), cheap to replay on a server, and the 3D view is the visual identity |
-| `web/3d.html` pasture (30–80 sheep, obstacles, and from POC-v17 bulls) | **Daily game 2, "The Gather"** (owner Q1: two daily games, one of each). Flock size varies by day; bulls appear as the sim draws them (Q10) | The original game. Longer and harder than the Trial, so it needs its own par, its own board and a flock range that a phone and the server replay can carry (section 5) |
-| `web/2d.html` | Not shipped. Stays the tuning bench | Debug tool by design |
-| `web/3d-assault.html` (wolf mortar teams) | Not shipped | Off-theme for a calm daily; a possible post-contest event |
+| `web/sheep/3d-competition.html` (4–6 ordered gates, 8 sheep, pen shut until the gates are cleared) | **Daily game 1, "The Trial"** | Bite-sized (the demo handler finishes in 50–85 s and won 20 of 20 measured courses), legible goal (numbers on the gates), cheap to replay on a server, and the 3D view is the visual identity |
+| `web/sheep/3d.html` pasture (30–80 sheep, obstacles, and from POC-v17 bulls) | **Daily game 2, "The Gather"** (owner Q1: two daily games, one of each). Flock size varies by day; bulls appear as the sim draws them (Q10) | The original game. Longer and harder than the Trial, so it needs its own par, its own board and a flock range that a phone and the server replay can carry (section 5) |
+| `web/sheep/2d.html` | Not shipped. Stays the tuning bench | Debug tool by design |
+| `web/sheep/3d-assault.html` (wolf mortar teams) | Not shipped | Off-theme for a calm daily; a possible post-contest event |
 | Wave mode, random courses, levers, capture, `obstacles` slider | Not shipped to players | "Remove clutter or secondary actions during active play" |
-| Demo mode (`AutoHandler` in `web/lib/sheep-auto.js`) | Kept, repurposed as the tutorial's "watch him work" and the ghost in onboarding | It already only issues pad commands, so what it shows is what a player can do |
+| Demo mode (`AutoHandler` in `web/sheep/lib/sheep-auto.js`) | Kept, repurposed as the tutorial's "watch him work" and the ghost in onboarding | It already only issues pad commands, so what it shows is what a player can do |
 
 Daily course size and time are tunable from data once the port runs: the target is a first-day player finishing in under three minutes and a practised player in about one.
 
@@ -38,10 +38,10 @@ Planned project (a new folder, created from the Devvit Three.js template; see Q3
 
 | Path | Contents |
 |---|---|
-| `src/shared/sim/` | `sheep-sim.js`, `sheep-defaults.json.js`, `sheep-auto.js` — the same DOM-free code that is in `web/lib/` today, built from one source so the browser and the server run identical physics |
+| `src/shared/sim/` | `sheep-sim.js`, `sheep-defaults.json.js`, `sheep-auto.js` — the same DOM-free code that is in `web/sheep/lib/` today, built from one source so the browser and the server run identical physics |
 | `src/shared/daily.ts` | Day number ↔ UTC date ↔ seed; the course preset (params that define a daily or weekly course); the run-log format |
 | `src/client/splash.html` + `splash.ts` | Inline first screen (entry point `default`) |
-| `src/client/game.html` + `game.ts` | The trial (entry points `game` and `_direct_launch`); the three.js renderer lifted from `web/3d-competition.html`, the pad from `sheep-pad-ui.js`, the score block and result card from `sheep-score-ui.js` |
+| `src/client/game.html` + `game.ts` | The trial (entry points `game` and `_direct_launch`); the three.js renderer lifted from `web/sheep/3d-competition.html`, the pad from `sheep-pad-ui.js`, the score block and result card from `sheep-score-ui.js` |
 | `src/client/leaderboard.html` + `leaderboard.ts` | The boards |
 | `src/server/index.ts` | Endpoints below |
 | `devvit.json` | Entry points, `permissions` (redis, reddit incl. `asUser` for comments, realtime if used, journeys), one scheduler task, menu items, install trigger |
@@ -145,12 +145,12 @@ The judges will open the demo post cold, probably on a phone, and decide in the 
 | Fail softly | Three panic strikes ends a run today. On the daily, a bust still gives a score and a result card with a one-line cause ("the dog was too close for too long") and Practice. Because a bust on the scored run cannot be retried, the guided first run and unlimited practice before pressing the scored Play matter more than they did |
 | Plain words | Player-facing text says "circle left / circle right" beside the traditional "come by / away" so the vocabulary is charm, not a barrier |
 
-## 9. Migration work from `web/`
+## 9. Migration work from `web/sheep/`
 
 | Area | Today | Work |
 |---|---|---|
-| Module loading | Plain `<script src>` globals plus an inline module importing three.js from a CDN; built to open from `file://` | Vite bundle. three.js from npm, bundled. No CDN, no inline script. The `web/` pages keep working from `file://` unchanged |
-| One sim source | `web/lib/sheep-sim.js` is 270 KB of plain script that assigns globals; the tests load it in a `vm` context | Add a thin module wrapper (or a build step that appends exports) so the same file is imported by the Devvit client and server without forking it. Decide in Phase 0; the rule is **one copy of the physics** (Q3) |
+| Module loading | Plain `<script src>` globals plus an inline module importing three.js from a CDN; built to open from `file://` | Vite bundle. three.js from npm, bundled. No CDN, no inline script. The `web/sheep/` pages keep working from `file://` unchanged |
+| One sim source | `web/sheep/lib/sheep-sim.js` is 270 KB of plain script that assigns globals; the tests load it in a `vm` context | Add a thin module wrapper (or a build step that appends exports) so the same file is imported by the Devvit client and server without forking it. Decide in Phase 0; the rule is **one copy of the physics** (Q3) |
 | Tuning UI | lil-gui panels, levers, capture, overlays, `obstacles` slider | Not included in the Reddit client at all. Params are frozen into a course preset in `src/shared/daily.ts` |
 | Storage | `localStorage` keys for bests, history, band bests, collection, demo-used | Server (Redis) is the source of truth; `localStorage` only caches |
 | Daily seed | Device local date | Server day number in `postData` |
@@ -161,7 +161,7 @@ The judges will open the demo post cold, probably on a phone, and decide in the 
 | Visual identity | Functional prototype styling | One palette, one display typeface (bundled, licensed), custom buttons, a title mark, a splash illustration rendered from the game itself. No default-looking controls anywhere |
 | Sound | None | A handful of original or properly licensed sounds (whistle per command, bleats, gate clack), off until the first tap, with a mute button and `visibilitychange` muting, as the inline rules require. **Committed work, not a stretch item (owner Q9)**: audio must be original or clearly licensed, sourced by 30 Nov |
 | Performance | 80 sheep cost about 2.5 ms a tick in node; fine on desktop | 8 sheep is trivial; the Gather's 30–80 are the real test (80 sheep is the prototype's desktop default and has not been run on a phone). Budget the three.js scene for low-end phones: cap pixel ratio, simple materials, no shadows on mobile. Splash must not load three.js |
-| Tests | `npm test` (sim) and `npm run test:pages` (headless Chrome on `web/`) | Keep both untouched. Add server-side replay tests: recorded command logs must reproduce their scores; a tampered log must be rejected |
+| Tests | `npm test` (sim) and `npm run test:pages` (headless Chrome on `web/sheep/`) | Keep both untouched. Add server-side replay tests: recorded command logs must reproduce their scores; a tampered log must be rejected |
 
 ## 10. Judging criteria → work
 
@@ -258,7 +258,7 @@ Realtime toast → ghost "beat this run" → weekly board → collection → wat
 | Q13 | The Gather's flock range | **30–80 sheep** |
 | Q14 | What keeps a streak alive? | **Separate streaks, one per game** |
 | Q15 | App name | **Hyphenated form**; the first try is `one-dude-and-his-dog` (exactly the 20-character limit), then `onedudeandhisdog`. Availability and whether hyphens are allowed are not verified |
-| Q16 | The top rank shares a BBC programme's title | ~~Rename the game to "One Man and His Dog"~~ → **the app and the top award are both "One Dude and His Dog"** (owner's final word, 2026-11-18). The rank is renamed in `web/lib/sheep-sim.js` |
+| Q16 | The top rank shares a BBC programme's title | ~~Rename the game to "One Man and His Dog"~~ → **the app and the top award are both "One Dude and His Dog"** (owner's final word, 2026-11-18). The rank is renamed in `web/sheep/lib/sheep-sim.js` |
 
 ### Still open
 

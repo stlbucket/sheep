@@ -1,4 +1,4 @@
-// Page suite — drives web/2d.html, web/3d.html, web/3d-assault.html and web/3d-competition.html in headless Chrome straight from file://
+// Page suite — drives web/sheep/2d.html, web/sheep/3d.html, web/sheep/3d-assault.html and web/sheep/3d-competition.html in headless Chrome straight from file://
 // (no web server), over the DevTools websocket. Needs node 22+ (global WebSocket / fetch), Google Chrome, and
 // network access (lil-gui and three.js load from a CDN).
 //   node test/pages.test.js              all three pages (about 2 minutes)
@@ -7,7 +7,7 @@
 // Screenshots land in test/shots/ (git-ignored). Exit code 1 on any failure.
 // Criteria: .claude/sheep/implemented/POC-v15/{verdict-and-hud,records,field-objectives}.md (VH, RC, FO) and POC-v14/replay-modes.md (RM)
 const { spawn } = require('child_process'), fs = require('fs'), path = require('path'), os = require('os'), url = require('url')
-const WEB = url.pathToFileURL(path.join(__dirname, '..', 'web')).href + '/'
+const WEB = url.pathToFileURL(path.join(__dirname, '..', 'web', 'sheep')).href + '/'
 const PORT = 9347, SHOTS = path.join(__dirname, 'shots')
 fs.mkdirSync(SHOTS, { recursive: true })
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'sheep-chrome-'))

@@ -1,6 +1,6 @@
 # Sheep behavior, in human terms
 
-A plain-language summary of every rule about how the sheep behave. Written 2026-11-16 from the rule specs under `.claude/sheep/implemented/` (POC-v2 `flock-behavior.md`, POC-v3 `course-and-flock.md` and `dog-behavior.md`, POC-v7 `gate-attraction.md`, POC-v9 `flock-behavior.md`, POC-v12 `obstacles.md`, POC-v13 `flock-behavior.md`) and `.claude/sheep/brainstorming/force-model.md`. It summarizes the specs; it was not checked against `web/lib/sheep-sim.js`. The specs remain the source of truth, and rule IDs are given in brackets.
+A plain-language summary of every rule about how the sheep behave. Written 2026-11-16 from the rule specs under `.claude/sheep/implemented/` (POC-v2 `flock-behavior.md`, POC-v3 `course-and-flock.md` and `dog-behavior.md`, POC-v7 `gate-attraction.md`, POC-v9 `flock-behavior.md`, POC-v12 `obstacles.md`, POC-v13 `flock-behavior.md`) and `.claude/sheep/brainstorming/force-model.md`. It summarizes the specs; it was not checked against `web/sheep/lib/sheep-sim.js`. The specs remain the source of truth, and rule IDs are given in brackets.
 
 ## Left alone
 

@@ -3,178 +3,107 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
-     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<meta name="apple-mobile-web-app-title" content="Sheep" />
-<script>
-  // phone landscape (owner 2026-11-19, same as the game pages): the page runs edge to edge (viewport-fit=cover) and keeps clear of the notch / Dynamic Island on
-  // whichever side it sits — the browser's own safe-area insets are the same both sides, so the rotation angle says which side that is
-  function islandSide() {
-    const a = typeof window.orientation === "number" ? window.orientation : (screen.orientation ? screen.orientation.angle : 0)
-    const c = document.documentElement.classList
-    c.toggle("island-left", a === 90) // turned anticlockwise: the top of the phone is on the left
-    c.toggle("island-right", a === -90 || a === 270)
-  }
-  islandSide()
-  addEventListener("orientationchange", islandSide)
-  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", islandSide)
-</script>
-<title>Sheep PoC</title>
+<title>function-bucket</title>
 <!--
-  HOME — pick a version. Every page here runs the same herding physics
-  (lib/sheep-sim.js); they differ only in how it is drawn and what is added:
+  function-bucket homepage (owner 2026-11-19): a plain front door for the site.
+  One self-contained page, no build step, no libraries, works from file://.
+  The colours and type are the music page's (bucket-music.html), so the two read as one site.
 
-    2d.html          the original canvas page, with levers + debug tools
-    3d.html          the same sim seen through three.js
-    3d-competition.html  3d.html on a clean course: numbered gates in order, then the pen
-    3d-assault.html  3d.html + the wolf-mortar teams (lib/assault-sim.js)
-
-  PHONES (owner 2026-11-18): the four cards always fit ONE screen, portrait (2 × 2) or
-  landscape (4 across) — the page never scrolls. Each card shows as much of its text
-  as its own height allows (container queries); the keyboard footer is dropped.
-
-  Plain links — works from file:// by double-click. The one script only decides
-  whether to show the iPhone "Add to Home Screen" tip.
+  TO ADD A LINK: copy one <a class="door"> block in <main> below.
+  The game lives in sheep/ (its own menu is sheep/index.html); the music page is bucket-music.html.
 -->
 <style>
+  :root {
+    --paper: #f4f1ea;
+    --panel: #fbf9f4;
+    --ink: #1c1a17;
+    --ink-2: #5c564d;
+    --ink-3: #8a8377;
+    --rule: #d9d3c6;
+    --accent: #9c3b1f;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #151412;
+      --panel: #1d1b18;
+      --ink: #ece7dc;
+      --ink-2: #a9a294;
+      --ink-3: #7a7468;
+      --rule: #34302a;
+      --accent: #e0714c;
+    }
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; }
-  html { --il: 0px; --ir: 0px; --sb: env(safe-area-inset-bottom, 0px); }
-  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
-  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    background: #14181c;
-    color: #cdd6df;
-    font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    --py: 48px; --px: 16px;
-    /* NOTCH / DYNAMIC ISLAND (owner 2026-11-19, same as the game pages): the side gap is 22 % of the safe-area inset (halved from the game pages' 45 %, owner: still too large here) on the island side only
-       (html.island-left / .island-right, set by islandSide() in the head) and replaces the edge padding; top and bottom keep clear of the
-       status bar and home bar when held upright (--sb is 0 in phone landscape, where the page ran under the home bar already) */
-    padding: max(var(--py), env(safe-area-inset-top, 0px)) max(var(--px), var(--ir)) max(var(--py), var(--sb)) max(var(--px), var(--il));
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.5 var(--sans);
   }
-  header { text-align: center; margin-bottom: 36px; }
-  h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; color: #e6edf3; }
-  header p { margin: 0; color: #7b8894; font-size: 13px; text-wrap: balance; }
-  .versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 720px; }
-  .card {
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
+  }
+  header { padding-top: max(72px, env(safe-area-inset-top)); padding-bottom: 32px; }
+  h1 { margin: 0; font: 600 clamp(34px, 7vw, 52px)/1.05 var(--serif); letter-spacing: -0.01em; }
+  header p { margin: 14px 0 0; max-width: 52ch; color: var(--ink-2); font-size: 17px; text-wrap: pretty; }
+
+  main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .door {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     padding: 20px;
-    background: #101418;
-    border: 1px solid #232b32;
-    border-radius: 8px;
-    color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
     text-decoration: none;
-    transition: border-color 0.12s, transform 0.12s;
   }
-  .card:hover, .card:focus-visible { border-color: #7fd79a; transform: translateY(-2px); outline: none; }
-  .card .icon { font-size: 34px; line-height: 1; }
-  .card h2 { margin: 4px 0 0; font-size: 17px; font-weight: 600; color: #e6edf3; }
-  .card p { margin: 0; font-size: 13px; color: #9fb0c0; flex: 1 1 auto; }
-  .card .tags { font-size: 11px; color: #7b8894; }
-  .card .go { margin-top: 6px; font-size: 13px; color: #7fd79a; }
-  .card.assault:hover, .card.assault:focus-visible { border-color: #e0a98a; }
-  .card.assault .go { color: #e0a98a; }
-  footer { margin-top: 32px; font-size: 12px; color: #7b8894; text-align: center; }
-  kbd { padding: 0 4px; border: 1px solid #3a4650; border-radius: 3px; font: inherit; font-size: 11px; color: #9fb0c0; }
-  @media (max-width: 720px) {
-    body { --py: 28px; --px: 16px; }
-    .versions { grid-template-columns: 1fr; }
-  }
-  /* iPhone Safari only (set by the script at the foot): how to get the game full screen */
-  #ios-tip { display: none; margin: 4px 0 0; font-size: 12px; line-height: 1.3; color: #9fd0ff; }
-  body.ios-browser #ios-tip { display: block; }
-  /* phones: everything on one screen, no scrolling, either way up */
-  @media (pointer: coarse) and (max-width: 950px) {
-    html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
-    body { height: 100vh; height: 100dvh; --py: 10px; --px: 12px; }
-    header { margin-bottom: 8px; flex: 0 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 2px; }
-    header p { font-size: 12px; line-height: 1.3; }
-    footer { display: none; } /* keyboard keys — nothing to press on a phone */
-    .versions { flex: 1 1 0; min-height: 0; max-width: none; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
-    .card { container-type: size; min-height: 0; min-width: 0; overflow: hidden; padding: 10px; gap: 4px; justify-content: center; transition: none; }
-    .card:hover, .card:focus-visible { transform: none; }
-    .card .icon { font-size: 26px; }
-    .card h2 { margin: 0; font-size: 15px; line-height: 1.2; }
-    .card .go { margin-top: 2px; font-size: 12px; line-height: 1.25; }
-    .card .tags { display: none; }
-    /* the description shows only where the card has the height for it, and never runs past it */
-    .card p { display: none; flex: 0 0 auto; font-size: 12px; line-height: 1.35; overflow: hidden; -webkit-box-orient: vertical; }
-    .card p kbd { display: none; }
-    @container (min-height: 170px) { .card p { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; } }
-    @container (min-height: 215px) { .card p { -webkit-line-clamp: 4; line-clamp: 4; } }
-    @container (min-height: 275px) { .card p { -webkit-line-clamp: 7; line-clamp: 7; } .card .icon { font-size: 32px; } }
-    @container (max-height: 105px) { .card .icon { display: none; } }
-  }
-  @media (pointer: coarse) and (max-width: 950px) and (orientation: landscape) {
-    html { --sb: 0px; }
-    body { --py: 6px; --px: 12px; }
-    header { margin-bottom: 4px; }
-    header p { display: none; }
-    header { display: flex; align-items: baseline; justify-content: center; gap: 12px; }
-    body.ios-browser #ios-tip { display: block; margin: 0; font-size: 11px; }
-    h1 { font-size: 16px; margin: 0; }
-    .versions { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+  .door:hover { border-color: var(--ink); }
+  .door:active { transform: translateY(1px); }
+  .door .kind { font: 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .door h2 { margin: 4px 0 0; font: 600 24px/1.15 var(--serif); }
+  .door p { margin: 0; color: var(--ink-2); font-size: 15px; text-wrap: pretty; }
+  .door .go { margin-top: auto; padding-top: 10px; font: 13px/1 var(--mono); color: var(--accent); }
+
+  footer { padding-top: 40px; padding-bottom: max(56px, env(safe-area-inset-bottom)); font-size: 13px; color: var(--ink-3); }
+
+  @media (max-width: 620px) {
+    header { padding-top: max(44px, env(safe-area-inset-top)); padding-bottom: 24px; }
+    main { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>🐑 Sheep PoC</h1>
-  <p>Work the dog, gather the flock, pen it through the gate. Pick a version.</p>
-  <p id="ios-tip">Full screen on iPhone: Share <b>→</b> Add to Home Screen, then open it from there.</p>
+
+<header class="wrap">
+  <h1>function-bucket</h1>
+  <p>Things Bucket makes: a sheepdog game and a lot of bass lines.</p>
 </header>
 
-<main class="versions">
-  <a class="card" href="2d.html">
-    <div class="icon">🗺️</div>
-    <h2>2D</h2>
-    <p>The original top-down field. Every debug overlay, the tuning levers and the state-capture tool live here.</p>
-    <div class="tags">canvas · levers · capture ⎘</div>
-    <div class="go">play 2D →</div>
+<main class="wrap">
+  <a class="door" href="sheep/index.html">
+    <span class="kind">Game</span>
+    <h2>One Dude and His Dog</h2>
+    <p>Work the dog, gather the flock, pen it through the gate. Plays in the browser, on a phone or with the arrow keys.</p>
+    <span class="go">play &rarr;</span>
   </a>
-  <a class="card" href="3d.html">
-    <div class="icon">🏞️</div>
-    <h2>3D</h2>
-    <p>The same simulation in a three.js pasture, with orbit, top, handler and dog cameras.</p>
-    <div class="tags">three.js · 4 cameras</div>
-    <div class="go">play 3D →</div>
-  </a>
-  <a class="card" href="3d-competition.html">
-    <div class="icon">🏁</div>
-    <h2>3D · Competition</h2>
-    <p>A clean trial field: take a small flock through four to six numbered gates, in order, then into the pen. Press <kbd>A</kbd> to watch the dog run it.</p>
-    <div class="tags">three.js · required path · demo</div>
-    <div class="go">play Competition →</div>
-  </a>
-  <a class="card assault" href="3d-assault.html">
-    <div class="icon">🐺</div>
-    <h2>3D · Assault</h2>
-    <p>The 3D pasture under fire: two-wolf mortar teams come over the hills and shell the flock while you pen it.</p>
-    <div class="tags">three.js · wolf mortars</div>
-    <div class="go">play Assault →</div>
+  <a class="door" href="bucket-music.html">
+    <span class="kind">Music</span>
+    <h2>Bucket on bass</h2>
+    <p>Afrobeat, soul and alt-country out of Seattle and St. Louis &mdash; recordings with me on bass, band by band.</p>
+    <span class="go">listen &rarr;</span>
   </a>
 </main>
 
-<footer>
-  same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do
-</footer>
-<script>
-  // iPhone / iPod Safari cannot make a page full screen (no Fullscreen API there) — a home-screen web app is the way.
-  // Show the tip only in the browser, never once it is running from the home screen.
-  (function () {
-    var iphone = /iPhone|iPod/.test(navigator.userAgent)
-    var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)
-    if (iphone && !standalone) document.body.classList.add('ios-browser')
-  })()
-</script>
+<footer class="wrap">function-bucket.com</footer>
+
 </body>
 </html>
