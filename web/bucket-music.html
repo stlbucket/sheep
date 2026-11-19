@@ -252,6 +252,44 @@
 var BC = 'https://f4.bcbits.com/img/';           // Bandcamp cover art (…_2.jpg = 350 px)
 var BANDS = [
   {
+    id: 'extra-thick', name: 'Extra Thick', where: 'Seattle · current',
+    blurb: 'Eleven-piece Afrobeat: most of Cascadia ’10, regrouped and doubled in size. Still playing Seattle rooms.',
+    links: [['extrathickafrobeat.com', 'https://extrathickafrobeat.com/'], ['ReverbNation', 'https://www.reverbnation.com/extrathick'], ['Facebook', 'https://www.facebook.com/ExtraThickAfrobeat/']],
+    releases: [
+      { title: 'Extra Thick', sub: 'Band player · four tracks', href: 'https://www.reverbnation.com/extrathick', tracks: [
+        { wide: true, label: 'Play the set', t: 'Knife Hit · The Secret Is Out · Brassquatch · Thick Business', d: 1078,
+          src: 'https://www.reverbnation.com/widget_code/html_widget/artist_8284227?widget_id=55&pwc[included_songs]=1&context_type=page_object',
+          h: 380, href: 'https://www.reverbnation.com/extrathick' }
+      ] }
+    ]
+  },
+  {
+    id: 'lady-c', name: 'Lady C & The Lowdown', where: 'Seattle · 2020',
+    blurb: 'Seven-piece ’60s and ’70s-style soul and funk dance band fronted by Christine Patterson. Singles cut at Shady Bottom Studios.',
+    links: [['Bandcamp', 'https://ladycandthelowdown.bandcamp.com/']],
+    releases: [
+      { title: 'Singles', sub: '2020 · studio · Shady Bottom, Seattle', art: BC + 'a0628640821_2.jpg', href: 'https://ladycandthelowdown.bandcamp.com/music', tracks: [
+        { t: 'Boom Boom', d: 170, bc: 1208644546, href: 'https://ladycandthelowdown.bandcamp.com/track/boom-boom' },
+        { t: 'Gimme Somthin’ Good', d: 237, bc: 2019202533, href: 'https://ladycandthelowdown.bandcamp.com/track/gimme-somthin-good' },
+        { t: 'I’m on Fire', d: 147, bc: 2472405894, href: 'https://ladycandthelowdown.bandcamp.com/track/im-on-fire' }
+      ] }
+    ]
+  },
+  {
+    id: 'the-ringers', name: 'The Ringers', where: 'Seattle · 2013–2017',
+    blurb: 'Studio soul project out of Shady Bottom Studios, fronted by Eldridge Gravy. Co-wrote “Shoulda Known (About You)” and “Mr. Politician”.',
+    links: [['Bandcamp', 'https://theringers.bandcamp.com/']],
+    releases: [
+      { title: 'The Ringers', sub: '2017 · studio · Shady Bottom, Seattle', art: BC + 'a4082267519_2.jpg', href: 'https://theringers.bandcamp.com/album/the-ringers', tracks: [
+        { t: 'Mr. Politician', d: 133, bc: 1589390336, href: 'https://theringers.bandcamp.com/track/mr-politician' },
+        { t: 'Bargain with the Rising Sun', d: 205, bc: 2371235032, href: 'https://theringers.bandcamp.com/track/bargain-with-the-rising-sun' },
+        { t: 'Shoulda Known (About You)', d: 194, bc: 2717411473, href: 'https://theringers.bandcamp.com/track/shoulda-known-about-you' },
+        { t: 'So Complicated', d: 193, bc: 3587008483, href: 'https://theringers.bandcamp.com/track/so-complicated' },
+        { t: 'Moment', d: 204, bc: 4131941781, href: 'https://theringers.bandcamp.com/track/moment' }
+      ] }
+    ]
+  },
+  {
     id: 'cascadia-10', name: 'Cascadia ’10', where: 'Seattle · 2010–2015',
     blurb: 'Nine-piece instrumental Afrobeat — three horns, two guitars, a wall of percussion. Recorded for KEXP and KBCS, and at Avast! with Mell Dettmer.',
     links: [['Bandcamp', 'https://cascadia10.bandcamp.com/'], ['Spotify', 'https://open.spotify.com/artist/4apSuIpO4R1zpvZ2JVed7g'], ['YouTube Music', 'https://music.youtube.com/channel/UCtMCBnCytiJvXE7BXmepKxQ'], ['KEXP write-up', 'https://kexp.org/read/2014/1/31/live-video-cascadia-10/']],
@@ -281,20 +319,6 @@ var BANDS = [
     ]
   },
   {
-    id: 'the-ringers', name: 'The Ringers', where: 'Seattle · 2013–2017',
-    blurb: 'Studio soul project out of Shady Bottom Studios, fronted by Eldridge Gravy. Co-wrote “Shoulda Known (About You)” and “Mr. Politician”.',
-    links: [['Bandcamp', 'https://theringers.bandcamp.com/']],
-    releases: [
-      { title: 'The Ringers', sub: '2017 · studio · Shady Bottom, Seattle', art: BC + 'a4082267519_2.jpg', href: 'https://theringers.bandcamp.com/album/the-ringers', tracks: [
-        { t: 'Mr. Politician', d: 133, bc: 1589390336, href: 'https://theringers.bandcamp.com/track/mr-politician' },
-        { t: 'Bargain with the Rising Sun', d: 205, bc: 2371235032, href: 'https://theringers.bandcamp.com/track/bargain-with-the-rising-sun' },
-        { t: 'Shoulda Known (About You)', d: 194, bc: 2717411473, href: 'https://theringers.bandcamp.com/track/shoulda-known-about-you' },
-        { t: 'So Complicated', d: 193, bc: 3587008483, href: 'https://theringers.bandcamp.com/track/so-complicated' },
-        { t: 'Moment', d: 204, bc: 4131941781, href: 'https://theringers.bandcamp.com/track/moment' }
-      ] }
-    ]
-  },
-  {
     id: 'soul-senate', name: 'Soul Senate', where: 'Seattle · 2009–2015',
     blurb: 'Eight-piece funk and soul with two lead singers, horns and organ. Tracked at The Playroom, mixed by Mell Dettmer.',
     links: [['Bandcamp', 'https://soulsenate.bandcamp.com/'], ['“Good Side” on YouTube', 'https://www.youtube.com/watch?v=52ttB2LjXNQ']],
@@ -313,59 +337,34 @@ var BANDS = [
     ]
   },
   {
-    id: 'extra-thick', name: 'Extra Thick', where: 'Seattle · current',
-    blurb: 'Eleven-piece Afrobeat: most of Cascadia ’10, regrouped and doubled in size. Still playing Seattle rooms.',
-    links: [['extrathickafrobeat.com', 'https://extrathickafrobeat.com/'], ['ReverbNation', 'https://www.reverbnation.com/extrathick'], ['Facebook', 'https://www.facebook.com/ExtraThickAfrobeat/']],
-    releases: [
-      { title: 'Extra Thick', sub: 'Band player · four tracks', href: 'https://www.reverbnation.com/extrathick', tracks: [
-        { wide: true, label: 'Play the set', t: 'Knife Hit · The Secret Is Out · Brassquatch · Thick Business', d: 1078,
-          src: 'https://www.reverbnation.com/widget_code/html_widget/artist_8284227?widget_id=55&pwc[included_songs]=1&context_type=page_object',
-          h: 380, href: 'https://www.reverbnation.com/extrathick' }
-      ] }
-    ]
-  },
-  {
-    id: 'lady-c', name: 'Lady C & The Lowdown', where: 'Seattle · 2020',
-    blurb: 'Seven-piece ’60s and ’70s-style soul and funk dance band fronted by Christine Patterson. Singles cut at Shady Bottom Studios.',
-    links: [['Bandcamp', 'https://ladycandthelowdown.bandcamp.com/']],
-    releases: [
-      { title: 'Singles', sub: '2020 · studio · Shady Bottom, Seattle', art: BC + 'a0628640821_2.jpg', href: 'https://ladycandthelowdown.bandcamp.com/music', tracks: [
-        { t: 'Boom Boom', d: 170, bc: 1208644546, href: 'https://ladycandthelowdown.bandcamp.com/track/boom-boom' },
-        { t: 'Gimme Somthin’ Good', d: 237, bc: 2019202533, href: 'https://ladycandthelowdown.bandcamp.com/track/gimme-somthin-good' },
-        { t: 'I’m on Fire', d: 147, bc: 2472405894, href: 'https://ladycandthelowdown.bandcamp.com/track/im-on-fire' }
-      ] }
-    ]
-  },
-  {
     id: 'north19', name: 'Anna Coogan & north19', where: 'Seattle · 2004–2007',
     blurb: 'Alt-country behind singer-songwriter Anna Coogan. Founding member; two full-length records.',
     links: [['Spotify', 'https://open.spotify.com/artist/23knNQBgwIpD10ijp51rQh'], ['YouTube Music', 'https://music.youtube.com/channel/UCE71ySw_y8QbUHDksLnaPyQ'], ['annacoogan.com', 'https://www.annacoogan.com/about']],
-    note: 'Spotify plays 30-second previews unless you are signed in.',
     releases: [
-      { title: 'Sleepwalker', sub: '2007 · studio', art: 'https://i.scdn.co/image/ab67616d00001e0285e3d78b98db7791e8917177', href: 'https://open.spotify.com/album/7wGfeQ2RIquNHoe2yhmKIs', tracks: [
-        { t: 'Rise On', d: 275, sp: '1SzhoxjKjlFRE9DkBx25yP' },
-        { t: 'State of Grace', d: 258, sp: '3Y7K8HHFxfcH6kTU60yUS3' },
-        { t: 'Wish You Well', d: 290, sp: '4Zx1lfi3MQEip4ITvQSu4X' },
-        { t: 'Wish You Well (reprise)', d: 140, sp: '2OyxjC5l4hdAbuaErrIZH8' },
-        { t: 'Hard Luck Halo', d: 213, sp: '25zpvA84T8fxbiyHOvRgpf' },
-        { t: 'Fade Away', d: 295, sp: '2BcOwXgC28L5e0HCqw4TLE' },
-        { t: 'The World Is Waiting on You', d: 304, sp: '3P3Uf8Uw9us1ApzLl80rjt' },
-        { t: 'When It Rains', d: 251, sp: '0mWb4xLGpmYQfiAlpnxHEg' },
-        { t: 'All I Can Give to You', d: 174, sp: '2BU6ZRnJ3r7q6bVwMKU7C4' },
-        { t: 'El Chupacabra', d: 391, sp: '4GFUmJKnwORj349Bx1mhkT' },
-        { t: 'Sleepwalker', d: 285, sp: '1vL8FPUS64RzLvPYEaUt5r' }
+      { title: 'Sleepwalker', sub: '2007 · studio', art: 'https://i.scdn.co/image/ab67616d00001e0285e3d78b98db7791e8917177', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mp83D9AP9WJiE7a8uR5OfYX1YlNUCwJwI', tracks: [
+        { t: 'Rise On', d: 275, yt: 'Vn-tst_7yTM' },
+        { t: 'State of Grace', d: 258, yt: '_fmRiOz18Xw' },
+        { t: 'Wish You Well', d: 290, yt: 'd8g_M_1_-gg' },
+        { t: 'Wish You Well (reprise)', d: 140, yt: 'JHb4sbF83Fw' },
+        { t: 'Hard Luck Halo', d: 213, yt: 'ZC7zGSNoUPc' },
+        { t: 'Fade Away', d: 295, yt: 'wyZO_Wduv7s' },
+        { t: 'The World Is Waiting on You', d: 304, yt: 'moCcRBf-5sM' },
+        { t: 'When It Rains', d: 251, yt: 'DUgu_go4NnU' },
+        { t: 'All I Can Give to You', d: 174, yt: 'Q-pwIvDkDxk' },
+        { t: 'El Chupacabra', d: 391, yt: 'Nmg2gJUlU_s' },
+        { t: 'Sleepwalker', d: 285, yt: 'iV08ESYODak' }
       ] },
-      { title: 'Glory', sub: '2005 · studio', art: 'https://i.scdn.co/image/ab67616d00001e02e69bdc6afc24b0f4f8dedfd0', href: 'https://open.spotify.com/album/6qBlKftZD1eFkO4l4XgDGs', tracks: [
-        { t: 'Another Day', d: 284, sp: '6niQJfTKAKPN8LMpJIpEWF' },
-        { t: 'South of the City', d: 319, sp: '1AmOiWlzTZpPQoOp35HvFR' },
-        { t: 'Glory', d: 259, sp: '4PzWeut1OsBif9GRSqNFWJ' },
-        { t: 'Colombia', d: 200, sp: '3nr5pjDpHGwiGia0VUIEdy' },
-        { t: 'Drop a Line', d: 324, sp: '6HxP6YPYdW3z5mIBTWIocw' },
-        { t: 'Love Will Find a Way', d: 215, sp: '4kOe2WhIFPO3qlwLou4rRq' },
-        { t: 'The Holy Ghosts of Texas', d: 295, sp: '2ONLCOMDEHFyI9tp7XZht2' },
-        { t: 'The Ones Who Love You the Most', d: 254, sp: '75jhwuAsbWt5EeZJzHYtXl' },
-        { t: 'Rise Above', d: 237, sp: '7aEueF4as7OuV9jccc3tLs' },
-        { t: 'Cold June', d: 164, sp: '6BAgCL7E2iRHZcSMqrrl4r' }
+      { title: 'Glory', sub: '2005 · studio', art: 'https://i.scdn.co/image/ab67616d00001e02e69bdc6afc24b0f4f8dedfd0', href: 'https://music.youtube.com/playlist?list=OLAK5uy_nUQPM7B6cSRPk3Wb6mGkyw74boO8VUZW8', tracks: [
+        { t: 'Another Day', d: 284, yt: 'cE9cSLW5TlQ' },
+        { t: 'South of the City', d: 319, yt: 'Jx1qAAPusAQ' },
+        { t: 'Glory', d: 259, yt: 'KJghvdzFpdk' },
+        { t: 'Colombia', d: 200, yt: 'guJZFQawago' },
+        { t: 'Drop a Line', d: 324, yt: '6eKFx1TQMWI' },
+        { t: 'Love Will Find a Way', d: 215, yt: 'dxzhh1eDXXA' },
+        { t: 'The Holy Ghosts of Texas', d: 295, yt: 'JgM_JIuG_vk' },
+        { t: 'The Ones Who Love You the Most', d: 254, yt: 'UFPc1SAm6ic' },
+        { t: 'Rise Above', d: 237, yt: '8b08E-0Ovjk' },
+        { t: 'Cold June', d: 164, yt: '_VqJ2F5QkCo' }
       ] }
     ]
   },
