@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Bucket — bass</title>
+<meta name="description" content="Recordings with Kevin “Bucket” Burkett on bass: Cascadia ’10, The Ringers, Soul Senate, Extra Thick, Lady C &amp; The Lowdown, Anna Coogan &amp; north19, Oat Soda." />
+<!--
+  BUCKET — a clickable bass résumé.
+
+  One self-contained page: no build step, no libraries, works from file://.
+  Every tile is a recording; clicking it loads that track's own player
+  (Bandcamp / Spotify / ReverbNation) into the dock at the bottom of the screen.
+  Those players do not allow a page to start playback for them, so the dock
+  needs one more press on its play button.
+
+  TO ADD OR CHANGE MUSIC: edit the BANDS list in the script at the bottom.
+    Bandcamp track   { t: 'Title', d: seconds, bc: <track id>, href: '<track page>' }
+    Spotify track    { t: 'Title', d: seconds, sp: '<track id>' }
+    YouTube track    { t: 'Title', d: seconds, yt: '<video id>' }
+  A band with no `releases` is listed by name only, under "Also".
+
+  YouTube refuses to play inside a page opened straight from disk (file://);
+  those tiles work once the page is served from the site. "Open" always works.
+-->
+<style>
+  :root {
+    --paper: #f4f1ea;
+    --panel: #fbf9f4;
+    --ink: #1c1a17;
+    --ink-2: #5c564d;
+    --ink-3: #8a8377;
+    --rule: #d9d3c6;
+    --accent: #9c3b1f;
+    --accent-ink: #fff8f2;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --dock-h: 0px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #151412;
+      --panel: #1d1b18;
+      --ink: #ece7dc;
+      --ink-2: #a9a294;
+      --ink-3: #7a7468;
+      --rule: #34302a;
+      --accent: #e0714c;
+      --accent-ink: #1a0f0a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.5 var(--sans);
+    padding-bottom: calc(var(--dock-h) + env(safe-area-inset-bottom));
+  }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
+  }
+
+  /* ---------- masthead ---------- */
+  .mast { padding-top: 72px; padding-bottom: 36px; }
+  .eyebrow {
+    margin: 0 0 14px;
+    font: 600 12px/1 var(--sans);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    margin: 0;
+    font: 400 clamp(40px, 8vw, 76px)/1.02 var(--serif);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .lede { margin: 20px 0 0; max-width: 56ch; color: var(--ink-2); font-size: 17px; text-wrap: pretty; }
+
+  /* ---------- band index ---------- */
+  .index {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--paper);
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+  .index ul {
+    display: flex;
+    gap: 4px 22px;
+    margin: 0;
+    padding: 12px 0;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+  .index ul::-webkit-scrollbar { display: none; }
+  .index a { font-size: 14px; color: var(--ink-2); text-decoration: none; }
+  .index a:hover { color: var(--accent); }
+
+  /* ---------- band ---------- */
+  .band {
+    display: grid;
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    gap: 16px 48px;
+    padding: 48px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .band-meta h2 { margin: 0; font: 400 32px/1.1 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .where {
+    margin: 10px 0 0;
+    font: 12px/1.4 var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .blurb { margin: 14px 0 0; font-size: 15px; color: var(--ink-2); text-wrap: pretty; }
+  .links { margin: 16px 0 0; padding: 0; list-style: none; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .release + .release { margin-top: 36px; }
+  .release-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .art {
+    flex: none;
+    width: 56px;
+    height: 56px;
+    border-radius: 2px;
+    object-fit: cover;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .release-head h3 { margin: 0; font: 600 17px/1.25 var(--sans); }
+  .release-head p { margin: 2px 0 0; font-size: 13px; color: var(--ink-3); }
+
+  /* ---------- pads ---------- */
+  .pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px; }
+  .pad {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 92px;
+    padding: 12px 12px 10px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 0.12s, background-color 0.12s, color 0.12s;
+  }
+  .pad:hover { border-color: var(--ink); color: inherit; }
+  .pad:active { transform: translateY(1px); }
+  .pad .t { font: 600 15px/1.25 var(--sans); overflow-wrap: anywhere; }
+  .pad .m { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 12px/1 var(--mono); color: var(--ink-3); }
+  .pad[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .pad[aria-current="true"] .m { color: inherit; opacity: 0.8; }
+  .pad.wide { grid-column: 1 / -1; min-height: 0; }
+  .pad.wide .t { font-weight: 400; color: var(--ink-2); }
+  .pad.wide[aria-current="true"] .t { color: inherit; }
+  .note { margin: 12px 0 0; font-size: 13px; color: var(--ink-3); }
+
+  /* ---------- also ---------- */
+  .also { padding: 40px 0 8px; }
+  .also h2 { margin: 0 0 14px; font: 600 12px/1 var(--sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+  .also dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 24px; }
+  .also dt { font: 400 20px/1.3 var(--serif); }
+  .also dd { margin: 0; align-self: center; font: 12px/1.4 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+
+  footer { padding-top: 40px; padding-bottom: 56px; font-size: 13px; color: var(--ink-3); }
+
+  /* ---------- dock ---------- */
+  .dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    background: var(--panel);
+    border-top: 1px solid var(--ink);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .dock[hidden] { display: none; }
+  .dock-bar { display: flex; align-items: center; gap: 12px; padding: 10px 0 8px; }
+  .dock-what { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-what b { font-weight: 600; }
+  .dock-what span { color: var(--ink-2); }
+  .dock-hint { flex: none; font-size: 12px; color: var(--ink-3); }
+  .dock-bar a, .dock-bar button {
+    flex: none;
+    padding: 6px 10px;
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: var(--ink-2);
+    font: 13px/1 var(--sans);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .dock-bar a:hover, .dock-bar button:hover { border-color: var(--ink); color: var(--ink); }
+  .dock iframe { display: block; width: 100%; border: 0; margin-bottom: 10px; border-radius: 4px; background: transparent; }
+
+  @media (max-width: 760px) {
+    .mast { padding-top: 44px; padding-bottom: 28px; }
+    .band { grid-template-columns: minmax(0, 1fr); padding: 36px 0; }
+    .band-meta h2 { font-size: 28px; }
+    .pads { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pad { min-height: 84px; }
+    .dock-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap mast">
+  <p class="eyebrow">Bass</p>
+  <h1>Kevin &ldquo;Bucket&rdquo; Burkett</h1>
+  <p class="lede">Afrobeat, soul and alt-country out of Seattle and St. Louis. Every tile below is a recording with me on bass &mdash; pick one and it loads in the player at the bottom of the page.</p>
+</header>
+
+<nav class="index" aria-label="Bands"><div class="wrap"><ul id="index"></ul></div></nav>
+
+<main class="wrap" id="bands"></main>
+
+<footer class="wrap">Audio plays from each band&rsquo;s own Bandcamp, Spotify, YouTube or ReverbNation page.</footer>
+
+<aside class="dock" id="dock" hidden aria-label="Player">
+  <div class="wrap">
+    <div class="dock-bar">
+      <div class="dock-what" id="dock-what" aria-live="polite"></div>
+      <span class="dock-hint">Press play to listen</span>
+      <a id="dock-open" target="_blank" rel="noopener">Open &#8599;</a>
+      <button type="button" id="dock-close" aria-label="Close player">Close</button>
+    </div>
+    <iframe id="dock-frame" title="Player" allow="autoplay; encrypted-media; fullscreen" referrerpolicy="strict-origin-when-cross-origin" loading="lazy"></iframe>
+  </div>
+</aside>
+
+<script>
+// ---------------------------------------------------------------- the music
+var BC = 'https://f4.bcbits.com/img/';           // Bandcamp cover art (…_2.jpg = 350 px)
+var BANDS = [
+  {
+    id: 'cascadia-10', name: 'Cascadia ’10', where: 'Seattle · 2010–2015',
+    blurb: 'Nine-piece instrumental Afrobeat — three horns, two guitars, a wall of percussion. Recorded for KEXP and KBCS, and at Avast! with Mell Dettmer.',
+    links: [['Bandcamp', 'https://cascadia10.bandcamp.com/'], ['Spotify', 'https://open.spotify.com/artist/4apSuIpO4R1zpvZ2JVed7g'], ['YouTube Music', 'https://music.youtube.com/channel/UCtMCBnCytiJvXE7BXmepKxQ'], ['KEXP write-up', 'https://kexp.org/read/2014/1/31/live-video-cascadia-10/']],
+    releases: [
+      { title: 'Live on KEXP', sub: '2014 · video', art: 'https://i.ytimg.com/vi/2fwVfhHC8H4/hqdefault.jpg', href: 'https://www.youtube.com/watch?v=2fwVfhHC8H4', tracks: [
+        { t: 'Full performance', d: 1640, yt: '2fwVfhHC8H4' },
+        { t: 'No Go Wacko', d: 381, yt: 'jxhXbO0Sq28' },
+        { t: 'Cascadio', d: 358, yt: '53IXFne4cfQ' },
+        { t: 'Secret Is Out', d: 314, yt: 'CdFQQI70sEE' }
+      ] },
+      { title: 'EP II', sub: '2015 · studio', art: BC + 'a2422926128_2.jpg', href: 'https://cascadia10.bandcamp.com/album/ep-ii', tracks: [
+        { t: 'Knife Hit', d: 345, bc: 1821823698, href: 'https://cascadia10.bandcamp.com/track/knife-hit-2' },
+        { t: 'No Go Wacko', d: 295, bc: 1439892044, href: 'https://cascadia10.bandcamp.com/track/no-go-wacko-2' }
+      ] },
+      { title: 'Cascadia ’10 EP', sub: '2013 · studio · Avast!, Seattle', art: BC + 'a2362741588_2.jpg', href: 'https://cascadia10.bandcamp.com/album/cascadia-10-ep', tracks: [
+        { t: 'The Secret Is Out', d: 261, bc: 4277154224, href: 'https://cascadia10.bandcamp.com/track/the-secret-is-out-2' },
+        { t: 'Song For Nehemes', d: 268, bc: 687375483, href: 'https://cascadia10.bandcamp.com/track/song-for-nehemes' },
+        { t: 'Apophistry', d: 320, bc: 350271765, href: 'https://cascadia10.bandcamp.com/track/apophistry' }
+      ] },
+      { title: 'Live', sub: '2011 · live in the studio for KEXP “Sonarchy” and KBCS “Music of Africa”', art: BC + 'a0054515119_2.jpg', href: 'https://cascadia10.bandcamp.com/album/live', tracks: [
+        { t: 'Pharaohs of Elysium', d: 618, bc: 3006628588, href: 'https://cascadia10.bandcamp.com/track/pharaohs-of-elysium' },
+        { t: 'Moon Go-Go', d: 590, bc: 1934329568, href: 'https://cascadia10.bandcamp.com/track/moon-go-go' },
+        { t: 'Gobo', d: 474, bc: 3320862302, href: 'https://cascadia10.bandcamp.com/track/gobo' },
+        { t: 'Ojo Dojo', d: 633, bc: 1145372281, href: 'https://cascadia10.bandcamp.com/track/ojo-dojo-2' },
+        { t: 'Cascadio', d: 703, bc: 2396910322, href: 'https://cascadia10.bandcamp.com/track/cascadio-2' }
+      ] }
+    ]
+  },
+  {
+    id: 'the-ringers', name: 'The Ringers', where: 'Seattle · 2013–2017',
+    blurb: 'Studio soul project out of Shady Bottom Studios, fronted by Eldridge Gravy. Co-wrote “Shoulda Known (About You)” and “Mr. Politician”.',
+    links: [['Bandcamp', 'https://theringers.bandcamp.com/']],
+    releases: [
+      { title: 'The Ringers', sub: '2017 · studio · Shady Bottom, Seattle', art: BC + 'a4082267519_2.jpg', href: 'https://theringers.bandcamp.com/album/the-ringers', tracks: [
+        { t: 'Mr. Politician', d: 133, bc: 1589390336, href: 'https://theringers.bandcamp.com/track/mr-politician' },
+        { t: 'Bargain with the Rising Sun', d: 205, bc: 2371235032, href: 'https://theringers.bandcamp.com/track/bargain-with-the-rising-sun' },
+        { t: 'Shoulda Known (About You)', d: 194, bc: 2717411473, href: 'https://theringers.bandcamp.com/track/shoulda-known-about-you' },
+        { t: 'So Complicated', d: 193, bc: 3587008483, href: 'https://theringers.bandcamp.com/track/so-complicated' },
+        { t: 'Moment', d: 204, bc: 4131941781, href: 'https://theringers.bandcamp.com/track/moment' }
+      ] }
+    ]
+  },
+  {
+    id: 'soul-senate', name: 'Soul Senate', where: 'Seattle · 2009–2015',
+    blurb: 'Eight-piece funk and soul with two lead singers, horns and organ. Tracked at The Playroom, mixed by Mell Dettmer.',
+    links: [['Bandcamp', 'https://soulsenate.bandcamp.com/'], ['“Good Side” on YouTube', 'https://www.youtube.com/watch?v=52ttB2LjXNQ']],
+    releases: [
+      { title: 'Good Side', sub: '2012 · studio · The Playroom, Seattle', art: BC + 'a1281460411_2.jpg', href: 'https://soulsenate.bandcamp.com/album/good-side', tracks: [
+        { t: 'You Lost That Right', d: 192, bc: 4145715471, href: 'https://soulsenate.bandcamp.com/track/you-lost-that-right' },
+        { t: 'Good Side', d: 277, bc: 2885705265, href: 'https://soulsenate.bandcamp.com/track/good-side' },
+        { t: 'Keep On Walkin’', d: 159, bc: 3628410497, href: 'https://soulsenate.bandcamp.com/track/keep-on-walkin' },
+        { t: 'Stompin’ in the Street', d: 239, bc: 2171270017, href: 'https://soulsenate.bandcamp.com/track/stompin-in-the-street' },
+        { t: 'Foot to the Floor', d: 180, bc: 2836937512, href: 'https://soulsenate.bandcamp.com/track/foot-to-the-floor' },
+        { t: 'Whoomp Dreams', d: 161, bc: 3626598955, href: 'https://soulsenate.bandcamp.com/track/whoomp-dreams' }
+      ] },
+      { title: 'Last Call', sub: '2015 · single', art: BC + 'a2883740358_2.jpg', href: 'https://soulsenate.bandcamp.com/album/last-call', tracks: [
+        { t: 'Come Back', d: 234, bc: 1786426384, href: 'https://soulsenate.bandcamp.com/track/come-back' }
+      ] }
+    ]
+  },
+  {
+    id: 'extra-thick', name: 'Extra Thick', where: 'Seattle · current',
+    blurb: 'Eleven-piece Afrobeat: most of Cascadia ’10, regrouped and doubled in size. Still playing Seattle rooms.',
+    links: [['extrathickafrobeat.com', 'https://extrathickafrobeat.com/'], ['ReverbNation', 'https://www.reverbnation.com/extrathick'], ['Facebook', 'https://www.facebook.com/ExtraThickAfrobeat/']],
+    releases: [
+      { title: 'Extra Thick', sub: 'Band player · four tracks', href: 'https://www.reverbnation.com/extrathick', tracks: [
+        { wide: true, label: 'Play the set', t: 'Knife Hit · The Secret Is Out · Brassquatch · Thick Business', d: 1078,
+          src: 'https://www.reverbnation.com/widget_code/html_widget/artist_8284227?widget_id=55&pwc[included_songs]=1&context_type=page_object',
+          h: 380, href: 'https://www.reverbnation.com/extrathick' }
+      ] }
+    ]
+  },
+  {
+    id: 'lady-c', name: 'Lady C & The Lowdown', where: 'Seattle · 2020',
+    blurb: 'Seven-piece ’60s and ’70s-style soul and funk dance band fronted by Christine Patterson. Singles cut at Shady Bottom Studios.',
+    links: [['Bandcamp', 'https://ladycandthelowdown.bandcamp.com/']],
+    releases: [
+      { title: 'Singles', sub: '2020 · studio · Shady Bottom, Seattle', art: BC + 'a0628640821_2.jpg', href: 'https://ladycandthelowdown.bandcamp.com/music', tracks: [
+        { t: 'Boom Boom', d: 170, bc: 1208644546, href: 'https://ladycandthelowdown.bandcamp.com/track/boom-boom' },
+        { t: 'Gimme Somthin’ Good', d: 237, bc: 2019202533, href: 'https://ladycandthelowdown.bandcamp.com/track/gimme-somthin-good' },
+        { t: 'I’m on Fire', d: 147, bc: 2472405894, href: 'https://ladycandthelowdown.bandcamp.com/track/im-on-fire' }
+      ] }
+    ]
+  },
+  {
+    id: 'north19', name: 'Anna Coogan & north19', where: 'Seattle · 2004–2007',
+    blurb: 'Alt-country behind singer-songwriter Anna Coogan. Founding member; two full-length records.',
+    links: [['Spotify', 'https://open.spotify.com/artist/23knNQBgwIpD10ijp51rQh'], ['YouTube Music', 'https://music.youtube.com/channel/UCE71ySw_y8QbUHDksLnaPyQ'], ['annacoogan.com', 'https://www.annacoogan.com/about']],
+    note: 'Spotify plays 30-second previews unless you are signed in.',
+    releases: [
+      { title: 'Sleepwalker', sub: '2007 · studio', art: 'https://i.scdn.co/image/ab67616d00001e0285e3d78b98db7791e8917177', href: 'https://open.spotify.com/album/7wGfeQ2RIquNHoe2yhmKIs', tracks: [
+        { t: 'Rise On', d: 275, sp: '1SzhoxjKjlFRE9DkBx25yP' },
+        { t: 'State of Grace', d: 258, sp: '3Y7K8HHFxfcH6kTU60yUS3' },
+        { t: 'Wish You Well', d: 290, sp: '4Zx1lfi3MQEip4ITvQSu4X' },
+        { t: 'Wish You Well (reprise)', d: 140, sp: '2OyxjC5l4hdAbuaErrIZH8' },
+        { t: 'Hard Luck Halo', d: 213, sp: '25zpvA84T8fxbiyHOvRgpf' },
+        { t: 'Fade Away', d: 295, sp: '2BcOwXgC28L5e0HCqw4TLE' },
+        { t: 'The World Is Waiting on You', d: 304, sp: '3P3Uf8Uw9us1ApzLl80rjt' },
+        { t: 'When It Rains', d: 251, sp: '0mWb4xLGpmYQfiAlpnxHEg' },
+        { t: 'All I Can Give to You', d: 174, sp: '2BU6ZRnJ3r7q6bVwMKU7C4' },
+        { t: 'El Chupacabra', d: 391, sp: '4GFUmJKnwORj349Bx1mhkT' },
+        { t: 'Sleepwalker', d: 285, sp: '1vL8FPUS64RzLvPYEaUt5r' }
+      ] },
+      { title: 'Glory', sub: '2005 · studio', art: 'https://i.scdn.co/image/ab67616d00001e02e69bdc6afc24b0f4f8dedfd0', href: 'https://open.spotify.com/album/6qBlKftZD1eFkO4l4XgDGs', tracks: [
+        { t: 'Another Day', d: 284, sp: '6niQJfTKAKPN8LMpJIpEWF' },
+        { t: 'South of the City', d: 319, sp: '1AmOiWlzTZpPQoOp35HvFR' },
+        { t: 'Glory', d: 259, sp: '4PzWeut1OsBif9GRSqNFWJ' },
+        { t: 'Colombia', d: 200, sp: '3nr5pjDpHGwiGia0VUIEdy' },
+        { t: 'Drop a Line', d: 324, sp: '6HxP6YPYdW3z5mIBTWIocw' },
+        { t: 'Love Will Find a Way', d: 215, sp: '4kOe2WhIFPO3qlwLou4rRq' },
+        { t: 'The Holy Ghosts of Texas', d: 295, sp: '2ONLCOMDEHFyI9tp7XZht2' },
+        { t: 'The Ones Who Love You the Most', d: 254, sp: '75jhwuAsbWt5EeZJzHYtXl' },
+        { t: 'Rise Above', d: 237, sp: '7aEueF4as7OuV9jccc3tLs' },
+        { t: 'Cold June', d: 164, sp: '6BAgCL7E2iRHZcSMqrrl4r' }
+      ] }
+    ]
+  },
+  {
+    id: 'oat-soda', name: 'Oat Soda', where: 'St. Louis',
+    blurb: 'St. Louis band; one full-length record, Strikes & Gutters.',
+    links: [['YouTube Music', 'https://music.youtube.com/playlist?list=OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs']],
+    releases: [
+      { title: 'Strikes & Gutters', sub: 'Album', art: 'https://i.ytimg.com/vi/mQb6OHMgDCE/hqdefault.jpg', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs', tracks: [
+        { t: 'Brand New Thinkin’', d: 199, yt: 'mQb6OHMgDCE' },
+        { t: 'Song A', d: 236, yt: 'tMvgkpgC2FQ' },
+        { t: 'How I Wanna Go', d: 159, yt: 't5Fy87c0zc0' },
+        { t: 'Mr. Sevens', d: 182, yt: 'hGJM2WuR1OY' },
+        { t: 'Ghosts', d: 318, yt: 'xo84dRIDFoE' },
+        { t: 'The Irish Tunes', d: 223, yt: 'RBI1-8yE7cQ' },
+        { t: 'I Don’t Know', d: 250, yt: 'mLT3VpbuFpM' },
+        { t: 'How About You', d: 207, yt: 'AbpSlCo9XIM' },
+        { t: 'California', d: 273, yt: '8G77TyT91Mg' },
+        { t: 'My Name Is George', d: 240, yt: '7ZJYXlnKHUU' }
+      ] }
+    ]
+  }
+];
+
+// ---------------------------------------------------------------- rendering
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  for (var k in attrs || {}) {
+    if (k === 'text') n.textContent = attrs[k]; else n.setAttribute(k, attrs[k]);
+  }
+  (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+  return n;
+}
+function clock(s) { var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
+function dark() { return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches; }
+
+// What goes in the dock for one track: { src, h, href }.
+function player(tr) {
+  if (tr.bc) {
+    var c = dark() ? 'bgcol=1d1b18/linkcol=e0714c' : 'bgcol=fbf9f4/linkcol=9c3b1f';
+    return { src: 'https://bandcamp.com/EmbeddedPlayer/track=' + tr.bc + '/size=large/' + c + '/tracklist=false/artwork=small/transparent=true/', h: 120, href: tr.href };
+  }
+  if (tr.sp) return { src: 'https://open.spotify.com/embed/track/' + tr.sp + '?utm_source=generator' + (dark() ? '&theme=0' : ''), h: 80, href: 'https://open.spotify.com/track/' + tr.sp };
+  // YouTube is the one source that may start itself once a tile has been clicked.
+  if (tr.yt) return { src: 'https://www.youtube-nocookie.com/embed/' + tr.yt + '?autoplay=1&playsinline=1&rel=0', h: 200, href: 'https://www.youtube.com/watch?v=' + tr.yt };
+  return { src: tr.src, h: tr.h || 160, href: tr.href };
+}
+
+var dock = document.getElementById('dock'), frame = document.getElementById('dock-frame');
+var current = null;
+
+function fitDock() {
+  document.documentElement.style.setProperty('--dock-h', dock.hidden ? '0px' : dock.offsetHeight + 'px');
+}
+function load(pad, band, tr) {
+  var p = player(tr);
+  if (current) current.removeAttribute('aria-current');
+  current = pad;
+  pad.setAttribute('aria-current', 'true');
+  var what = document.getElementById('dock-what');
+  what.textContent = '';
+  what.appendChild(el('b', { text: tr.label ? band.name : tr.t }));
+  if (!tr.label) what.appendChild(el('span', { text: ' — ' + band.name }));
+  document.getElementById('dock-open').href = p.href;
+  frame.style.height = 'min(' + p.h + 'px, 55vh)';
+  frame.src = p.src;
+  dock.hidden = false;
+  fitDock();
+}
+document.getElementById('dock-close').addEventListener('click', function () {
+  frame.src = 'about:blank';
+  dock.hidden = true;
+  if (current) { current.removeAttribute('aria-current'); current.focus(); current = null; }
+  fitDock();
+});
+window.addEventListener('resize', fitDock);
+
+var main = document.getElementById('bands'), index = document.getElementById('index'), also = [];
+BANDS.forEach(function (band) {
+  if (!band.releases) { also.push(band); return; }
+  index.appendChild(el('li', {}, [el('a', { href: '#' + band.id, text: band.name })]));
+
+  var meta = el('div', { class: 'band-meta' }, [
+    el('h2', { text: band.name }),
+    el('p', { class: 'where', text: band.where }),
+    el('p', { class: 'blurb', text: band.blurb }),
+    el('ul', { class: 'links' }, (band.links || []).map(function (l) {
+      return el('li', {}, [el('a', { href: l[1], target: '_blank', rel: 'noopener', text: l[0] + ' ↗' })]);
+    }))
+  ]);
+
+  var body = el('div', { class: 'band-body' }, band.releases.map(function (rel) {
+    var pads = el('div', { class: 'pads' }, rel.tracks.map(function (tr, i) {
+      // A real link, so it still goes somewhere with scripts off or on a middle-click.
+      var pad = el('a', { class: 'pad' + (tr.wide ? ' wide' : ''), href: player(tr).href, target: '_blank', rel: 'noopener' }, [
+        el('span', { class: 't', text: tr.t }),
+        el('span', { class: 'm' }, [el('span', { text: tr.label || (i < 9 ? '0' : '') + (i + 1) }), el('span', { text: clock(tr.d) })])
+      ]);
+      pad.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+        e.preventDefault();
+        load(pad, band, tr);
+      });
+      return pad;
+    }));
+    return el('div', { class: 'release' }, [
+      el('div', { class: 'release-head' }, [
+        rel.art ? el('img', { class: 'art', src: rel.art, alt: '', loading: 'lazy', width: 56, height: 56 }) : null,
+        el('div', {}, [
+          el('h3', {}, [el('a', { href: rel.href, target: '_blank', rel: 'noopener', text: rel.title })]),
+          el('p', { text: rel.sub })
+        ])
+      ]),
+      pads
+    ]);
+  }));
+  if (band.note) body.appendChild(el('p', { class: 'note', text: band.note }));
+
+  main.appendChild(el('section', { class: 'band', id: band.id }, [meta, body]));
+});
+
+if (also.length) {
+  var dl = el('dl');
+  also.forEach(function (b) { dl.appendChild(el('dt', { text: b.name })); dl.appendChild(el('dd', { text: b.where })); });
+  main.appendChild(el('section', { class: 'also' }, [el('h2', { text: 'Also' }), dl]));
+}
+</script>
+</body>
+</html>
