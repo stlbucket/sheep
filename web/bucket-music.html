@@ -18,6 +18,7 @@
     Bandcamp track   { t: 'Title', d: seconds, bc: <track id>, href: '<track page>' }
     Spotify track    { t: 'Title', d: seconds, sp: '<track id>' }
     YouTube track    { t: 'Title', d: seconds, yt: '<video id>' }
+    YouTube Music    { t: 'Title', d: seconds, ytm: '<video id>' }   (link only, opens in a new tab; the release carries list: '<playlist id>')
   A band with no `releases` is listed by name only, under "Also".
 
   YouTube refuses to play inside a page opened straight from disk (file://);
@@ -226,14 +227,14 @@
 <header class="wrap mast">
   <p class="eyebrow">Bass</p>
   <h1>Kevin &ldquo;Bucket&rdquo; Burkett</h1>
-  <p class="lede">Afrobeat, soul and alt-country out of Seattle and St. Louis. Every tile below is a recording with me on bass &mdash; pick one and it loads in the player at the bottom of the page.</p>
+  <p class="lede">Afrobeat, soul and alt-country out of Seattle and St. Louis. Every tile below is a recording with me on bass &mdash; pick one and it loads in the player at the bottom of the page; tiles marked &nearr; open the song on YouTube Music instead.</p>
 </header>
 
 <nav class="index" aria-label="Bands"><div class="wrap"><ul id="index"></ul></div></nav>
 
 <main class="wrap" id="bands"></main>
 
-<footer class="wrap">Audio plays from each band&rsquo;s own Bandcamp, Spotify, YouTube or ReverbNation page.</footer>
+<footer class="wrap">Audio plays from each band&rsquo;s own Bandcamp, YouTube, YouTube Music or ReverbNation page.</footer>
 
 <aside class="dock" id="dock" hidden aria-label="Player">
   <div class="wrap">
@@ -341,30 +342,30 @@ var BANDS = [
     blurb: 'Alt-country behind singer-songwriter Anna Coogan. Founding member; two full-length records.',
     links: [['Spotify', 'https://open.spotify.com/artist/23knNQBgwIpD10ijp51rQh'], ['YouTube Music', 'https://music.youtube.com/channel/UCE71ySw_y8QbUHDksLnaPyQ'], ['annacoogan.com', 'https://www.annacoogan.com/about']],
     releases: [
-      { title: 'Sleepwalker', sub: '2007 · studio', art: 'https://i.scdn.co/image/ab67616d00001e0285e3d78b98db7791e8917177', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mp83D9AP9WJiE7a8uR5OfYX1YlNUCwJwI', tracks: [
-        { t: 'Rise On', d: 275, yt: 'Vn-tst_7yTM' },
-        { t: 'State of Grace', d: 258, yt: '_fmRiOz18Xw' },
-        { t: 'Wish You Well', d: 290, yt: 'd8g_M_1_-gg' },
-        { t: 'Wish You Well (reprise)', d: 140, yt: 'JHb4sbF83Fw' },
-        { t: 'Hard Luck Halo', d: 213, yt: 'ZC7zGSNoUPc' },
-        { t: 'Fade Away', d: 295, yt: 'wyZO_Wduv7s' },
-        { t: 'The World Is Waiting on You', d: 304, yt: 'moCcRBf-5sM' },
-        { t: 'When It Rains', d: 251, yt: 'DUgu_go4NnU' },
-        { t: 'All I Can Give to You', d: 174, yt: 'Q-pwIvDkDxk' },
-        { t: 'El Chupacabra', d: 391, yt: 'Nmg2gJUlU_s' },
-        { t: 'Sleepwalker', d: 285, yt: 'iV08ESYODak' }
+      { title: 'Sleepwalker', sub: '2007 · studio', art: 'https://i.scdn.co/image/ab67616d00001e0285e3d78b98db7791e8917177', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mXZFKw1Qj17_qxEZ3eRfx5eJqbumBTjqQ', list: 'OLAK5uy_mXZFKw1Qj17_qxEZ3eRfx5eJqbumBTjqQ', tracks: [
+        { t: 'Rise On', d: 275, ytm: 'Vn-tst_7yTM' },
+        { t: 'State of Grace', d: 258, ytm: '_fmRiOz18Xw' },
+        { t: 'Wish You Well', d: 290, ytm: 'd8g_M_1_-gg' },
+        { t: 'Wish You Well (reprise)', d: 140, ytm: 'JHb4sbF83Fw' },
+        { t: 'Hard Luck Halo', d: 213, ytm: 'ZC7zGSNoUPc' },
+        { t: 'Fade Away', d: 295, ytm: 'wyZO_Wduv7s' },
+        { t: 'The World Is Waiting on You', d: 304, ytm: 'moCcRBf-5sM' },
+        { t: 'When It Rains', d: 251, ytm: 'DUgu_go4NnU' },
+        { t: 'All I Can Give to You', d: 174, ytm: 'Q-pwIvDkDxk' },
+        { t: 'El Chupacabra', d: 391, ytm: 'Nmg2gJUlU_s' },
+        { t: 'Sleepwalker', d: 285, ytm: 'iV08ESYODak' }
       ] },
-      { title: 'Glory', sub: '2005 · studio', art: 'https://i.scdn.co/image/ab67616d00001e02e69bdc6afc24b0f4f8dedfd0', href: 'https://music.youtube.com/playlist?list=OLAK5uy_nUQPM7B6cSRPk3Wb6mGkyw74boO8VUZW8', tracks: [
-        { t: 'Another Day', d: 284, yt: 'cE9cSLW5TlQ' },
-        { t: 'South of the City', d: 319, yt: 'Jx1qAAPusAQ' },
-        { t: 'Glory', d: 259, yt: 'KJghvdzFpdk' },
-        { t: 'Colombia', d: 200, yt: 'guJZFQawago' },
-        { t: 'Drop a Line', d: 324, yt: '6eKFx1TQMWI' },
-        { t: 'Love Will Find a Way', d: 215, yt: 'dxzhh1eDXXA' },
-        { t: 'The Holy Ghosts of Texas', d: 295, yt: 'JgM_JIuG_vk' },
-        { t: 'The Ones Who Love You the Most', d: 254, yt: 'UFPc1SAm6ic' },
-        { t: 'Rise Above', d: 237, yt: '8b08E-0Ovjk' },
-        { t: 'Cold June', d: 164, yt: '_VqJ2F5QkCo' }
+      { title: 'Glory', sub: '2005 · studio', art: 'https://i.scdn.co/image/ab67616d00001e02e69bdc6afc24b0f4f8dedfd0', href: 'https://music.youtube.com/playlist?list=OLAK5uy_m6lJgsqxD-E_ZFF3UhrJXgKcVar8hYyeE', list: 'OLAK5uy_m6lJgsqxD-E_ZFF3UhrJXgKcVar8hYyeE', tracks: [
+        { t: 'Another Day', d: 284, ytm: 'cE9cSLW5TlQ' },
+        { t: 'South of the City', d: 319, ytm: 'Jx1qAAPusAQ' },
+        { t: 'Glory', d: 259, ytm: 'KJghvdzFpdk' },
+        { t: 'Colombia', d: 200, ytm: 'guJZFQawago' },
+        { t: 'Drop a Line', d: 324, ytm: '6eKFx1TQMWI' },
+        { t: 'Love Will Find a Way', d: 215, ytm: 'dxzhh1eDXXA' },
+        { t: 'The Holy Ghosts of Texas', d: 295, ytm: 'JgM_JIuG_vk' },
+        { t: 'The Ones Who Love You the Most', d: 254, ytm: 'UFPc1SAm6ic' },
+        { t: 'Rise Above', d: 237, ytm: '8b08E-0Ovjk' },
+        { t: 'Cold June', d: 164, ytm: '_VqJ2F5QkCo' }
       ] }
     ]
   },
@@ -373,17 +374,17 @@ var BANDS = [
     blurb: 'St. Louis band; one full-length record, Strikes & Gutters.',
     links: [['YouTube Music', 'https://music.youtube.com/playlist?list=OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs']],
     releases: [
-      { title: 'Strikes & Gutters', sub: 'Album', art: 'https://i.ytimg.com/vi/mQb6OHMgDCE/hqdefault.jpg', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs', tracks: [
-        { t: 'Brand New Thinkin’', d: 199, yt: 'mQb6OHMgDCE' },
-        { t: 'Song A', d: 236, yt: 'tMvgkpgC2FQ' },
-        { t: 'How I Wanna Go', d: 159, yt: 't5Fy87c0zc0' },
-        { t: 'Mr. Sevens', d: 182, yt: 'hGJM2WuR1OY' },
-        { t: 'Ghosts', d: 318, yt: 'xo84dRIDFoE' },
-        { t: 'The Irish Tunes', d: 223, yt: 'RBI1-8yE7cQ' },
-        { t: 'I Don’t Know', d: 250, yt: 'mLT3VpbuFpM' },
-        { t: 'How About You', d: 207, yt: 'AbpSlCo9XIM' },
-        { t: 'California', d: 273, yt: '8G77TyT91Mg' },
-        { t: 'My Name Is George', d: 240, yt: '7ZJYXlnKHUU' }
+      { title: 'Strikes & Gutters', sub: 'Album', art: 'https://i.ytimg.com/vi/mQb6OHMgDCE/hqdefault.jpg', href: 'https://music.youtube.com/playlist?list=OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs', list: 'OLAK5uy_mElrgumO1k79GHJQsfs6IAXqAxhVHV8Rs', tracks: [
+        { t: 'Brand New Thinkin’', d: 199, ytm: 'mQb6OHMgDCE' },
+        { t: 'Song A', d: 236, ytm: 'tMvgkpgC2FQ' },
+        { t: 'How I Wanna Go', d: 159, ytm: 't5Fy87c0zc0' },
+        { t: 'Mr. Sevens', d: 182, ytm: 'hGJM2WuR1OY' },
+        { t: 'Ghosts', d: 318, ytm: 'xo84dRIDFoE' },
+        { t: 'The Irish Tunes', d: 223, ytm: 'RBI1-8yE7cQ' },
+        { t: 'I Don’t Know', d: 250, ytm: 'mLT3VpbuFpM' },
+        { t: 'How About You', d: 207, ytm: 'AbpSlCo9XIM' },
+        { t: 'California', d: 273, ytm: '8G77TyT91Mg' },
+        { t: 'My Name Is George', d: 240, ytm: '7ZJYXlnKHUU' }
       ] }
     ]
   }
@@ -408,6 +409,8 @@ function player(tr) {
     return { src: 'https://bandcamp.com/EmbeddedPlayer/track=' + tr.bc + '/size=large/' + c + '/tracklist=false/artwork=small/transparent=true/', h: 120, href: tr.href };
   }
   if (tr.sp) return { src: 'https://open.spotify.com/embed/track/' + tr.sp + '?utm_source=generator' + (dark() ? '&theme=0' : ''), h: 80, href: 'https://open.spotify.com/track/' + tr.sp };
+  // YouTube Music cannot be embedded: these tiles are plain links that open the song there, inside its album.
+  if (tr.ytm) return { link: true, href: 'https://music.youtube.com/watch?v=' + tr.ytm + (tr.list ? '&list=' + tr.list : '') };
   // YouTube is the one source that may start itself once a tile has been clicked.
   if (tr.yt) return { src: 'https://www.youtube-nocookie.com/embed/' + tr.yt + '?autoplay=1&playsinline=1&rel=0', h: 200, href: 'https://www.youtube.com/watch?v=' + tr.yt };
   return { src: tr.src, h: tr.h || 160, href: tr.href };
@@ -458,13 +461,14 @@ BANDS.forEach(function (band) {
 
   var body = el('div', { class: 'band-body' }, band.releases.map(function (rel) {
     var pads = el('div', { class: 'pads' }, rel.tracks.map(function (tr, i) {
+      if (rel.list) tr.list = rel.list;
       // A real link, so it still goes somewhere with scripts off or on a middle-click.
       var pad = el('a', { class: 'pad' + (tr.wide ? ' wide' : ''), href: player(tr).href, target: '_blank', rel: 'noopener' }, [
         el('span', { class: 't', text: tr.t }),
-        el('span', { class: 'm' }, [el('span', { text: tr.label || (i < 9 ? '0' : '') + (i + 1) }), el('span', { text: clock(tr.d) })])
+        el('span', { class: 'm' }, [el('span', { text: tr.label || (i < 9 ? '0' : '') + (i + 1) }), el('span', { text: clock(tr.d) + (tr.ytm ? ' ↗' : '') })])
       ]);
       pad.addEventListener('click', function (e) {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button || tr.ytm) return; // YouTube Music tiles just follow their link
         e.preventDefault();
         load(pad, band, tr);
       });
