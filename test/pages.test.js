@@ -155,6 +155,15 @@ async function runDemo(s, file) {
     const home = await s.ev(pose), back = []
     for (const via of ['top', 'handler', 'dog']) { await cam(via); const away = await s.ev(pose); await cam('orbit'); back.push(via + ':' + (away !== home && (await s.ev(pose)) === home)) }
     ok(P, 'CAM-1', 'top / handler / dog, then orbit once: the camera is back on the starting view', back.every((b) => b.endsWith('true')), back.join(' '))
+    // owner 2026-11-18: a run opens on the dude and his dog from the front, holds 1 s, then pans to the starting view over 1.5 s
+    const near = `(() => { const c = __sheep3d.camera, h = __sheep3d.handlerPos(), g = sim.gcm, i = __sheep3d.camIntro; const fwd = new __sheep3d.THREE.Vector3(); c.getWorldDirection(fwd); return { on: i.t >= 0, t: Math.round(i.t * 10) / 10, dist: Math.round(Math.hypot(c.position.x - h.x, c.position.z - h.y)), front: (c.position.x - h.x) * (g.x - h.x) + (c.position.z - h.y) * (g.y - h.y) > 0, facing: fwd.x * (h.x - c.position.x) + fwd.z * (h.y - c.position.z) > 0, orbit: __sheep3d.controls.enabled } })()`
+    await s.ev(`document.querySelector('[data-action="reset"]').click(); true`); await sleep(500)
+    const i0 = await s.ev(near), p0 = await s.ev(pose); await sleep(300)
+    const p1 = await s.ev(pose); await sleep(900)
+    const mid = await s.ev(near), pm = await s.ev(pose); await sleep(1600)
+    const i1 = await s.ev(near), p2 = await s.ev(pose)
+    ok(P, 'CAM-2', 'a restart opens in front of the dude and his dog, holds a second, then pans to the starting view within 2.5 s',
+      i0.on && i0.dist < 120 && i0.front && i0.facing && !i0.orbit && p0 === p1 && mid.on && pm !== p0 && pm !== home && !i1.on && i1.orbit && p2 === home, JSON.stringify({ i0, mid, i1, p0, pm, p2, home }))
   }
   { // owner 2026-11-18: a main menu button on every version. 2D: leads the reseed row. 3D (later the same day): main menu above pause, `scoring` below it, both pause's size
     const m = await s.ev(`(() => { const q = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }; const a = document.getElementById('menu-btn'), sc = document.getElementById('score-btn'); document.body.classList.add('score-closed'); const out = { menu: q('#menu-btn'), reseed: q('#reseed-btn'), pause: q('#pause-btn'), score: q('#score-btn'), href: a && a.getAttribute('href'), text: a && a.textContent, scoreText: sc && sc.textContent, inAux: !!(a && a.closest('.aux')) }; document.body.classList.remove('score-closed'); return out })()`)

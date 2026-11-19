@@ -32,7 +32,8 @@
     Seen from above with north (sim −y) at the top it matches the 2D canvas —
     come by is still clockwise.
   · URL knobs: ?seed=42 pins the course, ?cam=orbit|top|handler|dog picks the
-    starting camera.
+    starting camera. On the orbit camera every run opens on the dude and his
+    dog from the front, then pans out to the default view (startIntro).
 -->
 <style>
   html, body {
@@ -1237,18 +1238,42 @@ controls.maxDistance = 1500
 const camState = { mode: 'orbit', look: new V3(), snap: true }
 const camButtons = Array.from(document.querySelectorAll('#cam-bar button[data-cam]'))
 function fieldCentre() { return new V3(params.canvasW / 2, 0, params.canvasH / 2) }
-function homeOrbit() { // a raised view from the south: north at the top, east on the right — reads like the 2D canvas
+function homePose() { // the default orbit view — a raised view from the south: north at the top, east on the right — reads like the 2D canvas
   // default zoom (owner 2026-11-18, measured off a phone-landscape screenshot): 29° down, the near fence filling ~94 % of the
   // view width, aimed a touch south of centre. Distance = whichever is farther of the height framing and the width fit.
   const c = fieldCentre(), pitch = 29 * Math.PI / 180, tanH = Math.tan(camera.fov / 2 * Math.PI / 180)
   const dH = params.canvasH * 1.147
   const dW = params.canvasW * 0.45 / (tanH * Math.max(camera.aspect, 0.5) * 0.94) + params.canvasH * 0.38 * Math.cos(pitch)
-  const d = Math.max(dH, dW)
-  controls.target.set(c.x, 0, c.z + params.canvasH * 0.04)
-  camera.position.set(c.x, d * Math.sin(pitch), controls.target.z + d * Math.cos(pitch))
+  const d = Math.max(dH, dW), tz = c.z + params.canvasH * 0.04
+  return { pos: new V3(c.x, d * Math.sin(pitch), tz + d * Math.cos(pitch)), target: new V3(c.x, 0, tz) }
+}
+function homeOrbit() { const h = homePose(); controls.target.copy(h.target); camera.position.copy(h.pos) }
+// run-start intro (owner 2026-11-18): play opens on the dude and his dog seen from the front — the camera stands on the
+// flock's side of them, looking back — holds a second, then eases out to the default orbit view over a second and a half.
+// Orbit camera only (?cam=top / handler / dog are left alone); picking any camera cancels it; a paused page holds it.
+const INTRO = { hold: 1, pan: 1.5 }
+const camIntro = { t: -1, pos: new V3(), look: new V3() } // t < 0: not running
+function startIntro() {
+  if (camState.mode !== 'orbit') return
+  const h = handlerPos(), d = sim.dog.pos, yaw = Math.atan2(sim.gcm.y - h.y, sim.gcm.x - h.x)
+  const mx = (h.x + d.x) / 2, my = (h.y + d.y) / 2
+  handler.yaw = yaw // he faces the flock (and so the camera) from the first frame
+  camIntro.look.set(mx, 10, my)
+  camIntro.pos.set(mx + Math.cos(yaw) * 70, 21, my + Math.sin(yaw) * 70)
+  camIntro.t = 0
+  controls.enabled = false
+}
+function stepIntro(dt) {
+  camIntro.t += dt
+  const u = Math.min(1, Math.max(0, (camIntro.t - INTRO.hold) / INTRO.pan)), k = u * u * (3 - 2 * u), home = homePose()
+  camera.position.lerpVectors(camIntro.pos, home.pos, k)
+  controls.target.lerpVectors(camIntro.look, home.target, k)
+  camera.lookAt(controls.target)
+  if (u >= 1) { camIntro.t = -1; controls.enabled = true; controls.update() }
 }
 function setCam(mode) {
   if (!CAMS.includes(mode)) return
+  camIntro.t = -1
   // orbit always lands on the starting view (owner 2026-11-18): coming back from top / handler / dog the camera was still
   // sitting where that mode left it — straight overhead after `top` — and it took a second click to re-centre
   if (mode === 'orbit') homeOrbit()
@@ -1261,9 +1286,9 @@ function setCam(mode) {
   camHint.textContent = CAM_HINTS[mode]
 }
 const camWant = { pos: new V3(), look: new V3() }
-function updateCamera(dt) {
+function updateCamera(dt, played = dt) { // played: 0 while the page is paused
   const mode = camState.mode
-  if (mode === 'orbit') { controls.update(); return }
+  if (mode === 'orbit') { if (camIntro.t >= 0) stepIntro(played); else controls.update(); return }
   const { pos, look } = camWant
   if (mode === 'top') {
     const bb = course.bounds, tanH = Math.tan(camera.fov / 2 * Math.PI / 180)
@@ -1332,7 +1357,7 @@ function render3D(dt, time, fps) {
   updateHandler(dt)
   updateOverlays()
   for (const f of course.flags) f.rotation.y = f.userData.base + Math.sin(time * 2.2 + f.position.x) * 0.25
-  updateCamera(dt || 1 / 60)
+  updateCamera(dt || 1 / 60, dt || 0)
   updateHud(fps)
   renderer.render(scene, camera)
 }
@@ -1363,7 +1388,7 @@ function issue(cmd, flavor) {
   updateStrip()
 }
 const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
-function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do') }
+function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do'); startIntro() }
 for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
 document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
 function syncControllers(key) {
@@ -1371,7 +1396,7 @@ function syncControllers(key) {
 }
 function setSeed(seed) {
   params.seed = seed >>> 0
-  HOOKS.respawn(); hideCard(); issue('that_ll_do')
+  HOOKS.respawn(); hideCard(); issue('that_ll_do'); startIntro()
   syncControllers('seed')
 }
 function newCourse() { setSeed(Math.floor(Math.random() * 1e6)) }
@@ -1430,7 +1455,7 @@ herdInput.addEventListener('input', () => { herdOut.textContent = herdInput.valu
 herdInput.addEventListener('change', () => {
   params.sheepCount = parseInt(herdInput.value, 10)
   syncControllers('sheepCount')
-  HOOKS.respawn()
+  HOOKS.respawn(); startIntro()
 })
 
 let paused = false
@@ -1484,6 +1509,7 @@ syncControllers('seed')
 for (const g of guis.roots) g.close() // raw-param panels start folded; the stage is the point of this page
 issue(sim.dog.command)
 setCam(CAMS.includes(query.get('cam')) ? query.get('cam') : 'orbit')
+startIntro()
 
 // POC-v14: the score face. `project` maps a sim point to stage px through the live camera.
 const popV = new V3()
@@ -1493,7 +1519,7 @@ ScoreUI.init({
     popV.set(x, 12, y).project(camera)
     return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }
   },
-  setSeed, newCourse, restart: () => { restartRun(); setCam('orbit') }, // owner 2026-11-18: the end card's replay button always hard-resets the camera to the default orbit view
+  setSeed, newCourse, restart: () => { restartRun(); setCam('orbit'); startIntro() }, // owner 2026-11-18: the end card's replay button always hard-resets the camera to the default orbit view (by way of the run-start intro)
 })
 PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
 DemoUI.init({ stage }) // demo mode (A): lib/sheep-demo-ui.js
@@ -1533,7 +1559,7 @@ function frame(nowMs) {
 }
 
 // handles for the console (and for poking at the scene while tuning the look)
-window.__sheep3d = { THREE, sim, scene, camera, renderer, controls, setCam, issue, render3D }
+window.__sheep3d = { THREE, sim, scene, camera, renderer, controls, setCam, issue, render3D, camIntro, homePose, handlerPos }
 window.__sheep3dBooted = true
 requestAnimationFrame(frame)
 </script>
