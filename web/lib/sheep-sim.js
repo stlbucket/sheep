@@ -305,6 +305,8 @@ const SETTINGS = [
   { key: 'ramStandWait', category: 'Objectives', label: 'ram stand wait', type: 'float', default: 2, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6: a dog lying down this long also makes a standing ram give way (and he will not stand again for as long).', exposed: true },
   { key: 'ramYieldWait', category: 'Objectives', label: 'ram yield wait', type: 'float', default: 1, min: 0, max: 10, step: 0.25, unit: 's', description: 'FO6 (owner 2026-11-18): a dog on a direct walk-on facing a standing ram for this long makes him turn and trot off.', exposed: true },
   { key: 'ramYieldDur', category: 'Objectives', label: 'ram yield trot', type: 'float', default: 3, min: 0, max: 10, step: 0.5, unit: 's', description: 'FO6 (owner 2026-11-18): how long the ram slow-trots away from the dog once he yields (pace = `slow trot speed`); he will not stand again until `ram stand wait` after that.', exposed: true },
+  { key: 'heelNipReach', category: 'Objectives', label: 'heel nip reach', type: 'float', default: 150, min: 0, max: 400, step: 10, unit: 'px', description: 'Heel nip (owner 2026-11-18): the dog dives at a sheep that is standing him off (the ram) no further than this from him. Nobody standing in reach → no nip, and the pad hides the button.', exposed: true },
+  { key: 'heelNipDur', category: 'Objectives', label: 'heel nip flee', type: 'float', default: 2.5, min: 0, max: 10, step: 0.5, unit: 's', description: 'Heel nip: how long the nipped sheep runs flat out from the dog; a ram will not stand again until `ram stand wait` after that.', exposed: true },
   { key: 'blackChance', category: 'Objectives', label: 'black sheep chance', type: 'float', default: 0.3, min: 0, max: 1, step: 0.05, unit: '—', description: "FO8: chance a course has a black sheep.", exposed: true, onChange: 'respawn' },
   { key: 'blackMult', category: 'Objectives', label: 'black sheep worth', type: 'float', default: 2, min: 1, max: 20, step: 0.5, unit: '×', description: "FO8: her worth as a multiple of an ordinary sheep.", exposed: true },
   { key: 'blackThreatScale', category: 'Objectives', label: 'black sheep nerves', type: 'float', default: 1.5, min: 1, max: 4, step: 0.1, unit: '×', description: "FO8: how much more of the dog's pressure she feels — she startles sooner.", exposed: true },
@@ -500,7 +502,7 @@ const LEVER_NOT_LEVERED = {
     'multFullFlock', 'multClean', 'multAllCalm', 'multAwardCommon', 'multAwardRare', 'multAwardLegendary', 'multOneGo', 'perfectFileMin', 'frenzyEvery', 'frenzySecs', 'frenzyExtend', 'frenzyMax', 'finisherPoints',
     'quietHandBase', 'quietHandPerSheep', 'lineOnDist', 'lineAwardShare', 'photoFinishSecs', 'fullPurseShare', 'wolfPoints', 'rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan',
     'gradeA', 'gradeStep', 'gradeCalmCredit', 'safetyPanicCost'], // POC-v14 / v15 point values, rates and verdict bands — proposals until a /sheep tune pass (the bonus THRESHOLDS belong to Pasture · Strictness)
-  objectives: ['course', 'compGatesMin', 'compGatesMax', 'compLegMin', 'compTurnMax', 'driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait', 'ramYieldWait', 'ramYieldDur',
+  objectives: ['course', 'compGatesMin', 'compGatesMax', 'compLegMin', 'compTurnMax', 'driveGateMax', 'driveGateChance', 'driveGateWidth', 'driveGatePanel', 'driveGatePoints', 'driveGateMult', 'specials', 'goldenChance', 'goldenMult', 'lambChance', 'lambMult', 'lambFollow', 'ramChance', 'ramMult', 'ramFleeScale', 'ramSpeedScale', 'ramStandDist', 'ramStandRelease', 'ramStandWait', 'ramYieldWait', 'ramYieldDur', 'heelNipReach', 'heelNipDur',
     'blackChance', 'blackMult', 'blackThreatScale', 'blackSpookRadius', 'blackSpookThreat', 'bellChance', 'bellMult', 'bellRadius', 'bellWeight', 'yearlingChance', 'yearlingMult', 'yearlingFlightScale', 'yearlingSize', 'sideObjectiveCount', 'multSideObjective'], // POC-v14 field objectives + POC-v15 (FO7–FO11)
   modes: ['mode', 'waveClock', 'waveSecsPerSheep', 'waveClockMax', 'waveSheepStart', 'waveGrowth', 'waveSheepMax', 'historyMax', 'bandSmallMax', 'bandMediumMax'], // POC-v14 replay modes + POC-v15 records — a mode switch and the arcade clock
   // plus every `debug.*` render toggle
@@ -784,7 +786,7 @@ class FlockSim {
       command: 'that_ll_do', target: { ...home }, intensity: 1,
       owner: { ...home }, flankAngle: 0, flankR: 0, flankT: 0, flankParked: false, flankArmed: false, flankWaypoint: false, parkT: 0, handoff: null,
       driveDist: params.R_drive, stallT: 0, driveT: 0, fwdEMA: 0,
-      impulse: null, impulseFactor: 1,
+      impulse: null, impulseFactor: 1, nip: null,
       flankEasy: false, lieSide: 0, // POC-v10 variants: C11 gentle flank / D4 offset down
       avoidSide: 0,                 // which way round the obstacle he is currently skirting (0 = clear)
     }
@@ -1167,7 +1169,7 @@ class FlockSim {
       return
     }
     const was = d.command + '|' + d.flankEasy + '|' + d.lieSide
-    d.impulse = null
+    d.impulse = null; d.nip = null // a new command calls the dive off
     // POC-v10 (owner 2026-08-24): the C11/D4 variants ride the entry opts —
     // never new verbs. Every other command clears them.
     d.flankEasy = (cmd === 'come_by' || cmd === 'away') && !!opts.easy
@@ -1211,6 +1213,32 @@ class FlockSim {
       if (cmd === 'lie_down') { this.run.lieDowns++; this.setObjective('on_feet', 'lost') }                 // Never Sat
       if ((cmd === 'come_by' || cmd === 'away') && !d.flankEasy) this.run.fullFlanks++                       // Steady Away
     }
+  }
+
+  // HEEL NIP (owner 2026-11-18): not a command — the dog dives at the heels of
+  // a sheep that is STANDING HIM OFF (stepDog), bites, and goes straight back
+  // to the command he was on. The bitten sheep runs flat out from him for
+  // heelNipDur and its stand is broken. Only a standing sheep inside
+  // heelNipReach can be nipped — nipTarget() is its index (-1: none), which is
+  // also what the pad reads to show the button only while a nip can happen.
+  nipTarget() {
+    const p = this.p, d = this.dog
+    if (this.run.finished || d.nip) return -1
+    let best = -1, bestD = p.heelNipReach
+    for (let i = 0; i < this.sheep.length; i++) {
+      const s = this.sheep[i]
+      if (!s.stand || s.through || s.down || s.lost) continue
+      const dd = vec2.dist(s.pos, d.pos)
+      if (dd <= bestD) { bestD = dd; best = i }
+    }
+    return best
+  }
+  heelNip() {
+    const best = this.nipTarget()
+    if (best < 0) return false
+    this.dog.nip = { i: best, t: 0 }
+    this.countCommand('heel_nip') // SC19 Quiet Hand: a nip is a command too
+    return true
   }
 
   countCommand() {
@@ -1265,6 +1293,7 @@ class FlockSim {
         nearestMarker: nearestMarker(d.pos), distOutsideHull: sim.hull.length ? r1(sim.distToHull(d.pos)) : null, // = perimeterMargin when he is ON the dotted line
         intensity: +d.intensity.toFixed(2),
         impulse: d.impulse ? d.impulse.name : null,
+        ...(d.nip ? { nip: d.nip.i } : {}),
         ...(d.flankEasy ? { flankEasy: true } : {}), ...(d.lieSide ? { lieSide: d.lieSide } : {}), // POC-v10 variants
         flank: flanking ? {
           dir: d.command === 'come_by' ? 'CW' : 'CCW', angleDeg: deg(d.flankAngle), radius: r1(d.flankR),
@@ -2197,6 +2226,7 @@ class FlockSim {
         standCool: 0,                      //   …seconds before he may stand again
         standFace: 0,                      //   …how long a walk-on dog has faced him down (s)
         yieldT: 0,                         //   …seconds left of his slow trot away after yielding
+        nipT: 0,                           // heel nip: seconds left of the flat-out run from the dog (any sheep)
         penT: 0,                           // run time at which it crossed into the pen
         lost: false,                       // killed by the assault — out of the flock (SC11)
         stressAvg: 0,                      // POC-v15 SC12: stress smoothed over penStressMemory — what its tier is read from
@@ -2565,6 +2595,24 @@ class FlockSim {
     }
     d.atHeel = d.command === 'that_ll_do' && vec2.dist(d.pos, d.owner) < 12
 
+    // Heel nip: the dive overrides the command's target until he bites (or the
+    // sheep is gone / he cannot reach it in 1.5 s); the command itself is untouched.
+    let nipping = false
+    if (d.nip) {
+      const s = this.sheep[d.nip.i]
+      d.nip.t += dt
+      if (!s || s.through || s.down || s.lost || d.nip.t > 1.5) d.nip = null
+      else if (vec2.dist(d.pos, s.pos) <= p.L) {
+        s.stand = false; s.standLie = 0; s.standFace = 0; s.yieldT = 0; s.protest = 0
+        s.nipT = p.heelNipDur; s.standCool = p.heelNipDur + p.ramStandWait
+        d.nip = null
+      } else {
+        d.target = { x: s.pos.x, y: s.pos.y }
+        d.facing = Math.atan2(s.pos.y - d.pos.y, s.pos.x - d.pos.x)
+        nipping = true
+      }
+    }
+
     // Obstacles: a target that falls inside a stand / rock moves to its edge,
     // and the heading below bends round whatever blocks the way there.
     if (this.solids().length) this.pushOut(d.target, p.L + 2)
@@ -2576,11 +2624,12 @@ class FlockSim {
     // walkOnSpeedFrac × vMax (= the flock's pace), easy at easySpeedFrac × vMax
     // (half). Flanks and the recall keep dogVMax.
     const walk = Math.min(p.walkSpeed, p.vMax) // the sheep's walk — he drives at their pace (POC-v13)
-    const vmax = d.command === 'walk_on' ? walk * p.walkOnSpeedFrac
+    const vmax = nipping ? p.dogVMax * 1.5 // the dive
+               : d.command === 'walk_on' ? walk * p.walkOnSpeedFrac
                : d.command === 'easy'    ? walk * p.easySpeedFrac
                : d.flankEasy && (d.command === 'come_by' || d.command === 'away') ? p.dogVMax * p.flankEasySpeedFrac // C11 (POC-v10)
                : p.dogVMax
-    const speed = dist < arriveR ? vmax * (dist / arriveR) : vmax
+    const speed = dist < arriveR && !nipping ? vmax * (dist / arriveR) : vmax
     const dir = dist > 0.5 && this.solids().length ? this.dogDetour(d.pos, vec2.norm(to), dist) : vec2.norm(to)
     d.vel = dist > 0.5 ? vec2.scale(dir, Math.min(speed, dist / dt))
                        : { x: 0, y: 0 }
@@ -2662,6 +2711,12 @@ class FlockSim {
         a.stress = Math.max(a.stress, p.trotPressMin)
         return dist > 1e-6 ? { x: 2 * to.x / dist, y: 2 * to.y / dist } : { x: 0, y: 0 } // ×2: enough push to reach the slow trot
       }
+    }
+    if (a.nipT > 0) {                         // heel nip: bitten — flat out, straight away from the dog
+      a.nipT -= dt
+      if (a.protest > 0) a.protest -= dt
+      a.stress = Math.max(a.stress, p.trotPressMin)
+      return dist > 1e-6 ? { x: 3 * to.x / dist, y: 3 * to.y / dist } : { x: 0, y: 0 }
     }
     const sp = this.blackPanic ? this.spookOn(a) : null // FO8: spooked by a panicking black sheep
     if (dist >= reach || dist < 1e-6) {
@@ -2842,7 +2897,7 @@ class FlockSim {
       if (dm > gap + 1e-4) fLamb = vec2.scale(vec2.norm(to), smoothstep(gap, gap + p.idleCohRadius, dm))
     }
     const lambFar = vec2.len(fLamb) > 0.5
-    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0 || lambFar || s.stand || s.yieldT > 0) { // threat, the gate's draw (G2), a trot (T2), a lamb after its mother or a standing ram keeps a sheep alert
+    if (s.stress > 0 || s.gatePullNext > 0 || s.trot || s.trotEase > 0 || lambFar || s.stand || s.yieldT > 0 || s.nipT > 0) { // threat, the gate's draw (G2), a trot (T2), a lamb after its mother or a standing ram keeps a sheep alert
       s.idle = false
       s.calmT = 0
     } else if (!s.idle) {
@@ -2957,6 +3012,7 @@ class FlockSim {
     if (idle) vmax = Math.min(vmax, p.idleSpeedCap)
     if (s.kind === 'ram') vmax *= p.ramSpeedScale // FO6
     if (s.yieldT > 0) vmax = Math.max(vmax, p.trotSlowSpeed) // …but a yielding ram leaves at the slow trot
+    if (s.nipT > 0) vmax = Math.max(vmax, p.vMax) // a nipped sheep runs flat out (ram included)
     s.vel = clampLen(vec2.scale(vec2.add(s.vel, vec2.scale(accel, dt)), p.damping), vmax)
     s.pos = vec2.add(s.pos, vec2.scale(s.vel, dt))
     if (this.solids().length) this.pushOut(s.pos, 2, s.vel) // obstacles (and bulls) are solid

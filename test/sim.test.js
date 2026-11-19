@@ -603,6 +603,27 @@ function kindSim(kind, over) {
   ok('K-4c', 'a walk-on held on a standing ram for ramYieldWait makes him slow-trot away from the dog; easy does not',
     Math.abs(yw.tY - s.p.ramYieldWait) < 0.05 && yw.moved > 100 && yw.peak > s.p.walkSpeed * s.p.ramSpeedScale && yw.peak <= s.p.trotSlowSpeed + 1e-6 && ye.stand && Math.abs(ye.moved) < 1,
     `yielded after ${yw.tY.toFixed(2)} s, moved ${yw.moved.toFixed(0)} px away in 4 s, peak ${yw.peak.toFixed(0)} px/s; easy: still standing ${ye.stand}, moved ${ye.moved.toFixed(1)} px`)
+  // K-4d (owner 2026-11-18): heel nip — the dog dives at the standing ram, who then runs flat out from him; the dog keeps his command
+  const nipRun = (nip) => {
+    place(ri); ram.vel = { x: 0, y: 0 }; ram.stand = false; ram.standCool = 0; ram.yieldT = 0; ram.nipT = 0
+    s.dog.pos = { x: 500 - 50, y: 400 }; s.dog.vel = { x: 60, y: 0 }; s.dog.command = 'walk_on'; s.flee(ri, DT)
+    s.dog.vel = { x: 0, y: 0 }; s.dog.command = 'easy'; s.dog.nip = null
+    const cmds = s.run.commands, said = nip ? s.heelNip() : null
+    let peak = 0, tBite = -1
+    for (let k = 0; k < 60 * 3; k++) {
+      if (nip) s.stepDog(DT)
+      s.integrate(ri, DT)
+      if (tBite < 0 && ram.nipT > 0) tBite = (k + 1) * DT
+      peak = Math.max(peak, Math.hypot(ram.vel.x, ram.vel.y))
+    }
+    return { said, tBite, peak, moved: ram.pos.x - 500, stand: ram.stand, cmd: s.dog.command, counted: s.run.commands - cmds, nip: s.dog.nip }
+  }
+  const n0 = nipRun(false), n1 = nipRun(true)
+  place(ri); s.dog.pos = { x: 500 - s.p.heelNipReach - 20, y: 400 }; const far = s.heelNip()
+  place(ri); ram.stand = false; s.dog.pos = { x: 500 - 40, y: 400 }; const calm = s.heelNip(), noBtn = s.nipTarget() // nobody standing him off
+  ok('K-4d', 'heel nip: the dog dives at a standing ram and he runs flat out away; without it he never moves; the dog keeps his command; nothing in reach → no nip',
+    n0.stand && Math.abs(n0.moved) < 1 && n1.said === true && n1.tBite > 0 && n1.tBite < 0.6 && !n1.stand && n1.moved > 120 && n1.peak > s.p.trotSlowSpeed && n1.cmd === 'easy' && n1.counted === 1 && n1.nip === null && far === false && calm === false && noBtn === -1,
+    `no nip: standing ${n0.stand}, moved ${n0.moved.toFixed(1)} px; nip: bit after ${n1.tBite.toFixed(2)} s, moved ${n1.moved.toFixed(0)} px in 3 s, peak ${n1.peak.toFixed(0)} px/s, dog still on ${n1.cmd}; out of reach → ${far}; nobody standing → ${calm}`)
   // frequency sanity over 400 seeds
   const c = { golden: 0, lamb: 0, ram: 0 }
   for (let seed = 1; seed <= 400; seed++) { const q = mkc(N, { seed, sheepCount: 20, specials: true }); for (const k of Object.keys(c)) { const n = q.sheep.filter((x) => x.kind === k).length; if (n > 1) c[k] = NaN; c[k] += n } }

@@ -139,6 +139,11 @@ const PadUI = (() => {
       if (!quiet) flash(label(sim, cmd, opts))
       return set0(cmd, opts)
     }
+    const nip0 = sim.heelNip.bind(sim) // the heel nip is not a command, so it flashes from here
+    sim.heelNip = () => { const bit = nip0(); flash(bit ? 'HEEL NIP' : 'NOTHING TO NIP'); return bit }
+    // owner 2026-11-18: the heel nip button is only up while a nip can happen — a sheep standing the dog off, in reach (it keeps its place in the pad)
+    const nipBtn = document.getElementById('nip-btn')
+    if (nipBtn) { const show = () => { nipBtn.style.visibility = sim.nipTarget() >= 0 ? '' : 'hidden' }; show(); setInterval(show, 120) }
   }
 
   return { init, flash }

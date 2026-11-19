@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
      these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,6 +14,17 @@
 <script>
   for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, e => e.preventDefault(), { passive: false }) // iOS pinch + double-tap
   document.addEventListener("touchmove", e => { if (e.touches.length > 1 && !(e.target instanceof HTMLCanvasElement)) e.preventDefault() }, { passive: false }) // two thumbs on the buttons is not a pinch
+  // phone landscape (owner 2026-11-18): the page runs edge to edge (viewport-fit=cover) and keeps clear of the notch / Dynamic Island on
+  // whichever side it sits — the browser's own safe-area insets are the same both sides, so the rotation angle says which side that is
+  function islandSide() {
+    const a = typeof window.orientation === "number" ? window.orientation : (screen.orientation ? screen.orientation.angle : 0)
+    const c = document.documentElement.classList
+    c.toggle("island-left", a === 90) // turned anticlockwise: the top of the phone is on the left
+    c.toggle("island-right", a === -90 || a === 270)
+  }
+  islandSide()
+  addEventListener("orientationchange", islandSide)
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", islandSide)
 </script>
 <title>Sheep PoC — 3D · Assault</title>
 <!--
@@ -314,6 +325,18 @@
   }
   #home-link { margin-left: auto; align-self: center; font-size: 12px; color: #9fb0c0; text-decoration: none; }
   #home-link:hover { color: #e6edf3; text-decoration: underline; }
+  #controls > #nip-btn { width: calc((100% - var(--pad-g) * 2) / 3); }
+  /* NOTCH / DYNAMIC ISLAND (owner 2026-11-18) — the page keeps clear of it on the side it sits (html.island-left / .island-right,
+     set by islandSide() in the head) and runs out to the screen edge on the other side */
+  html { --il: 0px; --ir: 0px; }
+  html.island-left { --il: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)); }
+  html.island-right { --ir: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)); }
+  #app { padding-left: calc(10px + var(--il)); padding-right: calc(10px + var(--ir)); }
+  body.drawer-closed #side { right: calc(18px + var(--ir)); }
+  @media (pointer: coarse) and (max-height: 600px) {
+    #app { padding-left: calc(6px + var(--il)); padding-right: calc(6px + var(--ir)); }
+    body.drawer-closed #side { right: calc(6px + var(--ir)); }
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
 <script src="sheep-defaults.json.js?v=20261118p"></script>
@@ -379,6 +402,7 @@
     </div>
     <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
     <button data-cmd="battle_stations" title="the dog runs to the nearest fence gun that bears on a wolf, rears up and shoots — ⌘⇧B, Ctrl⇧B or plain B">battle stations <kbd>⌘⇧B</kbd></button>
+    <button id="nip-btn" title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; only shown while that can happen — N">heel <span class="w2">nip</span> <kbd>N</kbd></button>
     <button id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
     <div class="herd">
       <label for="herd-size">herd</label>
@@ -405,11 +429,11 @@
 </div>
 
 <!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
-<script src="lib/sheep-sim.js?v=20261118p"></script>
+<script src="lib/sheep-sim.js?v=20261119a"></script>
 <script>params.driveGateMax = 0 // owner 2026-11-18: the 3D pastures never carry drive gates (they live on the 3D competition course); set before lib/sheep-score-ui.js snapshots its defaults</script>
 <script src="lib/sheep-gui.js?v=20261118p"></script>
 <script src="lib/sheep-score-ui.js?v=20261118r"></script>
-<script src="lib/sheep-pad-ui.js?v=20261118p"></script>
+<script src="lib/sheep-pad-ui.js?v=20261119a"></script>
 <!-- the wolf-mortar physics (DOM-free, three-free) -->
 <script src="lib/assault-sim.js?v=20261118p"></script>
 <script>
@@ -1701,6 +1725,10 @@ function issue(cmd, flavor) {
 const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
 function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do'); startIntro() }
 for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
+// heel nip (owner 2026-11-18): not a command — the dog dives, bites and goes back to what he was on (sim.heelNip)
+const nipBtn = document.getElementById('nip-btn')
+function heelNip() { assaultStandDown(); sim.heelNip() }
+nipBtn.addEventListener('click', () => { heelNip(); nipBtn.blur() })
 document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
 function syncControllers(key) {
   for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === key) c.updateDisplay()
@@ -1802,6 +1830,7 @@ window.addEventListener('keydown', (ev) => {
     if (k === 'h') return togglePanels()
     if (k === 'd') return toggleDrawer()
     if (k === 'p') return togglePause()
+    if (k === 'n') return heelNip()
     if (k === 'o') return toggleOverlays()
     if (k === 'c') return setCam(CAMS[(CAMS.indexOf(camState.mode) + 1) % CAMS.length])
     if (k >= '1' && k <= '4' && !ev.altKey) return setCam(CAMS[+k - 1])
