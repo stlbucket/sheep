@@ -367,8 +367,8 @@ function winAll(sim, tier, gap) { let i = 0; for (const s of free(sim)) { pen(si
   const at = (f, bust) => { const sim = mk(); sim.points = Math.round(sim.run.reference * f); sim.run.bust = !!bust; return sim.rank() }
   const names = [0.005, 0.10, 0.70, 1.0, 6.0].map((f) => at(f).name)
   const b = at(0.70, true), nx = at(0.10)
-  ok('VH-8', '0.5 % / 10 % / 70 % / 100 % / 600 % → ranks (One Man and His Dog from 1,000 %); a bust at 70 % → Farmhand; next rank and points given',
-    names.join('|') === 'Lost Tourist|Drover|Head Shepherd|Trial Champion|Trial Champion' && at(12).name === 'One Man and His Dog' && b.name === 'Farmhand' && nx.next.name === 'Shepherd' && nx.next.points > 0, names.join(' · ') + ` · bust → ${b.name} · next ${nx.next.name} in ${nx.next.points}`)
+  ok('VH-8', '0.5 % / 10 % / 70 % / 100 % / 600 % → ranks (One Dude and His Dog from 1,000 %); a bust at 70 % → Farmhand; next rank and points given',
+    names.join('|') === 'Lost Tourist|Drover|Head Shepherd|Trial Champion|Trial Champion' && at(12).name === 'One Dude and His Dog' && b.name === 'Farmhand' && nx.next.name === 'Shepherd' && nx.next.points > 0, names.join(' · ') + ` · bust → ${b.name} · next ${nx.next.name} in ${nx.next.points}`)
 }
 // ---------------- VH-10: category grades move the right way
 {

@@ -258,7 +258,7 @@ const SETTINGS = [
   { key: 'rankShepherd', category: 'Scoring', label: 'rank: Shepherd', type: 'float', default: 0.15, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
   { key: 'rankHeadShepherd', category: 'Scoring', label: 'rank: Head Shepherd', type: 'float', default: 0.4, min: 0, max: 100, step: 0.01, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
   { key: 'rankChampion', category: 'Scoring', label: 'rank: Trial Champion', type: 'float', default: 1, min: 0, max: 100, step: 0.05, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
-  { key: 'rankOneMan', category: 'Scoring', label: 'rank: One Man and His Dog', type: 'float', default: 10, min: 0, max: 1000, step: 0.5, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
+  { key: 'rankOneMan', category: 'Scoring', label: 'rank: One Dude and His Dog', type: 'float', default: 10, min: 0, max: 1000, step: 0.5, unit: '× ref', description: "VH7: share of the reference run at which the rank begins.", exposed: true },
   { key: 'gradeA', category: 'Scoring', label: 'grade A from', type: 'float', default: 0.9, min: 0, max: 1, step: 0.01, unit: '—', description: "VH9: category value (0–1) at which the grade is A.", exposed: true },
   { key: 'gradeStep', category: 'Scoring', label: 'grade step', type: 'float', default: 0.18, min: 0.01, max: 1, step: 0.01, unit: '—', description: "VH9: each lower grade (B, C, D, E) begins this much further down; below E is F.", exposed: true },
   { key: 'gradeCalmCredit', category: 'Scoring', label: 'calm grade credit', type: 'float', default: 0.8, min: 0, max: 1, step: 0.05, unit: '—', description: "VH9 Calm: what a CALM sheep counts for beside a PERFECT one (1) and a RUSHED one (0).", exposed: true },
@@ -464,7 +464,7 @@ const AWARDS = [
   { name: 'Not a Hair Out of Place', rarity: 'rare' }, { name: 'Never Sat', rarity: 'rare' }, { name: 'Steady Away', rarity: 'rare' }, { name: 'Full Purse', rarity: 'rare' },
   { name: 'Sunday Stroll', rarity: 'legendary' }, { name: 'Nobody Ran', rarity: 'legendary' }, { name: 'Not a Word Wasted', rarity: 'legendary' },
 ]
-const RANKS = ['Lost Tourist', 'Farmhand', 'Drover', 'Shepherd', 'Head Shepherd', 'Trial Champion', 'One Man and His Dog']
+const RANKS = ['Lost Tourist', 'Farmhand', 'Drover', 'Shepherd', 'Head Shepherd', 'Trial Champion', 'One Dude and His Dog'] // top rank renamed by the owner 2026-11-18 (was One Man and His Dog)
 const RANK_KEYS = ['rankFarmhand', 'rankDrover', 'rankShepherd', 'rankHeadShepherd', 'rankChampion', 'rankOneMan']
 const JACKPOTS = [
   { id: 'file', label: 'Perfect file' }, { id: 'onego', label: 'One go' }, { id: 'frenzy', label: 'Frenzy' }, { id: 'finisher', label: 'Last sheep' },

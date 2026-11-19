@@ -1034,19 +1034,27 @@ function updateBulls(dt, time) {
 }
 
 // ---- the handler, at the dog's home post by the gate -------------------------
-function buildHandler() {
+function buildHandler() { // owner 2026-11-18: the handler is a laid-back dude — open bathrobe, shades, long hair, beard, shorts and sandals — crook in hand
   const root = new THREE.Group()
   const mesh = (geo, mat, x, y, z, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.z = rz; m.castShadow = true; root.add(m); return m }
-  const trousers = lam(0x2f3640), coat = lam(0x4f5d3c), skin = lam(0xe0b08c), cap = lam(0x5a4632), wood = lam(0xc8a66a)
-  const leg = new THREE.CylinderGeometry(1.0, 0.9, 8.4, 6)
-  mesh(leg, trousers, 0, 4.2, 1.2); mesh(leg, trousers, 0, 4.2, -1.2)
-  mesh(new THREE.CylinderGeometry(2.3, 2.9, 8.6, 8), coat, 0, 12.4, 0)
-  const arm = new THREE.CylinderGeometry(0.75, 0.7, 7, 5)
-  mesh(arm, coat, 0.3, 12.6, 3.2); mesh(arm, coat, 0.9, 12.8, -3.2, 0.35)
-  mesh(new THREE.IcosahedronGeometry(1.85, 1), skin, 0, 18.4, 0)
-  mesh(new THREE.CylinderGeometry(2.05, 2.05, 0.9, 10), cap, 0, 19.9, 0)
-  mesh(new THREE.BoxGeometry(1.8, 0.35, 2.6), cap, 2.2, 19.6, 0)
-  mesh(new THREE.CylinderGeometry(0.28, 0.28, 18, 5), wood, 2.6, 9, -3.6)                       // the crook
+  const skin = lam(0xe0b08c), robe = lam(0xb9a27c), robeTrim = lam(0x8c7652), tee = lam(0xf1ede2), shorts = lam(0x6f7f8c), hair = lam(0x7a5a3a), shades = lam(0x16161a), sandal = lam(0x4a3626), wood = lam(0xc8a66a)
+  const shin = new THREE.CylinderGeometry(0.8, 0.7, 5.2, 6)
+  mesh(shin, skin, 0, 2.9, 1.2); mesh(shin, skin, 0, 2.9, -1.2)                                   // bare legs
+  const sole = new THREE.BoxGeometry(3.0, 0.4, 1.7)
+  mesh(sole, sandal, 0.5, 0.2, 1.2); mesh(sole, sandal, 0.5, 0.2, -1.2)                           // sandals
+  mesh(new THREE.CylinderGeometry(2.2, 2.4, 3.4, 8), shorts, 0, 6.9, 0)                           // shorts
+  mesh(new THREE.CylinderGeometry(2.1, 2.5, 7.2, 8), tee, 0.25, 12.0, 0)                          // white tee, a bit of a belly
+  mesh(new THREE.CylinderGeometry(2.7, 3.4, 11.5, 8, 1, true, Math.PI * 0.72, Math.PI * 1.56), robe, 0, 10.2, 0).material.side = THREE.DoubleSide // the robe, hanging open at the front
+  mesh(new THREE.BoxGeometry(0.5, 11.5, 0.9), robeTrim, 2.25, 10.2, 2.0, -0.06); mesh(new THREE.BoxGeometry(0.5, 11.5, 0.9), robeTrim, 2.25, 10.2, -2.0, -0.06) // lapels
+  mesh(new THREE.BoxGeometry(0.4, 4.2, 0.5), robeTrim, -1.6, 7.2, 3.1, 0.12)                      // the belt, untied, hanging
+  const arm = new THREE.CylinderGeometry(0.95, 0.85, 7, 5)
+  mesh(arm, robe, 0.3, 12.6, 3.3); mesh(arm, robe, 0.9, 12.8, -3.3, 0.35)                         // robe sleeves
+  mesh(new THREE.IcosahedronGeometry(1.85, 1), skin, 0, 18.4, 0)                                  // head
+  mesh(new THREE.IcosahedronGeometry(2.0, 1), hair, -0.45, 18.9, 0).scale.set(1, 0.95, 1.05)      // hair on top and behind
+  mesh(new THREE.BoxGeometry(1.5, 4.2, 3.9), hair, -1.35, 16.6, 0)                                // long hair to the shoulders
+  mesh(new THREE.IcosahedronGeometry(1.25, 0), hair, 1.05, 17.2, 0).scale.set(0.8, 1.05, 1.15)    // beard
+  mesh(new THREE.BoxGeometry(0.5, 0.75, 3.3), shades, 1.72, 18.75, 0)                             // sunglasses
+  mesh(new THREE.CylinderGeometry(0.28, 0.28, 18, 5), wood, 2.6, 9, -3.6)                         // the crook
   mesh(new THREE.TorusGeometry(1.2, 0.28, 5, 10, Math.PI), wood, 3.8, 18, -3.6)
   return { root, yaw: 0 }
 }
