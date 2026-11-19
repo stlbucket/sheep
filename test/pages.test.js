@@ -88,6 +88,35 @@ async function runBulls(s, file) {
   const errs = s.errors.slice(errs0)
   ok(file, 'errors-bulls', 'zero console errors with bulls on the field', errs.length === 0, errs.slice(0, 4).join(' | '))
 }
+// owner 2026-11-18: WL — the first-visit welcome popup (demo / maybe later), shown once and only once
+async function runWelcome(s, file, skipId) {
+  const P = file, errs0 = s.errors.length, wait = file === '2d.html' ? 2500 : 5000
+  const state = `({ pop: !!document.getElementById('welcome'), flag: localStorage.getItem('sheep.welcomed.v1'), on: DemoUI.on, burst: document.getElementById('demo-btn').classList.contains('burst'), hint: document.getElementById('demo-btn').classList.contains('hint'), anim: getComputedStyle(document.getElementById('demo-btn')).animationName, count: getComputedStyle(document.getElementById('demo-btn')).animationIterationCount, pause: /^resume/.test(document.getElementById('pause-btn').textContent) ? 'resume' : 'pause', t: sim.run.t })`
+  await s.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: skipId })
+  await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`)
+  await s.send('Page.navigate', { url: WEB + file + '?seed=1259' }); await sleep(wait)
+  const a = await s.ev(state); await sleep(700); const a2 = await s.ev(`sim.run.t`)
+  const txt = await s.ev(`({ h: document.querySelector('#welcome h2').textContent, btns: Array.from(document.querySelectorAll('#welcome button')).map((b) => b.textContent).join('|') })`)
+  await shot(s, file, 'welcome')
+  ok(P, 'WL-p1', 'first visit: a welcome popup offers the demo or maybe later, and the course is held behind it', a.pop && a.flag === '1' && !a.on && a.pause === 'resume' && a2 === a.t && /Welcome/.test(txt.h) && txt.btns === 'watch the demo|maybe later', JSON.stringify({ a, a2, txt }))
+  await s.ev(`document.getElementById('welcome-later').click(); true`); await sleep(300)
+  const b = await s.ev(state); await sleep(5600); const c = await s.ev(state)
+  ok(P, 'WL-p2', 'maybe later closes it, the demo button pulses five times, then goes back to its regular pulse; the course runs again', !b.pop && !b.on && b.burst && b.anim === 'demo-burst' && b.count === '5' && b.pause === 'pause' && !c.burst && c.hint && c.anim === 'demo-hint' && c.t > b.t, JSON.stringify({ b, c }))
+  await s.send('Page.navigate', { url: WEB + file + '?seed=1259' }); await sleep(wait)
+  const d = await s.ev(state)
+  ok(P, 'WL-p3', 'the popup is shown once and only once: gone on the next visit', !d.pop && !d.burst && d.pause === 'pause', JSON.stringify(d))
+  await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`)
+  await s.send('Page.navigate', { url: WEB + file + '?seed=1259' }); await sleep(wait)
+  await s.ev(`document.getElementById('welcome-demo').click(); true`); await sleep(500)
+  const e = await s.ev(state)
+  ok(P, 'WL-p4', 'watch the demo closes it and starts the demo', !e.pop && e.on && e.pause === 'pause' && !e.hint && !e.burst, JSON.stringify(e))
+  const errs = s.errors.slice(errs0)
+  ok(P, 'errors-welcome', 'zero console errors round the welcome popup', errs.length === 0, errs.slice(0, 4).join(' | '))
+  await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`)
+  return (await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SKIP_WELCOME })).result.identifier
+}
+// every other run starts as a returning visitor, so the popup is not in the way
+const SKIP_WELCOME = `try { localStorage.setItem('sheep.welcomed.v1', '1') } catch (e) {}`
 // POC-v16: DM (demo mode) on a page; CC (the competition course) on 3d-competition.html
 async function runDemo(s, file) {
   const P = file, comp = file === '3d-competition.html', errs0 = s.errors.length
@@ -373,6 +402,7 @@ async function runPhone(s, file) {
     await s.open
     await s.send('Page.enable'); await s.send('Runtime.enable'); await s.send('Log.enable')
     const only = process.argv[2]
+    let skipId = (await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SKIP_WELCOME })).result.identifier
     if (only && !['2d.html', '3d.html', '3d-assault.html', '3d-competition.html'].includes(only)) throw new Error('unknown page ' + only)
     for (const f of ['2d.html', '3d.html', '3d-assault.html']) {
       if (only && only !== f) continue
@@ -386,6 +416,10 @@ async function runPhone(s, file) {
       if (only && only !== f) continue
       try { await runDemo(s, f) } catch (e) { ok(f, 'crash-demo', 'demo run completed', false, e.message) }
       await s.ev(`(() => { try { localStorage.clear() } catch (e) {} return true })()`).catch(() => {})
+    }
+    for (const f of ['2d.html', '3d.html', '3d-competition.html']) { // the first-visit welcome popup
+      if (only && only !== f) continue
+      try { skipId = await runWelcome(s, f, skipId) } catch (e) { ok(f, 'crash-welcome', 'welcome run completed', false, e.message) }
     }
     for (const f of ['2d.html', '3d.html', '3d-assault.html', '3d-competition.html']) { // POC-v17: wandering bulls
       if (only && only !== f) continue
