@@ -58,7 +58,7 @@ window.__t = {
   card() { const c = document.getElementById('card'), t = (q) => (c.querySelector(q) ? c.querySelector(q).textContent : ''); return { shown: c.style.display === 'block', done: c.classList.contains('done'), big: t('.big'), best: t('.best'), title: t('h2'), rank: t('.rank'), pct: t('.pct'), awards: t('.awards'), rows: c.querySelectorAll('.row.line').length, mrows: c.querySelectorAll('.row.mrow').length, grades: Array.from(c.querySelectorAll('.grades b')).map((b) => b.textContent).join(''), text: c.textContent } },
   hud() { return document.getElementById('score-hud').textContent },
   pts() { return document.querySelector('#score-hud .pts').textContent },
-  banner() { const b = document.getElementById('score-banner'); return { text: b.textContent, on: parseFloat(b.style.opacity || '0') > 0.5, cls: b.className } },
+  banner() { const b = document.getElementById('score-banner'), r = b.getBoundingClientRect(), st = b.parentElement.getBoundingClientRect(); return { text: b.textContent, on: parseFloat(b.style.opacity || '0') > 0.5, cls: b.className, left: Math.round(r.left - st.left), right: Math.round(r.right - st.left), stageW: Math.round(st.width) } },
   panel() { const p = document.getElementById('score-panel'); return { shown: p.style.display === 'block', rows: p.querySelectorAll('tr').length - 1, items: p.querySelectorAll('.item').length, none: p.querySelectorAll('.item.none').length, top: p.querySelectorAll('tr.top').length, tuned: p.querySelectorAll('tr.tuned').length, text: p.textContent } },
   modeBtn(label) { return Array.from(document.querySelectorAll('#controls .aux button.mode, #center-stack .aux button.mode')).find((b) => b.textContent.startsWith(label)) },
   fmt(n) { return Math.round(n).toLocaleString('en-US') },
@@ -206,7 +206,7 @@ async function runPage(s, file, opts = {}) {
   const o1 = await s.ev(`(() => ({ n: sim.sideObjectives.length, li: document.querySelectorAll('#score-hud .objs li').length, banner: __t.banner(), first: sim.sideObjectives[0].id }))()`)
   await s.ev(`sim.setObjective(sim.sideObjectives[0].id, 'lost'); true`); await sleep(200)
   const o2 = await s.ev(`({ cls: document.querySelector('#score-hud .objs li').className })`)
-  ok(P, 'VH-6', 'the side objectives are announced when the run starts and listed in the HUD; one flips to lost when the sim says so', o1.n === 2 && o1.li === 2 && /Side objectives/.test(o1.banner.text) && o1.banner.on && o2.cls === 'lost', `${o1.n} objectives, ${o1.li} listed, banner "${o1.banner.text.slice(0, 40)}…", then ${o2.cls}`)
+  ok(P, 'VH-6', 'the side objectives are announced when the run starts and listed in the HUD; one flips to lost when the sim says so', o1.n === 2 && o1.li === 2 && /Side objectives/.test(o1.banner.text) && o1.banner.on && o1.banner.left >= 0 && o1.banner.left < 40 && o1.banner.right < o1.banner.stageW / 2 && o2.cls === 'lost', `${o1.n} objectives, ${o1.li} listed, banner "${o1.banner.text.slice(0, 40)}…" on the left (${o1.banner.left}–${o1.banner.right} of ${o1.banner.stageW}), then ${o2.cls}`)
   await shot(s, file, 'start')
 
   // ---- VH4: three tiers → three visibly different pops; VH2: the chain meter

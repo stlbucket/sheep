@@ -93,7 +93,8 @@ const ScoreUI = (() => {
   #score-banner.gate { color: #9fd0ff; border-color: #9fd0ff; }
   #score-banner.objective { font-size: 20px; color: #7fd79a; border-color: #4c8a5e; }
   #score-banner.objective.lost { color: #aab3bb; border-color: #55616c; }
-  #score-banner.start { font-size: 16px; font-weight: 600; color: #e6edf3; border-color: #55616c; white-space: normal; max-width: 80%; }
+  #score-banner.start { font-size: 16px; font-weight: 600; color: #e6edf3; border-color: #55616c; white-space: normal;
+    left: 12px; top: 50%; max-width: min(44%, 420px); text-align: left; transform-origin: left center; } /* owner 2026-11-18: the side objectives sit on the left edge, under the score block, clear of the middle of the field */
   #score-banner.start b { color: #ffd24a; }
   #card.score-card { min-width: 380px; max-height: 92%; overflow-y: auto; z-index: 8; user-select: none; }
   #card.score-card .rank { font-size: 26px; font-weight: 800; color: #ffd24a; margin: 2px 0 0; letter-spacing: 0.01em; }
@@ -387,7 +388,7 @@ const ScoreUI = (() => {
     const u = (t - b.t0) / b.life
     if (u >= 1) { S.banner = null; bannerEl.style.opacity = '0'; return }
     bannerEl.style.opacity = String(u < 0.08 ? u / 0.08 : u > 0.8 ? (1 - u) / 0.2 : 1)
-    bannerEl.style.transform = `translate(-50%, -50%) scale(${(u < 0.1 ? 1.25 - u * 2.5 : 1).toFixed(3)})`
+    bannerEl.style.transform = `translate(${bannerEl.classList.contains('start') ? '0' : '-50%'}, -50%) scale(${(u < 0.1 ? 1.25 - u * 2.5 : 1).toFixed(3)})`
   }
 
   // ---- records (RC1–RC4) ----------------------------------------------------
