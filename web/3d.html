@@ -314,15 +314,15 @@
   /* drawer closed: that'll do stays under the middle column, heel nip under the right one */
   body.drawer-closed #controls > button[data-cmd="that_ll_do"] { margin-left: calc((100% - var(--pad-g) * 2) / 3 + var(--pad-g) - 1px); }
   /* NOTCH / DYNAMIC ISLAND (owner 2026-11-18) — the page keeps clear of it on the side it sits (html.island-left / .island-right,
-     set by islandSide() in the head) and runs out to the screen edge on the other side */
+     set by islandSide() in the head) and runs out to the screen edge on the other side; trimmed 2026-11-19: the gap is 85 % of the safe-area inset (just past the island) and replaces the edge padding instead of adding to it */
   html { --il: 0px; --ir: 0px; }
-  html.island-left { --il: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)); }
-  html.island-right { --ir: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)); }
-  #app { padding-left: calc(10px + var(--il)); padding-right: calc(10px + var(--ir)); }
-  body.drawer-closed #side { right: calc(18px + var(--ir)); }
+  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.85); }
+  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.85); }
+  #app { padding-left: max(10px, var(--il)); padding-right: max(10px, var(--ir)); }
+  body.drawer-closed #side { right: calc(max(10px, var(--ir)) + 8px); }
   @media (pointer: coarse) and (max-height: 600px) {
-    #app { padding-left: calc(6px + var(--il)); padding-right: calc(6px + var(--ir)); }
-    body.drawer-closed #side { right: calc(6px + var(--ir)); }
+    #app { padding-left: max(6px, var(--il)); padding-right: max(6px, var(--ir)); }
+    body.drawer-closed #side { right: max(6px, var(--ir)); }
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
