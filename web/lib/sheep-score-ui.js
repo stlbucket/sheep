@@ -94,7 +94,7 @@ const ScoreUI = (() => {
   #score-banner.objective { font-size: 20px; color: #7fd79a; border-color: #4c8a5e; }
   #score-banner.objective.lost { color: #aab3bb; border-color: #55616c; }
   #score-banner.start { font-size: 16px; font-weight: 600; color: #e6edf3; border-color: #55616c; white-space: normal;
-    left: 12px; top: 50%; max-width: min(44%, 420px); text-align: left; transform-origin: left center; } /* owner 2026-11-18: the side objectives sit on the left edge, under the score block, clear of the middle of the field */
+    left: 12px; top: 50%; padding: 8px 12px; max-width: min(27%, 300px); text-align: left; transform-origin: left center; } /* owner 2026-11-18: the side objectives sit on the left edge, under the score block, clear of the middle of the field */
   #score-banner.start b { color: #ffd24a; }
   #card.score-card { min-width: 380px; max-height: 92%; overflow-y: auto; z-index: 8; user-select: none; }
   #card.score-card .rank { font-size: 26px; font-weight: 800; color: #ffd24a; margin: 2px 0 0; letter-spacing: 0.01em; }
@@ -164,7 +164,7 @@ const ScoreUI = (() => {
     #card.score-card .grades { margin-top: 5px; gap: 4px; } #card.score-card .grades div { padding: 2px 0 3px; font-size: 9px; } #card.score-card .grades b { font-size: 15px; }
     #card.score-card .awards { margin-top: 4px; font-size: 10px; line-height: 1.35; }
     #card.score-card .best { margin-top: 3px; font-size: 10px; } #card.score-card .foot { flex: 1 1 0; min-width: 0; margin-top: 0; font-size: 9px; line-height: 1.3; }
-    #score-banner { font-size: 20px; padding: 6px 14px; } #score-banner.bust { font-size: 24px; }
+    #score-banner { font-size: 20px; padding: 6px 14px; } #score-banner.bust { font-size: 24px; } #score-banner.start { font-size: 13px; padding: 5px 9px; } #score-banner.start small { font-size: 11px; margin-top: 2px; }
   }
   `
   const fmt = (n) => Math.round(n).toLocaleString('en-US')
