@@ -1493,7 +1493,7 @@ ScoreUI.init({
     popV.set(x, 12, y).project(camera)
     return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }
   },
-  setSeed, newCourse, restart: restartRun,
+  setSeed, newCourse, restart: () => { restartRun(); setCam('orbit') }, // owner 2026-11-18: the end card's replay button always hard-resets the camera to the default orbit view
 })
 PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
 DemoUI.init({ stage }) // demo mode (A): lib/sheep-demo-ui.js
