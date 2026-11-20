@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
+     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-title" content="Sheep" />
+<!-- no browser zoom on phones (owner 2026-11-18): fast taps on the pads read as a double-tap and zoomed the page -->
+<style>* { touch-action: manipulation; }</style>
+<script>
+  for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, e => e.preventDefault(), { passive: false }) // iOS pinch + double-tap
+  document.addEventListener("touchmove", e => { if (e.touches.length > 1 && !(e.target instanceof HTMLCanvasElement)) e.preventDefault() }, { passive: false }) // two thumbs on the buttons is not a pinch
+  // phone landscape (owner 2026-11-18): the page runs edge to edge (viewport-fit=cover) and keeps clear of the notch / Dynamic Island on
+  // whichever side it sits — the browser's own safe-area insets are the same both sides, so the rotation angle says which side that is
+  function islandSide() {
+    const a = typeof window.orientation === "number" ? window.orientation : (screen.orientation ? screen.orientation.angle : 0)
+    const c = document.documentElement.classList
+    c.toggle("island-left", a === 90) // turned anticlockwise: the top of the phone is on the left
+    c.toggle("island-right", a === -90 || a === 270)
+  }
+  islandSide()
+  addEventListener("orientationchange", islandSide)
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", islandSide)
+</script>
+<title>Sheep PoC — 3D · Assault</title>
+<!--
+  ASSAULT VARIANT of 3d.html: the same page, plus §A — two-wolf mortar teams
+  that run in after a delay, set up outside the fence and lob shells into the
+  field (direct hit kills, near miss stuns, wider miss panics). The assault's
+  physics is lib/assault-sim.js — the ONLY code outside the sim that writes
+  sim state; §A in this file just draws it. Its settings live in the
+  "Wolf assault" section. The fence carries eight laser rifles (one post in
+  from each corner); BATTLE STATIONS (⌘⇧B / Ctrl⇧B / B, or the button) sends
+  the dog to the nearest one that bears on a wolf, to shoot back.
+
+  3D VIEW of the sheep PoC (three.js). Same simulation, different renderer.
+
+  · §0 PARAMS + §1 SIM are lib/sheep-sim.js — the same file 2d.html loads, so
+    there is one copy of the physics. The raw-param panels are lib/sheep-gui.js.
+  · §2 RENDER / §3 INPUT / §4 BOOTSTRAP below are this file's own: a three.js
+    scene that only READS sim state (positions, facings, flags). No sim logic.
+  · Runs from file:// by double-click, like the 2D page. three.js is an ES
+    module, so the 3D half is an inline <script type="module"> importing from
+    the CDN (inline modules + CORS-enabled CDN imports are allowed on file://);
+    the libs stay plain <script>s so their globals are shared (a LOCAL module
+    file could not be imported from file:// at all).
+  · World mapping: sim (x, y) px → world (x, 0, y); 1 px = 1 unit; +Y is up.
+    Seen from above with north (sim −y) at the top it matches the 2D canvas —
+    come by is still clockwise.
+  · URL knobs: ?seed=42 pins the course, ?cam=orbit|top|handler|dog picks the
+    starting camera. On the orbit camera every run opens on the dude and his
+    dog from the front, then pans out to the default view (startIntro).
+-->
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #14181c;
+    color: #cdd6df;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  body { overflow: hidden; }
+  #app {
+    display: flex;
+    gap: 12px;
+    height: 100vh;
+    height: 100dvh;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  #stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+    border: 1px solid #2c353d;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    background: #cfe0ee;
+  }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #side {
+    flex: 0 0 320px;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #side section {
+    flex: 0 0 auto;
+    background: rgba(10, 13, 16, 0.55);
+    border: 1px solid #2c353d;
+    border-radius: 4px;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  body.panels-hidden #side-levers { display: none; }
+  /* CENTRE STACK — top-centre of the stage, the same on every screen: settings, the reseed / mode row, then the camera row,
+     every button one size. Pause lives with the dog's pad (see #pause-btn). Keys live in the titles. */
+  #stage { --cs-w: 68px; --cs-h: 24px; --cs-g: 4px; --cs-top: 8px; --cs-half: calc((var(--cs-w) * 5 + var(--cs-g) * 4) / 2); --pad-edge: 327px; } /* --pad-edge: stage's right edge → the closed drawer's pad's left edge */
+  #center-stack { position: absolute; top: var(--cs-top); left: 43%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: var(--cs-g); pointer-events: none; }
+  #cam-bar, #center-stack .aux, #center-stack .top { display: flex; gap: var(--cs-g); } /* .aux: reseed + the mode buttons lib/sheep-score-ui.js adds */
+  #center-stack button {
+    box-sizing: border-box;
+    width: var(--cs-w);
+    height: var(--cs-h);
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: rgba(16, 20, 24, 0.72);
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  #center-stack button:hover { background: rgba(44, 53, 61, 0.85); }
+  #center-stack button.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #stress { position: absolute; top: 8px; right: 8px; width: 200px; z-index: 5; font-size: 11px; color: #e8eef3; text-shadow: 0 1px 2px rgba(0,0,0,0.7); pointer-events: none; }
+  #stress .bar { height: 10px; background: rgba(0, 0, 0, 0.45); border: 1px solid #4a5560; }
+  #stress .fill { height: 100%; width: 0; }
+  #cam-hint { position: absolute; bottom: 8px; left: 8px; z-index: 5; font-size: 11px; color: #e8eef3; text-shadow: 0 1px 2px rgba(0,0,0,0.75); pointer-events: none; }
+  #boot-error { display: none; position: absolute; inset: 0; z-index: 20; padding: 24px; background: #14181c; color: #e08a8a; white-space: pre-wrap; }
+  #side-debug { display: flex; flex-direction: column; gap: 6px; }
+  #side-debug .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #side-debug label, #side-debug .row > span:first-child { color: #7b8894; }
+  #side-debug input {
+    width: 84px;
+    padding: 3px 6px;
+    font: inherit;
+    color: #cdd6df;
+    background: #1c2228;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+  }
+  #side-debug button {
+    padding: 3px 8px;
+    font: inherit;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #side-debug button:hover { background: #2c353d; }
+  #side-debug button kbd { margin-left: 4px; font: inherit; color: #7b8894; }
+  #side-debug .layout { color: #9fb0c0; }
+  #hud {
+    white-space: pre;
+    font-size: 12px;
+    color: #9fb0c0;
+    border-top: 1px solid #232b32;
+    padding-top: 6px;
+  }
+  #controls { --pad-g: 6px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--pad-g); }
+  #controls > button[data-cmd="that_ll_do"] { width: calc((100% - var(--pad-g) * 2) / 3); }
+  /* pause (owner 2026-11-18): a command-sized button. Drawer closed: just left of the pad, level with the easy row. Drawer open: in the pad's own flow. */
+  #controls > #pause-btn { width: calc((100% - var(--pad-g) * 2) / 3); }
+  body.drawer-closed #controls { position: relative; }
+  body.drawer-closed #controls > #pause-btn { position: absolute; right: calc(100% + 44px); top: 38px; /* = pad row 2 (the easy row): one 32px row + the 6px gap */ }
+  #controls .pad {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 32px);
+    grid-template-areas:
+      "comeby  walk  away"
+      "comebye easy  awaye"
+      "lieL    lie   lieR";
+    gap: 6px;
+    align-items: center;
+    justify-items: stretch;
+  }
+  #controls .pad [data-cmd="come_by"]        { grid-area: comeby; }
+  #controls .pad [data-cmd="walk_on"]        { grid-area: walk; }
+  #controls .pad [data-cmd="away"]           { grid-area: away; }
+  #controls .pad [data-cmd="come_by_easy"]   { grid-area: comebye; }
+  #controls .pad [data-cmd="easy"]           { grid-area: easy; }
+  #controls .pad [data-cmd="away_easy"]      { grid-area: awaye; }
+  #controls .pad [data-cmd="lie_down_left"]  { grid-area: lieL; }
+  #controls .pad [data-cmd="lie_down"]       { grid-area: lie; }
+  #controls .pad [data-cmd="lie_down_right"] { grid-area: lieR; }
+  #controls button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 16px;
+    padding: 4px 6px;
+    height: 32px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  #controls button:hover { background: #2c363f; }
+  #controls button.active { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #controls button kbd { opacity: 0.55; font-size: 10px; margin-left: 3px; }
+  #controls .herd { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .herd label { color: #7b8894; }
+  #controls .herd input { flex: 1 1 auto; min-width: 0; }
+  #controls .herd #herd-size-out { color: #9fb0c0; min-width: 3ch; text-align: right; }
+  #controls .obst { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .obst label { color: #7b8894; }
+  #controls .obst input { flex: 1 1 auto; min-width: 0; }
+  #controls .obst #obst-freq-out { color: #9fb0c0; min-width: 9ch; text-align: right; white-space: nowrap; }
+  #card {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    min-width: 300px;
+    padding: 20px 24px;
+    background: rgba(16, 20, 24, 0.96);
+    border: 1px solid #3a4650;
+    border-radius: 8px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  }
+  #card h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  #card .big { font-size: 44px; font-weight: 700; color: #7fd79a; margin-bottom: 12px; }
+  #card .big small { font-size: 16px; color: #7b8894; font-weight: 400; }
+  #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
+  #card .row span:last-child { color: #e08a8a; }
+  #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
+  #card .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  #card .actions button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  #card .actions button:hover { background: #2c353d; }
+  #card .actions button.primary { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #card .actions button.primary:hover { background: #38704a; }
+  #card .actions button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-left: 4px; }
+  #side-levers { padding: 0; border: none; background: none; display: flex; flex-direction: column; }
+  #side-levers .lil-gui.root { width: 100%; --width: 100%; }
+  #side #side-assault { padding: 0; }
+  #side-assault .lil-gui.root { width: 100%; --width: 100%; --name-width: 48%; }
+  #assault-status { padding: 6px 8px; font-size: 12px; color: #e0a98a; border-top: 1px solid #232b32; white-space: pre-line; }
+  #controls > button[data-cmd="battle_stations"] { width: calc((100% - var(--pad-g) * 2) / 3 * 2 + var(--pad-g)); }
+  #controls > button[data-cmd="battle_stations"] { border-color: #6b4a3a; color: #f0c9b0; }
+  #controls > button[data-cmd="battle_stations"].active { background: #7a2f26; border-color: #b0503f; color: #ffece4; }
+  /* DRAWER — the side column is a drawer, closed by default (settings button or D).
+     Closed: the column floats over the stage's top-right corner and shows only
+     the dog's buttons; the stage takes the full width. Open: the full column,
+     beside the stage. Phone landscape is the same layout, only smaller and see-through. */
+  #app { position: relative; }
+  body.drawer-closed #side {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 320px;
+    max-height: calc(100% - 36px);
+    z-index: 6;
+    gap: 6px;
+    overflow: visible;
+    pointer-events: none; /* gaps in the overlay still drag the camera */
+  }
+  body.drawer-closed #side > * { pointer-events: auto; }
+  body.drawer-closed #side > section:not(#side-dog) { display: none; }
+  /* no card behind the pad (owner 2026-11-18: as on the phone) — only the see-through buttons show, and the gaps between them still drag the camera */
+  body.drawer-closed #side-dog { background: none; border-color: transparent; pointer-events: none; }
+  body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+  body.drawer-closed #controls button:hover { background: rgba(44, 53, 61, 0.7); }
+  body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
+  body.drawer-closed #controls .herd, body.drawer-closed #controls .obst { display: none; }
+  body.drawer-closed #stress { top: auto; bottom: 8px; } /* the corner is the pad's now */
+  #rotate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: #14181c;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    font-size: 15px;
+    color: #cdd6df;
+  }
+  #rotate-overlay .icon { font-size: 54px; animation: tip-over 1.4s ease-in-out infinite alternate; }
+  @keyframes tip-over { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+    #rotate-overlay { display: flex; }
+  }
+  /* phone landscape — the SAME layout as the full browser screen; only the sizes shrink and the chrome goes see-through */
+  @media (pointer: coarse) and (max-height: 600px) {
+    #app { padding: 6px; gap: 8px; }
+    #stage { --cs-w: 48px; --cs-h: 18px; --cs-g: 3px; --cs-top: 6px; --pad-edge: 185px; }
+    #center-stack button { font-size: 9px; background: rgba(20, 26, 31, 0.42); }
+    /* the pad floats over the stage's top-right corner here too — no sidebar */
+    body.drawer-closed #side { top: 6px; right: 6px; width: 186px; max-height: calc(100% - 12px); }
+    /* no card behind the pad: only the buttons show (see-through), and the gaps between them still drag the camera */
+    body.drawer-closed #side-dog { padding: 0; background: none; border: none; pointer-events: none; }
+    body.drawer-closed #controls button { pointer-events: auto; background: rgba(20, 26, 31, 0.42); border-color: rgba(205, 214, 223, 0.35); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+    body.drawer-closed #controls button.active { background: rgba(47, 93, 58, 0.8); border-color: #4c8a5e; }
+    body.drawer-closed #controls > #pause-btn { right: calc(100% + 20px); top: 33px; background: rgba(20, 26, 31, 0.42); }
+    body.drawer-closed #controls > #pause-btn.active { background: rgba(47, 93, 58, 0.8); }
+    #controls .pad { grid-template-rows: repeat(3, 30px); gap: 3px; }
+    #controls button {
+      font-size: 10px;
+      line-height: 1.1;
+      height: 30px;
+      padding: 1px 3px;
+      border-radius: 15px;
+      white-space: normal;
+    }
+    #controls .w2 { display: block; }
+    #controls { --pad-g: 3px; }
+    #controls .herd { font-size: 11px; }
+    #controls button kbd, #cam-hint { display: none; }
+    #stress { width: 100px; font-size: 10px; }
+  }
+  #home-link { margin-left: auto; align-self: center; font-size: 12px; color: #9fb0c0; text-decoration: none; }
+  #home-link:hover { color: #e6edf3; text-decoration: underline; }
+  #controls > #nip-btn { width: calc((100% - var(--pad-g) * 2) / 3); }
+  /* NOTCH / DYNAMIC ISLAND (owner 2026-11-18) — the page keeps clear of it on the side it sits (html.island-left / .island-right,
+     set by islandSide() in the head) and runs out to the screen edge on the other side; trimmed 2026-11-19: the gap is 45 % of the safe-area inset (halved again the same day, owner: still too large) and replaces the edge padding instead of adding to it */
+  html { --il: 0px; --ir: 0px; }
+  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
+  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
+  #app { padding-left: max(10px, var(--il)); padding-right: max(10px, var(--ir)); }
+  body.drawer-closed #side { right: calc(max(10px, var(--ir)) + 8px); }
+  @media (pointer: coarse) and (max-height: 600px) {
+    #app { padding-left: max(6px, var(--il)); padding-right: max(6px, var(--ir)); }
+    body.drawer-closed #side { right: max(6px, var(--ir)); }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
+<script src="sheep-defaults.json.js?v=20261119a"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body class="drawer-closed">
+<div id="rotate-overlay">
+  <div class="icon">📱</div>
+  <div>rotate your phone —<br>the pasture plays in landscape</div>
+</div>
+<div id="app">
+<div id="stage">
+  <canvas id="scene"></canvas>
+  <div id="center-stack">
+  <div class="top"><button id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders, raw-param panels) — D">settings</button><button id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture</button></div>
+  <div class="aux"><button id="reseed-btn" title="draw a new course">reseed</button></div>
+  <div id="cam-bar">
+    <button data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C cycles the cameras)">orbit</button>
+    <button data-cam="top" title="straight down — matches the 2D page — 2 (C cycles the cameras)">top</button>
+    <button data-cam="handler" title="over the handler's shoulder, by the gate — 3 (C cycles the cameras)">handler</button>
+    <button data-cam="dog" title="behind the dog, looking down his eye — 4 (C cycles the cameras)">dog</button>
+    <button id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O">overlays</button>
+  </div>
+  </div>
+  <div id="stress">flock stress<div class="bar"><div class="fill" id="stress-fill"></div></div></div>
+  <div id="cam-hint"></div>
+  <div id="card"></div>
+  <div id="boot-error"></div>
+</div>
+<div id="side">
+<section id="side-debug">
+  <div class="row">
+    <label for="seed-input">seed</label>
+    <input id="seed-input" type="number" min="0" step="1" inputmode="numeric">
+  </div>
+  <div class="row">
+    <button id="panels-btn" title="show / hide the raw-param panels">panels <kbd>H</kbd></button>
+    <button data-action="reset" title="restart the run on the same course">reset <kbd>R</kbd></button>
+    <a id="home-link" href="index.html" title="back to the version picker">⌂ versions</a>
+  </div>
+  <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
+  <div id="hud">boot…</div>
+</section>
+<section id="side-dog">
+  <div id="controls">
+    <div class="pad">
+      <button data-cmd="come_by">come <span class="w2">by</span> <kbd>←</kbd></button>
+      <button data-cmd="walk_on">walk <span class="w2">on</span> <kbd>↑</kbd></button>
+      <button data-cmd="away">away <kbd>→</kbd></button>
+      <button data-cmd="come_by_easy">come <span class="w2">easy</span> <kbd>⇧←</kbd></button>
+      <button data-cmd="easy">easy <kbd>⇧↑</kbd></button>
+      <button data-cmd="away_easy">away <span class="w2">easy</span> <kbd>⇧→</kbd></button>
+      <button data-cmd="lie_down_left">left <span class="w2">down</span> <kbd>⌥←</kbd></button>
+      <button data-cmd="lie_down">lie <span class="w2">down</span> <kbd>↓</kbd></button>
+      <button data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
+    </div>
+    <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
+    <button data-cmd="battle_stations" title="the dog runs to the nearest fence gun that bears on a wolf, rears up and shoots — ⌘⇧B, Ctrl⇧B or plain B">battle stations <kbd>⌘⇧B</kbd></button>
+    <button id="nip-btn" title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; only shown while that can happen — N">heel <span class="w2">nip</span> <kbd>N</kbd></button>
+    <button id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
+    <div class="herd">
+      <label for="herd-size">herd</label>
+      <input id="herd-size" type="range">
+      <span id="herd-size-out">—</span>
+    </div>
+    <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+      <label for="obst-freq">obstacles</label>
+      <input id="obst-freq" type="range">
+      <span id="obst-freq-out">—</span>
+    </div>
+  </div>
+</section>
+<section id="side-assault">
+  <div id="assault-gui"></div>
+  <div id="assault-status">—</div>
+</section>
+<section id="side-levers">
+  <div id="panel-sheep"></div>
+  <div id="panel-dog"></div>
+  <div id="panel-meta"></div>
+</section>
+</div>
+</div>
+
+<!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
+<script src="lib/sheep-sim.js?v=20261119b"></script>
+<script>params.driveGateMax = 0 // owner 2026-11-18: the 3D pastures never carry drive gates (they live on the 3D competition course); set before lib/sheep-score-ui.js snapshots its defaults</script>
+<script src="lib/sheep-gui.js?v=20261118p"></script>
+<script src="lib/sheep-score-ui.js?v=20261118r"></script>
+<script src="lib/sheep-pad-ui.js?v=20261119a"></script>
+<!-- the wolf-mortar physics (DOM-free, three-free) -->
+<script src="lib/assault-sim.js?v=20261118p"></script>
+<script>
+// A blocked CDN / offline load would otherwise leave a blank stage with the
+// error only in the console — say it on the page.
+window.addEventListener('error', (ev) => {
+  const el = document.getElementById('boot-error')
+  if (!el || window.__sheep3dBooted) return
+  el.style.display = 'block'
+  el.textContent = 'The 3D view failed to start.\n\n' + (ev.message || 'A script failed to load (three.js comes from cdn.jsdelivr.net — is the network reachable?).')
+}, true)
+</script>
+
+<script type="module">
+// ============================================================================
+// §2 RENDER (3D) — three.js scene that READS the sim. [throwaway]
+//   Nothing here writes sim state. Render-only liberties, all cosmetic:
+//   · smoothed turning, leg/head animation, the dog's body following his
+//     travel while his head holds the eye;
+//   · penned sheep walk on from the sim's settle line to a free spot in a
+//     fenced paddock (the sim parks them all on one line — fine as 2D
+//     triangles, a pile-up as 3D bodies).
+// ============================================================================
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+
+const V3 = THREE.Vector3, M4 = THREE.Matrix4, Quat = THREE.Quaternion
+const AX_X = new V3(1, 0, 0), AX_Y = new V3(0, 1, 0), AX_Z = new V3(0, 0, 1), ONE = new V3(1, 1, 1)
+const lerp = THREE.MathUtils.lerp
+const clamp01 = (v) => Math.max(0, Math.min(1, v))
+const ease = (rate, dt) => 1 - Math.exp(-rate * dt) // framerate-independent smoothing factor
+const coarse = window.matchMedia('(pointer: coarse)').matches
+const query = new URLSearchParams(location.search)
+
+const stage = document.getElementById('stage')
+const canvas = document.getElementById('scene')
+const hud = document.getElementById('hud')
+const seedInput = document.getElementById('seed-input')
+const layoutOut = document.getElementById('layout-out')
+const stressFill = document.getElementById('stress-fill')
+const camHint = document.getElementById('cam-hint')
+
+// ---- sim (same construction as the 2D page's §4) ---------------------------
+const pinnedSeed = parseInt(query.get('seed'), 10)
+if (Number.isFinite(pinnedSeed) && pinnedSeed >= 0) params.seed = pinnedSeed >>> 0
+else if (params.randomSeedOnLoad) params.seed = Math.floor(Math.random() * 1e6)
+const sim = new FlockSim(params)
+// HOOKS.respawn in lib/sheep-gui.js (lil-gui sliders) calls these two by global name
+window.sim = sim
+window.resizeCanvas = () => {} // the 3D course rebuilds itself from a signature check each frame
+
+// ---- renderer / scene / lights ---------------------------------------------
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.PCFSoftShadowMap
+
+const HORIZON = 0xcfe0ee
+const scene = new THREE.Scene()
+scene.fog = new THREE.Fog(HORIZON, 1600, 7500)
+
+const camera = new THREE.PerspectiveCamera(45, 1, 8, 24000)
+const flashCol = new THREE.Color() // scratch: the score flash on a sheep's wool
+
+const hemi = new THREE.HemisphereLight(0xe6f1ff, 0x7f9a5c, 1.5)
+scene.add(hemi)
+const sun = new THREE.DirectionalLight(0xfff4dc, 2.5)
+sun.castShadow = true
+sun.shadow.mapSize.set(coarse ? 2048 : 4096, coarse ? 2048 : 4096)
+sun.shadow.bias = -0.0004
+sun.shadow.normalBias = 0.6
+scene.add(sun, sun.target)
+
+// sky dome: horizon haze → zenith blue
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(20000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(0x3f7fd0) }, bottom: { value: new THREE.Color(HORIZON) } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(normalize(vP).y, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.5)), 1.0);\n#include <colorspace_fragment>\n}',
+  }),
+))
+
+// ---- shared materials / geometry -------------------------------------------
+// procedural grass: a speckled tile, repeated. 1 tile = TILE world units.
+const TILE = 128
+function makeGroundTexture(base, [r0, r1], [g0, g1], [b0, b1]) {
+  const c = document.createElement('canvas'); c.width = c.height = 256
+  const x = c.getContext('2d'), rnd = makePRNG(20260824)
+  x.fillStyle = base; x.fillRect(0, 0, 256, 256)
+  for (let i = 0; i < 5200; i++) {
+    const r = r0 + Math.floor(rnd() * (r1 - r0)), g = g0 + Math.floor(rnd() * (g1 - g0)), b = b0 + Math.floor(rnd() * (b1 - b0))
+    x.fillStyle = `rgba(${r},${g},${b},${0.25 + rnd() * 0.35})`
+    x.fillRect(rnd() * 256, rnd() * 256, 1 + rnd() * 2, 2 + rnd() * 4)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+  return t
+}
+const grassTex = makeGroundTexture('#6aa64a', [70, 135], [135, 205], [45, 85])
+const strawTex = makeGroundTexture('#b39a5c', [140, 205], [118, 172], [60, 110]) // trodden paddock floor
+const lam = (color, extra) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra })
+const MAT = {
+  ground:  new THREE.MeshLambertMaterial({ map: grassTex, color: 0xc9dcb4 }),                       // rough grass outside the fence
+  pasture: new THREE.MeshLambertMaterial({ map: grassTex, color: 0xffffff }),
+  pen:     new THREE.MeshLambertMaterial({ map: strawTex, color: 0xffffff }),
+  post:    lam(0x7d6341),
+  rail:    lam(0xa0865a),
+  gatePost: lam(0xd8c487),
+  flag:    new THREE.MeshLambertMaterial({ color: 0xd9412f, side: THREE.DoubleSide }),
+  trunk:   lam(0x6b5236),
+  crown:   lam(0xffffff),
+  hill:    lam(0x6c9a5c),
+  cloud:   new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, emissive: 0x9aa7b3 }),
+  vcol:    new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
+}
+const decal = (color, opacity, order) => {
+  const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide })
+  m.userData.order = order
+  return m
+}
+const unitBox = new THREE.BoxGeometry(1, 1, 1)
+const unitDisc = new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2)   // flat on the ground, radius 1
+const TRS = (x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) =>
+  new M4().compose(new V3(x, y, z), new Quat().setFromEuler(new THREE.Euler(rx, ry, rz)), new V3(sx, sy, sz))
+// one coloured, placed piece of a merged model (non-indexed so everything merges)
+function part(geo, color, m) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone()
+  if (m) g.applyMatrix4(m)
+  const c = new THREE.Color(color), n = g.attributes.position.count, a = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3))
+  return g
+}
+// a ground-hugging plane with world-scaled UVs (so every surface shares one grass tile size)
+function groundPlane(w, h, mat, y) {
+  const g = new THREE.PlaneGeometry(w, h).rotateX(-Math.PI / 2)
+  const uv = g.attributes.uv
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / TILE, uv.getY(i) * h / TILE)
+  const m = new THREE.Mesh(g, mat)
+  m.position.y = y
+  m.receiveShadow = true
+  return m
+}
+
+// ---- static world: endless ground, far hills, clouds -----------------------
+let hillMesh = null
+const hillRay = new THREE.Raycaster(new V3(), new V3(0, -1, 0))
+// ground height at a sim point: 0 on the plain, the hill surface out on the ring (hills stand ≥ 1800 out)
+function hillHeight(x, y) {
+  if (!hillMesh || Math.hypot(x - 560, y - 360) < 1500) return 0
+  hillRay.ray.origin.set(x, 4000, y)
+  const hit = hillRay.intersectObject(hillMesh, false)[0]
+  return hit ? Math.max(0, hit.point.y) : 0
+}
+{
+  const R = 12000, g = new THREE.CircleGeometry(R, 48).rotateX(-Math.PI / 2), uv = g.attributes.uv
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2 * R / TILE, uv.getY(i) * 2 * R / TILE)
+  const ground = new THREE.Mesh(g, MAT.ground)
+  ground.receiveShadow = true
+  scene.add(ground)
+
+  const rnd = makePRNG(7), ico = new THREE.IcosahedronGeometry(1, 1)
+  const hills = new THREE.InstancedMesh(ico, MAT.hill, 18)
+  const m = new M4()
+  for (let i = 0; i < 18; i++) {
+    const a = (i + rnd() * 0.6) / 18 * Math.PI * 2, d = 3600 + rnd() * 1800, s = 900 + rnd() * 900
+    m.compose(new V3(560 + Math.cos(a) * d, -40, 360 + Math.sin(a) * d), new Quat().setFromAxisAngle(AX_Y, rnd() * 6), new V3(s, 220 + rnd() * 320, s * (0.7 + rnd() * 0.5)))
+    hills.setMatrixAt(i, m)
+  }
+  hills.frustumCulled = false
+  scene.add(hills)
+  hillMesh = hills
+
+  // clouds sit beyond every camera's reach (orbit zoom is capped below them)
+  const blobs = []
+  for (let i = 0; i < 11; i++) {
+    const a = rnd() * Math.PI * 2, d = 3200 + rnd() * 3600, y = 1500 + rnd() * 800, s = 220 + rnd() * 220
+    const cx = 560 + Math.cos(a) * d, cz = 360 + Math.sin(a) * d
+    for (let k = 0; k < 4; k++) blobs.push([cx + (k - 1.5) * s * 0.75, y + (rnd() - 0.5) * s * 0.2, cz + (rnd() - 0.5) * s * 0.5, s * (0.6 + rnd() * 0.5)])
+  }
+  const clouds = new THREE.InstancedMesh(ico, MAT.cloud, blobs.length)
+  blobs.forEach(([x, y, z, s], i) => { m.compose(new V3(x, y, z), new Quat(), new V3(s, s * 0.45, s * 0.8)); clouds.setMatrixAt(i, m) })
+  clouds.frustumCulled = false
+  scene.add(clouds)
+}
+
+// ---- the course: pasture, fence, gate, paddock, trees (rebuilt per course) --
+const FENCE_H = 10, POST_GAP = LASER.postGap   // the lib mounts its guns on these posts — one spacing, one place
+const postGeo = new THREE.BoxGeometry(2.2, FENCE_H + 1, 2.2).translate(0, (FENCE_H + 1) / 2, 0)
+const gatePostGeo = new THREE.BoxGeometry(3.2, 17, 3.2).translate(0, 8.5, 0)
+const flagGeo = new THREE.PlaneGeometry(7, 4).translate(3.5, 0, 0)
+const trunkGeo = new THREE.CylinderGeometry(2.2, 3.2, 22, 6).translate(0, 11, 0)
+const crownGeo = new THREE.IcosahedronGeometry(1, 1)
+const rockGeo = new THREE.DodecahedronGeometry(1, 0)
+const course = { group: new THREE.Group(), disposables: [], sig: '', gate: null, slots: [], nextSlot: 0, paddock: null, flags: [], bounds: null, dims: '' }
+scene.add(course.group)
+
+function rebuildCourse() {
+  for (const o of course.disposables) o.dispose()
+  course.disposables.length = 0
+  course.group.clear()
+  course.flags.length = 0
+  const p = params, g = sim.gate, half = p.gateWidth / 2, r = sim.playRect()
+  const cx = p.canvasW / 2, cz = p.canvasH / 2
+  const add = (o) => { course.group.add(o); return o }
+  const own = (geo) => { course.disposables.push(geo); return geo }
+  const m = new M4(), q = new Quat()
+  // gate frame → world: u runs along the wall (tx,ty), v points out of the pasture (nx,ny)
+  const gw = (u, v) => ({ x: g.x + g.tx * u + g.nx * v, y: g.y + g.ty * u + g.ny * v })
+
+  // pasture floor
+  const floor = groundPlane(r.x1 - r.x0, r.y1 - r.y0, MAT.pasture, 0.2)
+  own(floor.geometry); floor.position.x = cx; floor.position.z = cz
+  add(floor)
+
+  // paddock (the pen): sized to the herd, slots filled far-end first
+  const N = sim.sheep.length, SP = 14
+  const cols = Math.max(6, Math.ceil(Math.sqrt(N * 1.5))), rows = Math.max(1, Math.ceil(N / cols))
+  const PW = Math.max(cols * SP + 14, p.gateWidth + 60), PD = 66 + rows * SP
+  course.paddock = { PW, PD }
+  const rnd = makePRNG((p.seed ^ 0x9e3779b9) >>> 0)
+  course.slots = []
+  for (let row = 0; row < rows; row++) {
+    const line = []
+    for (let c = 0; c < cols; c++) {
+      const s = gw((c - (cols - 1) / 2) * SP + (rnd() - 0.5) * 5, PD - 10 - row * SP + (rnd() - 0.5) * 5)
+      s.face = rnd() * Math.PI * 2
+      line.push(s)
+    }
+    for (let i = line.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [line[i], line[j]] = [line[j], line[i]] }
+    course.slots.push(...line)
+  }
+  course.nextSlot = 0
+  const penMid = gw(0, PD / 2)
+  const penFloor = groundPlane(PW, PD, MAT.pen, 0.3)
+  own(penFloor.geometry)
+  penFloor.position.x = penMid.x; penFloor.position.z = penMid.y
+  penFloor.rotation.y = -Math.atan2(g.ty, g.tx)
+  add(penFloor)
+  // worn earth at the gate mouth — the thing to aim the flock at
+  const mouth = new THREE.Mesh(unitDisc, decal(0x7a6242, 0.6))
+  course.disposables.push(mouth.material)
+  mouth.position.set(g.x, 0.45, g.y); mouth.scale.set(p.gateWidth * 0.8, 1, p.gateWidth * 0.8); mouth.renderOrder = 1
+  add(mouth)
+
+  // fence runs → posts + three rails each
+  const posts = [], rails = []
+  const run = (a, b) => {
+    const len = Math.hypot(b.x - a.x, b.y - a.y)
+    if (len < 1) return
+    const n = Math.max(1, Math.round(len / POST_GAP))
+    for (let i = 0; i <= n; i++) posts.push({ x: a.x + (b.x - a.x) * i / n, y: a.y + (b.y - a.y) * i / n })
+    rails.push([a, b, len])
+  }
+  const sides = [
+    [{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }], // 0 N
+    [{ x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }], // 1 E
+    [{ x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }], // 2 S
+    [{ x: r.x0, y: r.y1 }, { x: r.x0, y: r.y0 }], // 3 W
+  ]
+  const along = (pt) => (pt.x - g.x) * g.tx + (pt.y - g.y) * g.ty
+  for (let side = 0; side < 4; side++) {
+    const [a, b] = sides[side]
+    if (side !== g.side) { run(a, b); continue }
+    const lo = along(a) < along(b) ? a : b, hi = lo === a ? b : a
+    run(lo, gw(-half, 0)); run(gw(half, 0), hi)          // the mouth stays open
+    // paddock: two flanks + far end, plus a near-side stub where it overhangs a pasture corner
+    run(gw(-PW / 2, 0), gw(-PW / 2, PD)); run(gw(-PW / 2, PD), gw(PW / 2, PD)); run(gw(PW / 2, PD), gw(PW / 2, 0))
+    if (-PW / 2 < along(lo)) run(gw(-PW / 2, 0), lo)
+    if (PW / 2 > along(hi)) run(hi, gw(PW / 2, 0))
+  }
+  const postMesh = add(new THREE.InstancedMesh(postGeo, MAT.post, posts.length))
+  posts.forEach((pt, i) => { m.makeTranslation(pt.x, 0, pt.y); postMesh.setMatrixAt(i, m) })
+  const railMesh = add(new THREE.InstancedMesh(unitBox, MAT.rail, rails.length * 3))
+  rails.forEach(([a, b, len], i) => {
+    q.setFromAxisAngle(AX_Y, -Math.atan2(b.y - a.y, b.x - a.x))
+    for (let k = 0; k < 3; k++) {
+      m.compose(new V3((a.x + b.x) / 2, 3 + k * 3, (a.y + b.y) / 2), q, new V3(len, 1.1, 0.7))
+      railMesh.setMatrixAt(i * 3 + k, m)
+    }
+  })
+  for (const im of [postMesh, railMesh]) { im.castShadow = im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+
+  // gate posts (tall, pale, flagged) and the gate leaf swung back along the outside of the fence
+  for (const u of [-half, half]) {
+    const pt = gw(u, 0)
+    const gp = add(new THREE.Mesh(gatePostGeo, MAT.gatePost))
+    gp.position.set(pt.x, 0, pt.y); gp.castShadow = true
+    const flag = add(new THREE.Mesh(flagGeo, MAT.flag))
+    flag.position.set(pt.x, 19.5, pt.y); flag.userData.base = -Math.atan2(g.ty, g.tx) + (u < 0 ? Math.PI : 0)
+    course.flags.push(flag)
+  }
+  {
+    const leaf = add(new THREE.Group()), W = p.gateWidth - 3, hinge = gw(-half, 2.5)
+    const ang = Math.atan2(-g.ty * 0.966 + g.ny * 0.259, -g.tx * 0.966 + g.nx * 0.259) // 15° off the fence line, outside
+    leaf.position.set(hinge.x, 0, hinge.y); leaf.rotation.y = -ang
+    const bar = (x, y, sx, sy, rz = 0) => {
+      const b = new THREE.Mesh(unitBox, MAT.gatePost)
+      b.position.set(x, y, 0); b.scale.set(sx, sy, 0.8); b.rotation.z = rz; b.castShadow = true
+      leaf.add(b)
+    }
+    bar(W / 2, 2.4, W, 1); bar(W / 2, 6, W, 1); bar(W / 2, 9.6, W, 1)
+    bar(0.6, 6, 1.2, 9); bar(W - 0.6, 6, 1.2, 9)
+    bar(W / 2, 6, Math.hypot(W, 7.2), 0.9, Math.atan2(7.2, W))
+  }
+
+  // trees: seeded scatter outside the fence, thinning toward it so the view stays open
+  const trees = [], trnd = makePRNG(4242)
+  const inPaddock = (x, y) => { const u = along({ x, y }), v = (x - g.x) * g.nx + (y - g.y) * g.ny; return Math.abs(u) < PW / 2 + 45 && v > -10 && v < PD + 45 }
+  for (let i = 0; i < 900 && trees.length < 150; i++) {
+    const x = cx + (trnd() - 0.5) * (p.canvasW + 3200), y = cz + (trnd() - 0.5) * (p.canvasH + 3200)
+    const size = 16 + trnd() * 16, tone = trnd(), keep = trnd()
+    const dx = Math.max(r.x0 - x, 0, x - r.x1), dy = Math.max(r.y0 - y, 0, y - r.y1), d = Math.hypot(dx, dy)
+    if (d < 110 || inPaddock(x, y)) continue
+    if (keep > 0.08 + 0.92 * smoothstep(110, 700, d)) continue
+    trees.push({ x, y, size, tone })
+  }
+  const trunks = add(new THREE.InstancedMesh(trunkGeo, MAT.trunk, trees.length))
+  const crowns = add(new THREE.InstancedMesh(crownGeo, MAT.crown, trees.length))
+  const col = new THREE.Color()
+  trees.forEach((t, i) => {
+    const k = t.size / 22
+    m.compose(new V3(t.x, 0, t.y), q.identity(), new V3(k, k, k)); trunks.setMatrixAt(i, m)
+    m.compose(new V3(t.x, 20 * k + t.size * 0.75, t.y), q.setFromAxisAngle(AX_Y, t.tone * 6), new V3(t.size, t.size * 1.2, t.size)); crowns.setMatrixAt(i, m)
+    crowns.setColorAt(i, col.setHSL(0.27 + t.tone * 0.08, 0.42, 0.26 + t.tone * 0.1))
+  })
+  for (const im of [trunks, crowns]) { im.castShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+
+  // obstacles inside the pasture (owner 2026-11-14): the sim's solid discs, dressed
+  // from obstacleItems() — a stand's trees, a rock's boulders (same seeds as the 2D page)
+  {
+    const stand = [], rocks = []
+    for (const o of sim.obstacles) for (const it of obstacleItems(o)) (o.kind === 'rocks' ? rocks : stand).push(it)
+    const oc = new THREE.Color()
+    if (stand.length) {
+      const oTrunks = add(new THREE.InstancedMesh(trunkGeo, MAT.trunk, stand.length))
+      const oCrowns = add(new THREE.InstancedMesh(crownGeo, MAT.crown, stand.length))
+      stand.forEach((t, i) => {
+        const size = t.r * 1.15, k = (0.8 + t.tone * 0.5) * size / 14
+        m.compose(new V3(t.x, 0, t.y), q.identity(), new V3(k * 0.7, k, k * 0.7)); oTrunks.setMatrixAt(i, m)
+        m.compose(new V3(t.x, 18 * k + size * 0.7, t.y), q.setFromAxisAngle(AX_Y, t.tone * 6), new V3(size, size * 1.25, size)); oCrowns.setMatrixAt(i, m)
+        oCrowns.setColorAt(i, oc.setHSL(0.27 + t.tone * 0.08, 0.45, 0.24 + t.tone * 0.1))
+      })
+      for (const im of [oTrunks, oCrowns]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+    }
+    if (rocks.length) {
+      const oRocks = add(new THREE.InstancedMesh(rockGeo, MAT.crown, rocks.length))
+      rocks.forEach((t, i) => {
+        const h = t.r * (0.55 + t.tone * 0.35)
+        m.compose(new V3(t.x, h * 0.35, t.y), q.setFromEuler(new THREE.Euler(t.tone * 0.5 - 0.25, t.tone * 6, 0.2 - t.tone * 0.4)), new V3(t.r, h, t.r)); oRocks.setMatrixAt(i, m)
+        oRocks.setColorAt(i, oc.setHSL(0.09, 0.06, 0.42 + t.tone * 0.16))
+      })
+      oRocks.castShadow = true; oRocks.receiveShadow = true; oRocks.frustumCulled = false; course.disposables.push(oRocks)
+    }
+  }
+
+  // drive gates (POC-v14 FO1–FO3): two hurdle panels per gate, a post at each end;
+  // a gate the whole working flock has been through turns green
+  if (sim.driveGates.length) {
+    const hurdleMat = MAT.hurdle || (MAT.hurdle = lam(0xffffff)) // white: the per-instance colour is the paint
+    const panels = []
+    for (const d of sim.driveGates) panels.push([d.a0, d.e0, d.done], [d.a1, d.e1, d.done])
+    const bars = add(new THREE.InstancedMesh(unitBox, hurdleMat, panels.length * 3))
+    const ends = add(new THREE.InstancedMesh(unitBox, hurdleMat, panels.length * 2))
+    const dc = new THREE.Color()
+    panels.forEach(([a, b, done], i) => {
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      q.setFromAxisAngle(AX_Y, -Math.atan2(b.y - a.y, b.x - a.x))
+      for (let k = 0; k < 3; k++) {
+        m.compose(new V3((a.x + b.x) / 2, 3.5 + k * 4, (a.y + b.y) / 2), q, new V3(len, 1.5, 1.2))
+        bars.setMatrixAt(i * 3 + k, m); bars.setColorAt(i * 3 + k, dc.set(done ? 0x6fcf8c : 0xd9b877))
+      }
+      ;[a, b].forEach((pt, k) => {
+        m.compose(new V3(pt.x, k ? 7 : 9.5, pt.y), q, new V3(2.4, k ? 14 : 19, 2.4))  // the gap post (a) stands taller
+        ends.setMatrixAt(i * 2 + k, m); ends.setColorAt(i * 2 + k, dc.set(done ? 0xeafaef : k ? 0x8a6f48 : 0xf6ecd2))
+      })
+    })
+    for (const im of [bars, ends]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; course.disposables.push(im) }
+  }
+
+  // sun + shadow box follow the field
+  const R = Math.hypot(p.canvasW, p.canvasH) / 2 + 260
+  sun.position.set(cx - 650, 1000, cz + 520); sun.target.position.set(cx, 0, cz)
+  Object.assign(sun.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 200, far: 2600 })
+  sun.shadow.camera.updateProjectionMatrix()
+
+  // what the top camera frames: the fenced pasture plus the whole paddock
+  const pad = BLAST.standoff + 40, bx = [r.x0 - pad, r.x1 + pad], by = [r.y0 - pad, r.y1 + pad] // wider than the plain 3D page: room for the mortar stations
+  for (const c of [gw(-PW / 2, PD + 12), gw(PW / 2, PD + 12)]) { bx.push(c.x); by.push(c.y) }
+  course.bounds = { x0: Math.min(...bx), x1: Math.max(...bx), y0: Math.min(...by), y1: Math.max(...by) }
+  const dims = p.canvasW + 'x' + p.canvasH
+  if (course.dims && course.dims !== dims) homeOrbit() // field resized → re-frame the free camera
+  course.dims = dims
+  course.gate = g
+  course.sig = courseSig()
+}
+const courseSig = () => [params.canvasW, params.canvasH, params.fenceInset, params.gateWidth, sim.sheep.length, sim.courseRev, sim.driveGates.filter((d) => d.done).length].join('|') // courseRev: a new wave re-lays the obstacles (POC-v14) · done gates turn green
+function takeSlot(from) {
+  if (course.nextSlot < course.slots.length) return course.slots[course.nextSlot++]
+  return { x: from.x, y: from.y, face: 0 } // more sheep than slots (herd grew mid-run) → stay put
+}
+
+// ---- sheep: three instanced meshes (wool / head / legs) ---------------------
+const SHEEP_CAP = Math.max(256, SETTINGS.find((e) => e.key === 'sheepCount').max)
+const ico1 = new THREE.IcosahedronGeometry(1, 1), ico0 = new THREE.IcosahedronGeometry(1, 0)
+const WOOL = 0xffffff, FACE = 0x2a2522
+const woolGeo = mergeGeometries([
+  part(ico1, WOOL, TRS(-0.4, 7.0, 0, 4.9, 3.5, 3.4)),   // barrel
+  part(ico1, WOOL, TRS(2.6, 7.3, 0, 3.0, 3.1, 3.0)),    // chest
+  part(ico1, WOOL, TRS(-3.3, 7.1, 0, 3.1, 3.2, 3.1)),   // rump
+  part(ico0, WOOL, TRS(-6.0, 7.2, 0, 1.0)),             // tail
+])
+const headGeo = mergeGeometries([                         // origin = the neck joint
+  part(ico1, FACE, TRS(1.5, 0.1, 0, 2.0, 1.5, 1.45)),
+  part(ico0, FACE, TRS(0.5, 0.75, 1.7, 0.4, 0.5, 1.0)),
+  part(ico0, FACE, TRS(0.5, 0.75, -1.7, 0.4, 0.5, 1.0)),
+  part(ico0, 0xf1eee6, TRS(0.1, 1.15, 0, 1.35)),         // wool cap
+])
+const legGeo = part(new THREE.CylinderGeometry(0.6, 0.5, 4.5, 5).translate(0, -2.25, 0), FACE) // origin = the hip
+const HIPS = [new V3(2.6, 4.4, 1.6), new V3(2.6, 4.4, -1.6), new V3(-2.9, 4.4, 1.6), new V3(-2.9, 4.4, -1.6)]
+const woolMesh = new THREE.InstancedMesh(woolGeo, MAT.vcol, SHEEP_CAP)
+const headMesh = new THREE.InstancedMesh(headGeo, MAT.vcol, SHEEP_CAP)
+const legMesh = new THREE.InstancedMesh(legGeo, MAT.vcol, SHEEP_CAP * 4)
+for (const im of [woolMesh, headMesh, legMesh]) {
+  im.castShadow = true; im.frustumCulled = false; im.count = 0
+  im.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  scene.add(im)
+}
+woolMesh.receiveShadow = true
+const C_GOLD = new THREE.Color(0xf5c230), C_RAM = new THREE.Color(0xb39a7c) // POC-v14 FO4 / FO6
+const C_BLACK = new THREE.Color(0x2a2a30), C_BELL = new THREE.Color(0x8fc4f0), C_YEARLING = new THREE.Color(0xf3d2b4) // POC-v15 FO8–FO10
+const KIND_COL = { golden: C_GOLD, ram: C_RAM, black: C_BLACK, bell: C_BELL, yearling: C_YEARLING }
+const C_WOOL = new THREE.Color(0xf4f2ea), C_ALARM = new THREE.Color(0xdc463c), C_DOWN = new THREE.Color(0x7a1f1f), C_CHAR = new THREE.Color(0x2b2622)
+const PEN_WALK = 26 // px/s — the render-only stroll from the settle line to a paddock slot
+const sheepRS = new WeakMap() // per-sheep render state, keyed by the sim's sheep object (a reseed makes new ones)
+const tmp = { pos: new V3(), scale: new V3(), qYaw: new Quat(), qRoll: new Quat(), q: new Quat(), qT: new Quat(), mBody: new M4(), mLegs: new M4(), mLocal: new M4(), mOut: new M4(), col: new THREE.Color() }
+
+function updateSheep(dt, time) {
+  const n = Math.min(sim.sheep.length, SHEEP_CAP), SC = params.L / 12 * 0.9
+  const { pos, scale, qYaw, qRoll, q, qT, mBody, mLegs, mLocal, mOut, col } = tmp
+  for (let i = 0; i < n; i++) {
+    const s = sim.sheep[i]
+    const KS = SC * (s.kind === 'lamb' ? 0.62 : s.kind === 'ram' ? 1.28 : s.kind === 'yearling' ? params.yearlingSize : s.kind === 'bell' ? 1.12 : 1) // a lamb is small, a ram is big; POC-v15: a yearling is slight, the bellwether a little larger
+    scale.set(KS, KS, KS)
+    let st = sheepRS.get(s)
+    if (!st) { st = { yaw: s.facing, phase: (i * 2.399) % 6.283, amp: 0, graze: 0, roll: 0, seed: (i * 0.618034) % 1, slot: null, x: 0, y: 0 }; sheepRS.set(s, st) }
+    let x = s.pos.x, y = s.pos.y, speed = Math.hypot(s.vel.x, s.vel.y), face = s.facing
+    if (s.through) {
+      if (!st.slot && speed < 0.5) { st.slot = takeSlot(s.pos); st.x = x; st.y = y }
+      if (st.slot) {
+        const dx = st.slot.x - st.x, dy = st.slot.y - st.y, d = Math.hypot(dx, dy)
+        if (d > 0.8) {
+          const v = Math.min(PEN_WALK * dt, d)
+          st.x += dx / d * v; st.y += dy / d * v
+          speed = PEN_WALK; face = Math.atan2(dy, dx)
+        } else { speed = 0; face = st.slot.face }
+        x = st.x; y = st.y
+      }
+    }
+    st.yaw += angleDiff(face, st.yaw) * ease(10, dt)
+    st.amp += (Math.min(1, speed / 18) - st.amp) * ease(8, dt)
+    st.phase += speed * 0.55 * dt
+    const grazing = !s.down && speed < 4 && (s.idle || s.through) && Math.sin(time * 0.35 + st.seed * 40) > -0.35
+    st.graze += ((grazing ? 1 : 0) - st.graze) * ease(3, dt)
+    st.roll += ((s.down ? 1 : assault.stunned.has(s) ? 0.85 : 0) - st.roll) * ease(6, dt) // §A: a stunned sheep is knocked flat too
+
+    qYaw.setFromAxisAngle(AX_Y, -st.yaw)
+    if (st.roll > 0.001) { qRoll.setFromAxisAngle(AX_X, st.roll * Math.PI / 2 * (st.seed < 0.5 ? 1 : -1)); q.multiplyQuaternions(qYaw, qRoll) }
+    else q.copy(qYaw)
+    pos.set(x, st.roll * 3.1 * SC, y)
+    mLegs.compose(pos, q, scale)
+    pos.y += Math.abs(Math.sin(st.phase)) * 0.35 * st.amp * SC
+    mBody.compose(pos, q, scale)
+    woolMesh.setMatrixAt(i, mBody)
+
+    const g = st.graze
+    const pitch = lerp(0.14 - 0.12 * st.amp, -1.15, g) + Math.sin(time * 6 + st.seed * 90) * 0.06 * g
+    pos.set(lerp(4.4, 5.0, g), lerp(9.0, 5.2, g), 0)
+    mLocal.compose(pos, qT.setFromAxisAngle(AX_Z, pitch), ONE)
+    headMesh.setMatrixAt(i, mOut.multiplyMatrices(mBody, mLocal))
+
+    const amp = (s.trot ? 0.75 : 0.55) * st.amp
+    for (let k = 0; k < 4; k++) {
+      mLocal.compose(HIPS[k], qT.setFromAxisAngle(AX_Z, Math.sin(st.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * amp), ONE)
+      legMesh.setMatrixAt(i * 4 + k, mOut.multiplyMatrices(mLegs, mLocal))
+    }
+    if (s.down) col.copy(assault.killed.has(s) ? C_CHAR : C_DOWN) // §A: mortar kills are charred, crush injuries stay red
+    else col.copy(KIND_COL[s.kind] || C_WOOL).lerp(C_ALARM, clamp01(s.stress) * (s.kind === 'black' ? 0.6 : 1)) // stress tint, same read-out as the 2D page
+    const fl = ScoreUI.flash(s) // just scored → blink in the score's colour
+    if (fl) col.lerp(flashCol.setRGB(fl.r / 255, fl.g / 255, fl.b / 255, THREE.SRGBColorSpace), fl.k)
+    woolMesh.setColorAt(i, col)
+  }
+  woolMesh.count = headMesh.count = n; legMesh.count = n * 4
+  for (const im of [woolMesh, headMesh, legMesh]) im.instanceMatrix.needsUpdate = true
+  if (woolMesh.instanceColor) woolMesh.instanceColor.needsUpdate = true
+}
+
+// ---- the dog (a collie: body follows his travel, head holds the eye) --------
+const BLACK = lam(0x1c1c1f), WHITE = lam(0xf3f0e8)
+function buildDog() {
+  const root = new THREE.Group(), body = new THREE.Group()
+  root.add(body)
+  const mesh = (geo, mat, parent, x, y, z, sx = 1, sy = sx, sz = sx) => {
+    const m = new THREE.Mesh(geo, mat)
+    m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true
+    parent.add(m)
+    return m
+  }
+  mesh(new THREE.CapsuleGeometry(1.9, 5.4, 4, 8).rotateZ(Math.PI / 2), BLACK, body, 0, 5.6, 0)
+  mesh(ico1, WHITE, body, 3.0, 5.0, 0, 1.75, 1.95, 1.8)            // white chest
+  mesh(ico1, WHITE, body, 3.4, 6.4, 0, 1.5, 1.5, 1.7)              // ruff
+  const head = new THREE.Group(); head.position.set(4.4, 7.0, 0); body.add(head)
+  mesh(ico1, BLACK, head, 0.9, 0.7, 0, 1.7, 1.5, 1.5)
+  mesh(unitBox, WHITE, head, 2.6, 0.3, 0, 1.9, 1.0, 1.1)           // muzzle
+  mesh(unitBox, WHITE, head, 1.5, 1.95, 0, 1.5, 0.4, 0.5)          // blaze
+  mesh(unitBox, BLACK, head, 3.6, 0.5, 0, 0.45)                    // nose
+  const ear = new THREE.ConeGeometry(0.55, 1.4, 4)
+  mesh(ear, BLACK, head, 0.4, 2.3, 0.95); mesh(ear, BLACK, head, 0.4, 2.3, -0.95)
+  const tail = new THREE.Group(); tail.position.set(-4.3, 6.0, 0); body.add(tail)
+  mesh(new THREE.CylinderGeometry(0.45, 0.3, 4.2, 5).translate(0, -2.1, 0), BLACK, tail, 0, 0, 0)
+  mesh(ico0, WHITE, tail, 0, -4.3, 0, 0.55)                        // white tip
+  const legs = []
+  for (const [x, z] of [[2.9, 1.15], [2.9, -1.15], [-2.9, 1.15], [-2.9, -1.15]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 4.3, z); body.add(leg)
+    mesh(unitBox, BLACK, leg, 0, -1.2, 0, 0.95, 2.4, 0.95)
+    mesh(unitBox, WHITE, leg, 0, -3.3, 0, 0.8, 2.0, 0.8)           // socks
+    legs.push(leg)
+  }
+  root.scale.setScalar(1.25)
+  return { root, body, head, tail, legs, yaw: 0, headYaw: 0, phase: 0, lie: 0, stalk: 0, amp: 0, rear: 0 }
+}
+const dog = buildDog()
+scene.add(dog.root)
+
+function updateDog(dt, time) {
+  const d = sim.dog, speed = Math.hypot(d.vel.x, d.vel.y)
+  const want = speed > 6 ? Math.atan2(d.vel.y, d.vel.x) : d.facing
+  dog.yaw += angleDiff(want, dog.yaw) * ease(10, dt)
+  dog.root.position.set(d.pos.x, 0, d.pos.y)
+  dog.root.rotation.y = -dog.yaw
+  const rel = Math.max(-1.4, Math.min(1.4, angleDiff(d.facing, dog.yaw)))
+  dog.headYaw += (rel - dog.headYaw) * ease(12, dt)
+  const lying = d.command === 'lie_down' && speed < 8
+  dog.lie += ((lying ? 1 : 0) - dog.lie) * ease(7, dt)
+  dog.stalk += ((d.command === 'easy' ? 1 : d.command === 'walk_on' ? 0.45 : 0) - dog.stalk) * ease(5, dt)
+  dog.amp += (Math.min(1, speed / 60) - dog.amp) * ease(8, dt)
+  dog.phase += speed * 0.32 * dt
+  // §A battle stations: at the gun he rears up on his hind legs — the body tips back about the hips, forepaws out to the rifle
+  const manning = assault.battle && assault.battle.state === 'shoot'
+  dog.rear += ((manning ? 1 : 0) - dog.rear) * ease(6, dt)
+  const th = dog.rear * 1.1, HX = -2.9, HY = 4.3
+  dog.body.rotation.z = th
+  dog.body.position.x = HX - (HX * Math.cos(th) - HY * Math.sin(th))
+  dog.body.position.y = -2.6 * dog.lie - 0.9 * dog.stalk * (1 - dog.lie) + HY - (HX * Math.sin(th) + HY * Math.cos(th))
+  dog.head.position.y = 7.0 - 0.9 * dog.stalk * (1 - dog.lie)
+  dog.head.rotation.set(0, -dog.headYaw, -0.18 * dog.stalk - th * 0.85)
+  dog.legs.forEach((leg, k) => {
+    const swing = Math.sin(dog.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * 0.75 * dog.amp
+    leg.rotation.z = lerp(lerp(swing, k < 2 ? 1.35 : 1.2, dog.lie), k < 2 ? Math.PI / 2 - th : -th, dog.rear)
+  })
+  dog.tail.rotation.z = lerp(-0.93, -1.35, Math.min(1, speed / 80))
+  dog.tail.rotation.x = d.atHeel ? Math.sin(time * 11) * 0.55 : 0 // a wag at heel
+}
+
+// ---- POC-v17: wandering bulls (sim.bulls) — large, black, horned; moving solids the sheep go round ------
+const BULL_HORN = lam(0xe9dfc6), BULL_NOSE = lam(0x3a3336)
+const bullHornGeo = new THREE.ConeGeometry(0.075, 0.5, 5)
+function buildBull() { // modelled at radius 1 (nose toward +x); root.scale = the bull's disc radius
+  const root = new THREE.Group(), body = new THREE.Group()
+  root.add(body)
+  const mesh = (geo, mat, parent, x, y, z, sx = 1, sy = sx, sz = sx) => {
+    const m = new THREE.Mesh(geo, mat)
+    m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true
+    parent.add(m)
+    return m
+  }
+  mesh(unitBox, BLACK, body, -0.08, 0.92, 0, 1.5, 0.72, 0.8)            // barrel
+  mesh(ico1, BLACK, body, 0.42, 1.24, 0, 0.5, 0.34, 0.42)               // shoulder hump
+  mesh(ico1, BLACK, body, -0.62, 1.0, 0, 0.36, 0.42, 0.4)               // rump
+  const head = new THREE.Group(); head.position.set(0.72, 1.08, 0); body.add(head)
+  mesh(unitBox, BLACK, head, 0.2, -0.02, 0, 0.5, 0.4, 0.48)             // neck
+  mesh(unitBox, BLACK, head, 0.52, -0.06, 0, 0.42, 0.42, 0.46)          // head
+  mesh(unitBox, BULL_NOSE, head, 0.78, -0.14, 0, 0.16, 0.24, 0.34)      // muzzle
+  for (const sgn of [1, -1]) {
+    const horn = mesh(bullHornGeo, BULL_HORN, head, 0.5, 0.22, sgn * 0.36)
+    horn.rotation.set(sgn * 1.05, 0, -0.35)                             // out to the side, tipped forward
+    mesh(ico0, BLACK, head, 0.38, 0.1, sgn * 0.27, 0.09, 0.07, 0.12)    // ear
+  }
+  const tail = new THREE.Group(); tail.position.set(-0.84, 1.18, 0); body.add(tail)
+  mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.75, 5).translate(0, -0.375, 0), BLACK, tail, 0, 0, 0)
+  mesh(ico0, BLACK, tail, 0, -0.8, 0, 0.07, 0.11, 0.07)                 // tuft
+  const legs = []
+  for (const [x, z] of [[0.48, 0.27], [0.48, -0.27], [-0.6, 0.27], [-0.6, -0.27]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 0.62, z); body.add(leg)
+    mesh(unitBox, BLACK, leg, 0, -0.31, 0, 0.2, 0.62, 0.2)
+    legs.push(leg)
+  }
+  return { root, head, tail, legs, yaw: 0, phase: 0, amp: 0, graze: 0 }
+}
+const bullPool = []
+function updateBulls(dt, time) {
+  const bulls = sim.bulls || []
+  while (bullPool.length < bulls.length) { const b = buildBull(); scene.add(b.root); bullPool.push(b) }
+  bullPool.forEach((bm, i) => {
+    const b = bulls[i]
+    bm.root.visible = !!b
+    if (!b) return
+    const speed = Math.hypot(b.vx, b.vy)
+    bm.yaw += angleDiff(b.heading, bm.yaw) * ease(10, dt)
+    bm.root.position.set(b.x, 0, b.y); bm.root.rotation.y = -bm.yaw; bm.root.scale.setScalar(b.r)
+    bm.amp += (Math.min(1, speed / 12) - bm.amp) * ease(6, dt)
+    bm.graze += ((b.state === 'graze' ? 1 : 0) - bm.graze) * ease(1.5, dt)
+    bm.phase += speed * 0.22 * dt
+    bm.head.rotation.z = -0.95 * bm.graze - 0.08 * bm.amp + (b.state === 'graze' ? Math.sin(time * 2.4 + i) * 0.05 : 0) // head down to graze
+    bm.legs.forEach((leg, k) => { leg.rotation.z = Math.sin(bm.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * 0.45 * bm.amp })
+    bm.tail.rotation.z = -0.12; bm.tail.rotation.x = Math.sin(time * 1.7 + i * 2.1) * 0.35 // a slow swish
+  })
+}
+
+// ---- the handler, at the dog's home post by the gate -------------------------
+function buildHandler() { // owner 2026-11-18: the handler is a laid-back dude — open bathrobe, shades, long hair, beard, shorts and sandals — crook in hand
+  const root = new THREE.Group()
+  const mesh = (geo, mat, x, y, z, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.z = rz; m.castShadow = true; root.add(m); return m }
+  const skin = lam(0xe0b08c), robe = lam(0xb9a27c), robeTrim = lam(0x8c7652), tee = lam(0xf1ede2), shorts = lam(0x6f7f8c), hair = lam(0x7a5a3a), shades = lam(0x16161a), sandal = lam(0x4a3626), wood = lam(0xc8a66a)
+  const shin = new THREE.CylinderGeometry(0.8, 0.7, 5.2, 6)
+  mesh(shin, skin, 0, 2.9, 1.2); mesh(shin, skin, 0, 2.9, -1.2)                                   // bare legs
+  const sole = new THREE.BoxGeometry(3.0, 0.4, 1.7)
+  mesh(sole, sandal, 0.5, 0.2, 1.2); mesh(sole, sandal, 0.5, 0.2, -1.2)                           // sandals
+  mesh(new THREE.CylinderGeometry(2.2, 2.4, 3.4, 8), shorts, 0, 6.9, 0)                           // shorts
+  mesh(new THREE.CylinderGeometry(2.1, 2.5, 7.2, 8), tee, 0.25, 12.0, 0)                          // white tee, a bit of a belly
+  mesh(new THREE.CylinderGeometry(2.7, 3.4, 11.5, 8, 1, true, Math.PI * 0.72, Math.PI * 1.56), robe, 0, 10.2, 0).material.side = THREE.DoubleSide // the robe, hanging open at the front
+  mesh(new THREE.BoxGeometry(0.5, 11.5, 0.9), robeTrim, 2.25, 10.2, 2.0, -0.06); mesh(new THREE.BoxGeometry(0.5, 11.5, 0.9), robeTrim, 2.25, 10.2, -2.0, -0.06) // lapels
+  mesh(new THREE.BoxGeometry(0.4, 4.2, 0.5), robeTrim, -1.6, 7.2, 3.1, 0.12)                      // the belt, untied, hanging
+  const arm = new THREE.CylinderGeometry(0.95, 0.85, 7, 5)
+  mesh(arm, robe, 0.3, 12.6, 3.3); mesh(arm, robe, 0.9, 12.8, -3.3, 0.35)                         // robe sleeves
+  mesh(new THREE.IcosahedronGeometry(1.85, 1), skin, 0, 18.4, 0)                                  // head
+  mesh(new THREE.IcosahedronGeometry(2.0, 1), hair, -0.45, 18.9, 0).scale.set(1, 0.95, 1.05)      // hair on top and behind
+  mesh(new THREE.BoxGeometry(1.5, 4.2, 3.9), hair, -1.35, 16.6, 0)                                // long hair to the shoulders
+  mesh(new THREE.IcosahedronGeometry(1.25, 0), hair, 1.05, 17.2, 0).scale.set(0.8, 1.05, 1.15)    // beard
+  mesh(new THREE.BoxGeometry(0.5, 0.75, 3.3), shades, 1.72, 18.75, 0)                             // sunglasses
+  mesh(new THREE.CylinderGeometry(0.28, 0.28, 18, 5), wood, 2.6, 9, -3.6)                         // the crook
+  mesh(new THREE.TorusGeometry(1.2, 0.28, 5, 10, Math.PI), wood, 3.8, 18, -3.6)
+  return { root, yaw: 0 }
+}
+const handler = buildHandler()
+scene.add(handler.root)
+const handlerPos = () => {                  // a pace toward the gate from the home post, so the heeling dog isn't inside him
+  const o = sim.dog.owner, g = sim.gate, dx = g.x - o.x, dy = g.y - o.y, d = Math.hypot(dx, dy) || 1
+  return { x: o.x + dx / d * 13, y: o.y + dy / d * 13 }
+}
+function updateHandler(dt) {
+  const h = handlerPos()
+  handler.root.position.set(h.x, 0, h.y)
+  handler.yaw += angleDiff(Math.atan2(sim.gcm.y - h.y, sim.gcm.x - h.x), handler.yaw) * ease(3, dt)
+  handler.root.rotation.y = -handler.yaw
+}
+
+// ---- ground overlays (the 2D page's defaults-on debug draws) ------------------
+//   eye (ambient disc + per-command cone wedge), herd perimeter line (orange
+//   while the dog flanks along it), ideal path, gate draw area, crush heat,
+//   goal marker. Each respects its params.debug.* toggle; O hides them all.
+let overlaysOn = true
+const overlays = new THREE.Group()
+scene.add(overlays)
+function decalMesh(geo, color, opacity, y, order) {
+  const m = new THREE.Mesh(geo, decal(color, opacity))
+  m.position.y = y; m.renderOrder = order
+  overlays.add(m)
+  return m
+}
+const eyeDisc = decalMesh(unitDisc, 0xdc5050, 0.1, 0.62, 4)
+const eyeWedge = decalMesh(new THREE.CircleGeometry(1, 40, -0.5, 1).rotateX(-Math.PI / 2), 0xeb5f46, 0.2, 0.7, 5)
+eyeWedge.userData.key = -1
+const attractOuter = decalMesh(unitDisc, 0x6eb4ff, 0.10, 0.5, 2)
+const attractInner = decalMesh(unitDisc, 0x6eb4ff, 0.12, 0.54, 3)
+const attractCone = decalMesh(new THREE.CircleGeometry(1, 40, -0.5, 1).rotateX(-Math.PI / 2), 0x6eb4ff, 0.14, 0.52, 3) // POC-v13 G5
+attractCone.userData.key = -1
+const crushDisc = decalMesh(unitDisc, 0xffb428, 0.2, 0.58, 3)
+const goalRing = decalMesh(new THREE.RingGeometry(14, 16, 48).rotateX(-Math.PI / 2), 0x5fbf7a, 0.9, 0.66, 6)
+const goalDot = decalMesh(unitDisc, 0x5fbf7a, 0.9, 0.66, 6); goalDot.scale.set(4, 1, 4)
+
+// a dashed polyline on the ground with a fixed-size buffer (no per-frame allocation)
+function dashLine(maxPts, color, opacity, dash, gap) {
+  const geo = new THREE.BufferGeometry()
+  const pos = new THREE.BufferAttribute(new Float32Array(maxPts * 3), 3), dist = new THREE.BufferAttribute(new Float32Array(maxPts), 1)
+  pos.setUsage(THREE.DynamicDrawUsage); dist.setUsage(THREE.DynamicDrawUsage)
+  geo.setAttribute('position', pos); geo.setAttribute('lineDistance', dist)
+  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color, transparent: true, opacity, dashSize: dash, gapSize: gap, depthWrite: false }))
+  line.frustumCulled = false; line.renderOrder = 7
+  line.setPoints = (pts, y) => {
+    const n = Math.min(pts.length, maxPts)
+    let acc = 0
+    for (let i = 0; i < n; i++) {
+      if (i) acc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+      pos.setXYZ(i, pts[i].x, y, pts[i].y); dist.setX(i, acc)
+    }
+    pos.needsUpdate = dist.needsUpdate = true
+    geo.setDrawRange(0, n)
+  }
+  overlays.add(line)
+  return line
+}
+const outlineLine = dashLine(1024, 0xe8eef3, 0.8, 3, 6)
+const pathLine = dashLine(8, 0x6eaa78, 0.7, 7, 8)
+const C_OUTLINE = new THREE.Color(0xe8eef3), C_TRACK = new THREE.Color(0xf0a24f)
+
+// the herd perimeter line: hull ⊕ disc(margin), rounded corners — same construction as the 2D drawFlockOutline
+function outlinePoints(hull, m) {
+  const out = []
+  if (hull.length === 1) {
+    for (let k = 0; k <= 32; k++) out.push({ x: hull[0].x + m * Math.cos(k / 32 * Math.PI * 2), y: hull[0].y + m * Math.sin(k / 32 * Math.PI * 2) })
+    return out
+  }
+  const n = hull.length, normalAngle = (a, b) => Math.atan2(-(b.x - a.x), b.y - a.y)
+  for (let i = 0; i < n; i++) {
+    const prev = hull[(i - 1 + n) % n], v = hull[i], next = hull[(i + 1) % n]
+    let a0 = normalAngle(prev, v), a1 = normalAngle(v, next)
+    if (a1 < a0) a1 += Math.PI * 2
+    const steps = Math.max(1, Math.ceil((a1 - a0) / 0.22))
+    for (let k = 0; k <= steps; k++) { const a = a0 + (a1 - a0) * k / steps; out.push({ x: v.x + m * Math.cos(a), y: v.y + m * Math.sin(a) }) }
+  }
+  out.push(out[0])
+  return out
+}
+
+function updateOverlays() {
+  overlays.visible = overlaysOn
+  if (!overlaysOn) return
+  const p = params, d = sim.dog, g = sim.gate, dbg = p.debug
+
+  // the eye — per command, exactly the 2D drawEye numbers
+  eyeDisc.visible = eyeWedge.visible = dbg.eye
+  if (dbg.eye) {
+    const easy = d.command === 'easy', lying = d.command === 'lie_down'
+    const Rc = lying ? p.R_flee * (1 + p.lieConeExt)
+             : d.command === 'walk_on' ? p.R_flee * (1 + p.driveConeExt)
+             : easy ? p.R_flee * (1 + p.easyConeExt)
+             : p.R_flee
+    const Ra = lying ? p.R_flee * p.postureRange : p.R_flee
+    const half = easy ? p.easyConeDeg / 2 * Math.PI / 180
+               : lying ? p.lieConeDeg / 2 * Math.PI / 180
+               : Math.acos(Math.pow(0.5, 1 / Math.max(p.coneK, 0.01)))
+    const mid = d.facing + (d.lieSide || 0) * p.downConeOffsetDeg * Math.PI / 180
+    eyeDisc.position.set(d.pos.x, 0.62, d.pos.y); eyeDisc.scale.set(Ra, 1, Ra)
+    eyeDisc.material.opacity = 0.06 + 0.16 * p.ambient
+    const key = Math.round(half * 500)
+    if (key !== eyeWedge.userData.key) {
+      eyeWedge.geometry.dispose()
+      eyeWedge.geometry = new THREE.CircleGeometry(1, 40, -half, 2 * half).rotateX(-Math.PI / 2)
+      eyeWedge.userData.key = key
+    }
+    eyeWedge.position.set(d.pos.x, 0.7, d.pos.y); eyeWedge.scale.set(Rc, 1, Rc); eyeWedge.rotation.y = -mid
+  }
+
+  // herd perimeter line; orange while it is the dog's flank track
+  const flanking = d.command === 'come_by' || d.command === 'away'
+  outlineLine.visible = dbg.flockOutline && sim.hull.length > 0
+  if (outlineLine.visible) {
+    outlineLine.setPoints(outlinePoints(sim.hull, p.perimeterMargin), 0.9)
+    outlineLine.material.color.copy(flanking && dbg.dogTrack ? C_TRACK : C_OUTLINE)
+  }
+
+  // ideal path, shaded by the flock's current deviation
+  const path = sim.idealPath
+  pathLine.visible = !!path
+  if (path) {
+    const dev = Math.min(1, sim.distToPath(sim.gcm) / p.lineNorm)
+    pathLine.setPoints(path, 0.8)
+    pathLine.material.color.setRGB((110 + 130 * dev) / 255, (170 - 110 * dev) / 255, 120 / 255, THREE.SRGBColorSpace)
+  }
+
+  // gate draw area + crush heat + goal
+  attractOuter.visible = attractInner.visible = dbg.gateAttract && p.gateAttractR > 0
+  attractOuter.position.set(g.x, 0.5, g.y); attractOuter.scale.set(p.gateAttractR, 1, p.gateAttractR)
+  attractInner.position.set(g.x, 0.54, g.y); attractInner.scale.set(p.gateAttractR / 2, 1, p.gateAttractR / 2)
+  // POC-v13 G5: the cone the draw has grown toward a trotting line's leaders
+  const gc = sim.gateCone
+  attractCone.visible = attractOuter.visible && !!gc && gc.len > 0
+  if (attractCone.visible) {
+    const chalf = p.gateConeDeg / 2 * Math.PI / 180, ckey = Math.round(chalf * 500), cR = p.gateAttractR + gc.len
+    if (ckey !== attractCone.userData.key) {
+      attractCone.geometry.dispose()
+      attractCone.geometry = new THREE.CircleGeometry(1, 40, -chalf, 2 * chalf).rotateX(-Math.PI / 2)
+      attractCone.userData.key = ckey
+    }
+    attractCone.position.set(g.x, 0.52, g.y); attractCone.scale.set(cR, 1, cR); attractCone.rotation.y = -gc.ang
+  }
+  const t = p.crushThreshold > 0 ? sim.crush / p.crushThreshold : 0
+  crushDisc.visible = t >= 0.05
+  if (crushDisc.visible) {
+    crushDisc.position.set(g.x, 0.58, g.y); crushDisc.scale.set(p.crushRadius, 1, p.crushRadius)
+    crushDisc.material.color.setRGB(1, 180 * (1 - Math.min(t, 1)) / 255, 40 / 255, THREE.SRGBColorSpace)
+    crushDisc.material.opacity = Math.min(0.75, 0.15 + 0.4 * Math.min(t, 1.3))
+  }
+  goalRing.position.set(p.goal.x, 0.66, p.goal.y); goalDot.position.set(p.goal.x, 0.66, p.goal.y)
+}
+
+// ============================================================================
+// §A ASSAULT (VIEW) — the wolves, mortars, shells and blasts. [throwaway — this page only]
+//   The assault's PHYSICS lives in lib/assault-sim.js: ASSAULT (settings), BLAST
+//   (constants), assault (state) and assaultStep — the one thing outside the
+//   sim that writes sim state. This section only DRAWS it. It plugs into
+//   ASSAULT_ENV to tell the lib where the camera's background, the hills and
+//   the paddock are, and to build / drop meshes as teams arrive and rounds fly.
+// ============================================================================
+const assaultView = { group: new THREE.Group(), teams: new Map(), shells: new Map(), guns: new Map(), fx: [], scorch: [], note: '', noteUntil: 0 }  // team → { root, wolves, mortar, … } · shell → { mesh, ring } · gun → { root, swivel, yaw }
+scene.add(assaultView.group)
+
+{
+  const gui = new lil.GUI({ title: 'Wolf assault', container: document.getElementById('assault-gui') })
+  gui.add(ASSAULT, 'delay', 0, 180, 1).name('arrive after (s)')
+  gui.add(ASSAULT, 'teams', 0, 6, 1).name('two-wolf teams')
+  gui.add(ASSAULT, 'rate', 1, 60, 1).name('rounds / min')
+  gui.add(ASSAULT, 'accuracy', 0, 1, 0.05).name('accuracy')
+  gui.add(ASSAULT, 'dogAccuracy', 0, 1, 0.05).name('dog accuracy')
+}
+const assaultStatus = document.getElementById('assault-status')
+
+// ---- models (geometry + materials shared by every team) ----------------------
+const NOFOG = { fog: false }                                          // keeps the far-off specks readable against the hazy hills
+const WOLF = lam(0x70757c, NOFOG), WOLF_DARK = lam(0x474b51, NOFOG), WOLF_PALE = lam(0xbdbfc2, NOFOG), OLIVE = lam(0x4f5c36), STEEL = lam(0x2f3438)
+const GUNMETAL = lam(0x3d444b), GLOW = new THREE.MeshBasicMaterial({ color: 0xff5a3c })
+const AG = {
+  torso: new THREE.CapsuleGeometry(2.1, 6.2, 4, 8).rotateZ(Math.PI / 2),
+  ear: new THREE.ConeGeometry(0.6, 1.7, 4),
+  helmet: new THREE.SphereGeometry(2.05, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+  tail: new THREE.CylinderGeometry(0.85, 0.4, 5.6, 5).translate(0, -2.8, 0),
+  tube: new THREE.CylinderGeometry(1.2, 1.45, 13, 8).translate(0, 6.5, 0),
+  plate: new THREE.CylinderGeometry(4, 4.4, 0.8, 10).translate(0, 0.4, 0),
+  strut: new THREE.CylinderGeometry(0.28, 0.28, 10.5, 4).translate(0, 5.25, 0),
+  shell: new THREE.CapsuleGeometry(1.5, 3.6, 3, 6).rotateX(Math.PI / 2),
+  ring: new THREE.RingGeometry(0.88, 1, 48).rotateX(-Math.PI / 2),
+  star: new THREE.OctahedronGeometry(0.9),
+}
+function buildWolf() {
+  const root = new THREE.Group(), pivot = new THREE.Group(), body = new THREE.Group()
+  pivot.position.set(-3.2, 4.6, 0); body.position.set(3.2, -4.6, 0)   // the torso rears up about the hips
+  root.add(pivot); pivot.add(body)
+  const mesh = (geo, mat, parent, x, y, z, sx = 1, sy = sx, sz = sx) => {
+    const m = new THREE.Mesh(geo, mat)
+    m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true
+    parent.add(m)
+    return m
+  }
+  mesh(AG.torso, WOLF, body, 0, 6.4, 0)
+  mesh(ico1, WOLF_PALE, body, 3.1, 5.7, 0, 1.7, 1.8, 1.7)           // pale chest
+  const head = new THREE.Group(); head.position.set(5.0, 8.0, 0); body.add(head)
+  mesh(ico1, WOLF, head, 0.9, 0.7, 0, 1.8, 1.6, 1.6)
+  mesh(unitBox, WOLF_DARK, head, 2.9, 0.2, 0, 2.5, 1.0, 1.1)        // long muzzle
+  mesh(unitBox, STEEL, head, 4.2, 0.45, 0, 0.5)                     // nose
+  mesh(AG.ear, WOLF_DARK, head, 0.1, 2.5, 1.2); mesh(AG.ear, WOLF_DARK, head, 0.1, 2.5, -1.2)
+  mesh(AG.helmet, OLIVE, head, 0.9, 1.2, 0)                         // tin hat
+  const tail = new THREE.Group(); tail.position.set(-4.8, 6.4, 0); root.add(tail)
+  mesh(AG.tail, WOLF_DARK, tail, 0, 0, 0)
+  const legs = []
+  for (const [x, z, parent] of [[2.9, 1.25, body], [2.9, -1.25, body], [-3.2, 1.25, root], [-3.2, -1.25, root]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 4.6, z); parent.add(leg)
+    mesh(unitBox, WOLF_DARK, leg, 0, -2.3, 0, 1.0, 4.6, 1.0)
+    legs.push(leg)
+  }
+  root.scale.setScalar(1.45)
+  return { root, pivot, head, tail, legs, yaw: null, up: 0, phase: 0, fall: 0 }
+}
+// run on all fours (up 0) or stand at the tube (up 1); `dip` bends the wolf toward the ground
+function poseWolf(w, x, y, yaw, speed, up, dip, dt, h = 0) {
+  if (w.yaw === null) w.yaw = yaw
+  w.yaw += angleDiff(yaw, w.yaw) * ease(10, dt)
+  w.up += (up - w.up) * ease(5, dt)
+  w.phase += speed * 0.3 * dt
+  w.root.position.set(x, h, y); w.root.rotation.y = -w.yaw
+  const amp = Math.min(1, speed / 60) * 0.8, rear = Math.max(0, w.up * 1.1 - dip * 0.55)
+  w.pivot.rotation.z = rear
+  w.head.rotation.z = -rear * 0.8
+  w.legs.forEach((leg, k) => {
+    const swing = Math.sin(w.phase + (k === 0 || k === 3 ? 0 : Math.PI)) * amp
+    leg.rotation.z = k < 2 ? lerp(swing, 0.5 - rear, w.up) : swing * (1 - w.up)
+  })
+  w.tail.rotation.z = lerp(-1.15, -0.5, w.up)
+}
+function buildMortar() {
+  const root = new THREE.Group(), tube = new THREE.Group()
+  const mesh = (geo, mat, parent, x, y, z, rz = 0, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; parent.add(m); return m }
+  mesh(AG.plate, STEEL, root, 0, 0, 0)
+  tube.rotation.z = -0.35; root.add(tube)                            // leans toward the field (+x)
+  mesh(AG.tube, OLIVE, tube, 0, 0, 0)
+  mesh(AG.strut, STEEL, root, 5.6, 0, 0, 0.2, 0.3); mesh(AG.strut, STEEL, root, 5.6, 0, 0, 0.2, -0.3) // bipod
+  const crate = mesh(unitBox, OLIVE, root, -4, 2, -9); crate.scale.set(7, 4, 5)
+  return { root, tube }
+}
+
+// a laser rifle on a pintle: sits on a fence post, swivels about +y; the barrel runs along +x
+function buildGun() {
+  const root = new THREE.Group(), swivel = new THREE.Group()
+  const box = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(unitBox, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; swivel.add(m); return m }
+  const pin = new THREE.Mesh(unitBox, STEEL); pin.position.y = 0.9; pin.scale.set(0.8, 1.8, 0.8); root.add(pin)
+  swivel.position.y = 2.2; root.add(swivel)
+  box(GUNMETAL, -0.4, 0, 0, 5.2, 1.7, 1.4)     // receiver
+  box(STEEL, 5.2, 0.15, 0, 6.4, 0.75, 0.75)    // barrel
+  box(GLOW, 8.6, 0.15, 0, 0.7, 1.0, 1.0)       // emitter
+  box(STEEL, -4.4, -0.5, 0, 3.2, 1.3, 1.0)     // stock
+  box(OLIVE, 0.2, 1.3, 0, 2.8, 0.7, 0.7)       // sight
+  box(GLOW, -0.4, 0, 0.75, 2.2, 0.5, 0.12); box(GLOW, -0.4, 0, -0.75, 2.2, 0.5, 0.12) // power cells
+  return { root, swivel, yaw: 0 }
+}
+const GUN_Y = FENCE_H + 1                                              // the top of a fence post
+
+// ---- wiring: the lib says what happened, the view keeps its meshes in step -----
+function freeFx(o) { assaultView.group.remove(o); o.traverse((c) => { if (c.material) c.material.dispose() }) }
+ASSAULT_ENV.viewAngle = () => {                                       // teams come over the hills in the camera's background (the top view has none)
+  camera.getWorldDirection(tmp.pos)
+  return Math.hypot(tmp.pos.x, tmp.pos.z) > 0.2 ? Math.atan2(tmp.pos.z, tmp.pos.x) : null
+}
+ASSAULT_ENV.groundHeight = hillHeight
+ASSAULT_ENV.bounds = () => course.bounds
+ASSAULT_ENV.onReset = () => {
+  const v = assaultView
+  for (const tv of v.teams.values()) v.group.remove(tv.root)
+  for (const sv of v.shells.values()) { v.group.remove(sv.mesh); freeFx(sv.ring) }
+  for (const fx of v.fx) freeFx(fx.root)
+  for (const m of v.scorch) freeFx(m)
+  v.teams.clear(); v.shells.clear(); v.fx.length = v.scorch.length = 0
+  for (const gv of v.guns.values()) v.group.remove(gv.root)            // the fence guns: one per assault.guns entry, on its post
+  v.guns.clear()
+  for (const gun of assault.guns) {
+    const gv = buildGun()
+    gv.root.position.set(gun.x, GUN_Y, gun.y); gv.yaw = gun.aim; gv.swivel.rotation.y = -gv.yaw
+    v.group.add(gv.root); v.guns.set(gun, gv)
+  }
+}
+ASSAULT_ENV.onTeamAdded = (T) => {
+  const root = new THREE.Group(), wolves = [buildWolf(), buildWolf()], mortar = buildMortar()
+  mortar.root.position.set(T.st.x, 0, T.st.y); mortar.root.rotation.y = -Math.atan2(T.iny, T.inx); mortar.root.visible = false
+  root.add(wolves[0].root, wolves[1].root, mortar.root)
+  assaultView.group.add(root)
+  assaultView.teams.set(T, { root, wolves, mortar, px: null, py: 0, drop: 0, kick: 0 })
+}
+ASSAULT_ENV.onTeamRemoved = (T) => {
+  const tv = assaultView.teams.get(T)
+  if (tv) { assaultView.group.remove(tv.root); assaultView.teams.delete(T) }
+}
+ASSAULT_ENV.onFire = (T, sh) => {
+  const mesh = new THREE.Mesh(AG.shell, STEEL); mesh.castShadow = true
+  const ring = new THREE.Mesh(AG.ring, decal(0xff3b2f, 0.8)); ring.position.set(sh.x1, 0.74, sh.y1); ring.renderOrder = 8
+  assaultView.group.add(mesh, ring)
+  assaultView.shells.set(sh, { mesh, ring })
+  const tv = assaultView.teams.get(T)
+  if (tv) tv.drop = tv.kick = 1
+  puffFx(T.st.x + T.inx * 6, 17, T.st.y + T.iny * 6)
+}
+ASSAULT_ENV.onLand = (sh) => {
+  const sv = assaultView.shells.get(sh)
+  if (sv) { assaultView.group.remove(sv.mesh); freeFx(sv.ring); assaultView.shells.delete(sh) }
+}
+ASSAULT_ENV.onBlast = (x, y) => blastFx(x, y)
+ASSAULT_ENV.onLaser = (gun, shot) => {
+  const up = shot.T.state === 'setup' || shot.T.state === 'fire' || (shot.T.state === 'dead' && shot.T.built)   // was he standing at the tube?
+  const hit = shot.result !== 'near' && shot.result !== 'miss'
+  const h = hit ? Math.max(1, (up ? 15 : 9) + shot.dh * (up ? 1 : 0.6)) : 0.6   // a miss ploughs into the ground beside him
+  beamFx(gun, shot.x, h, shot.y, shot.result)
+}
+
+// ---- effects (render-rate, cosmetic) -------------------------------------------
+function fxMesh(geo, mat, root) { const m = new THREE.Mesh(geo, mat); root.add(m); return m }
+function blastFx(x, y) {
+  const a = assaultView, root = new THREE.Group()
+  root.position.set(x, 0, y)
+  const fire = fxMesh(ico1, new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, depthWrite: false }), root)
+  const smoke = fxMesh(ico1, new THREE.MeshLambertMaterial({ color: 0x5b5651, transparent: true, depthWrite: false, flatShading: true }), root)
+  const shock = fxMesh(AG.ring, decal(0xfff1d0, 0.6), root); shock.position.y = 0.8; shock.renderOrder = 9
+  a.group.add(root)
+  a.fx.push({ root, t: 0, dur: 1.8, update(u) {
+    const f = Math.min(1, u / 0.3), w = Math.min(1, u / 0.55)
+    fire.scale.setScalar(4 + 24 * (1 - (1 - f) * (1 - f))); fire.position.y = 6 + 10 * f; fire.material.opacity = 1 - f; fire.visible = f < 1
+    smoke.scale.set(12 + 26 * u, 10 + 22 * u, 12 + 26 * u); smoke.position.y = 10 + 60 * u; smoke.material.opacity = 0.6 * (1 - u)
+    shock.scale.setScalar(BLAST.kill + (BLAST.panic - BLAST.kill) * (1 - (1 - w) * (1 - w))); shock.material.opacity = 0.6 * (1 - w); shock.visible = w < 1
+  } })
+  const scar = new THREE.Mesh(unitDisc, decal(0x2a2118, 0.55)); scar.position.set(x, 0.48, y); scar.scale.set(BLAST.kill + 3, 1, BLAST.kill + 3); scar.renderOrder = 2
+  a.group.add(scar); a.scorch.push(scar)
+  if (a.scorch.length > 40) freeFx(a.scorch.shift())
+}
+function puffFx(x, h, y) {
+  const root = new THREE.Group(); root.position.set(x, h, y)
+  const smoke = fxMesh(ico0, new THREE.MeshLambertMaterial({ color: 0xd8d4cc, transparent: true, depthWrite: false, flatShading: true }), root)
+  assaultView.group.add(root)
+  assaultView.fx.push({ root, t: 0, dur: 0.9, update(u) { smoke.scale.setScalar(2 + 8 * u); smoke.position.y = 14 * u; smoke.material.opacity = 0.7 * (1 - u) } })
+}
+// the laser: a bolt from the muzzle to where it landed, and a flash there (bigger for a kill)
+function beamFx(gun, x, h, y, result) {
+  const a = assaultView, root = new THREE.Group()
+  const from = new V3(gun.x + Math.cos(gun.aim) * 9, GUN_Y + 2.4, gun.y + Math.sin(gun.aim) * 9), to = new V3(x, h, y)
+  const len = from.distanceTo(to), kill = result === 'head' || result === 'torso', hit = kill || result === 'hit'
+  const mat = () => new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, depthWrite: false, fog: false })
+  const beam = fxMesh(unitBox, mat(), root), core = fxMesh(unitBox, mat(), root)
+  core.material.color.set(0xfff0e0)
+  for (const m of [beam, core]) { m.position.copy(from).lerp(to, 0.5); m.quaternion.setFromUnitVectors(AX_X, tmp.pos.copy(to).sub(from).normalize()) }
+  const flash = fxMesh(ico0, mat(), root); flash.position.copy(to)
+  flash.material.color.set(kill ? 0xfff6c8 : hit ? 0xffb070 : 0xd8c8a0)
+  const muzzle = fxMesh(ico0, mat(), root); muzzle.position.copy(from)
+  a.group.add(root)
+  a.fx.push({ root, t: 0, dur: kill ? 0.7 : 0.45, update(u) {
+    const b = Math.max(0, 1 - u * 3)                                   // the bolt is gone in the first third
+    beam.scale.set(len, 1.5 * b + 0.01, 1.5 * b + 0.01); beam.material.opacity = 0.55 * b
+    core.scale.set(len, 0.5 * b + 0.01, 0.5 * b + 0.01); core.material.opacity = b
+    beam.visible = core.visible = b > 0
+    muzzle.scale.setScalar(1 + 2.5 * b); muzzle.material.opacity = b; muzzle.visible = b > 0
+    flash.scale.setScalar((kill ? 4 : hit ? 2.5 : 1.5) + (kill ? 14 : hit ? 6 : 5) * u); flash.material.opacity = 0.9 * (1 - u)
+  } })
+}
+const STAR_CAP = 64 * 3
+const starMesh = new THREE.InstancedMesh(AG.star, new THREE.MeshBasicMaterial({ color: 0xffe14d }), STAR_CAP)
+starMesh.frustumCulled = false; starMesh.count = 0
+starMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+scene.add(starMesh)
+
+function assaultRender(dt, time) {
+  const a = assault, v = assaultView
+  if (sim.run !== a.run) assaultReset(sim)
+  for (const T of a.teams) {
+    const tv = v.teams.get(T)
+    if (!tv) continue
+    const fleeing = T.state === 'flee', running = T.state === 'run' || fleeing, setting = T.state === 'setup', away = T.state === 'away'
+    const at = teamAt(T), cx = at.x, cy = at.y
+    // side by side across the direction of travel, swinging onto the fence line over the last strides
+    const k = smoothstep(120, 0, T.runLen - T.prog)
+    const wx = lerp(-at.dy * T.flip, T.tx, k), wy = lerp(at.dx * T.flip, T.ty, k), e = tv.px === null ? 1 : ease(6, dt)
+    if (tv.px === null) tv.px = wx
+    tv.px += (wx - tv.px) * e; tv.py += (wy - tv.py) * e
+    tv.drop *= Math.exp(-3 * dt); tv.kick *= Math.exp(-9 * dt)
+    tv.wolves.forEach((w, i) => {
+      const o = i ? -11 : 11, sw = T.wolves[i]
+      if (!sw.alive) {                                                // shot dead: he drops where he stood and stays there
+        w.fall += (1 - w.fall) * ease(7, dt)
+        w.root.visible = true
+        w.root.position.set(sw.x, 3.2 * w.fall, sw.y)
+        w.root.rotation.set(w.fall * Math.PI / 2 * (i ? -1 : 1), -(w.yaw || 0), 0)
+        w.up += (0 - w.up) * ease(7, dt)
+        w.pivot.rotation.z = w.up; w.head.rotation.z = -0.5 * w.fall
+        w.legs.forEach((leg, k) => { leg.rotation.z = (k < 2 ? 0.5 : -0.4) * w.fall })
+        return
+      }
+      w.root.visible = !away                                          // routed and over the hills: out of sight until they start back
+      const yaw = fleeing ? Math.atan2(-at.dy, -at.dx)                // running for it, back the way they came
+                : running ? Math.atan2(at.dy, at.dx)
+                : i ? Math.atan2(-T.ty * o, -T.tx * o)                // the loader faces the tube
+                : Math.atan2(T.iny, T.inx)                            // the gunner watches the fall of shot
+      const dip = setting ? 0.6 + 0.4 * Math.sin(time * 9 + i * 2) : i ? tv.drop : 0
+      const x = cx + tv.px * o, y = cy + tv.py * o
+      poseWolf(w, x, y, yaw, running ? Math.min(T.speed, 200) : 0, running || away ? 0 : 1, dip, dt, running ? hillHeight(x, y) : 0)
+    })
+    const built = T.built ? 1 : setting ? 1 - T.timer / BLAST.setup : 0   // once up, the mortar stays put while its crew is routed
+    tv.mortar.root.visible = built > 0.02
+    tv.mortar.root.scale.setScalar(Math.max(0.02, built) * 1.2)
+    tv.mortar.tube.position.y = -2.2 * tv.kick
+  }
+  // the fence guns: the manned one tracks the dog's target, the rest swing back to point straight out
+  for (const [gun, gv] of v.guns) {
+    const manned = a.battle && a.battle.gun === gun && a.battle.state === 'shoot'
+    if (!manned) gun.aim += angleDiff(Math.atan2(gun.ny, gun.nx), gun.aim) * ease(2, dt)
+    gv.yaw += angleDiff(gun.aim, gv.yaw) * ease(12, dt)
+    gv.swivel.rotation.y = -gv.yaw
+  }
+  for (const sh of a.shells) {
+    const sv = v.shells.get(sh)
+    if (!sv) continue
+    const u = Math.min(1, sh.t / BLAST.flight), du = 0.02
+    const at = (v) => tmp.pos.set(lerp(sh.x0, sh.x1, v), 14 + 4 * BLAST.apex * v * (1 - v) - 14 * v, lerp(sh.y0, sh.y1, v))
+    sv.mesh.position.copy(at(u)); sv.mesh.lookAt(at(u + du))
+    const rr = BLAST.stun * (1.7 - 0.7 * u)                           // the warning ring closes on the stun radius as the round comes in
+    sv.ring.scale.set(rr, 1, rr)
+    sv.ring.material.opacity = 0.35 + 0.5 * u * (0.6 + 0.4 * Math.sin(time * 14))
+  }
+  for (let i = v.fx.length - 1; i >= 0; i--) {
+    const f = v.fx[i]
+    f.t += dt
+    if (f.t >= f.dur) { freeFx(f.root); v.fx.splice(i, 1) } else f.update(f.t / f.dur)
+  }
+  // seeing stars
+  let n = 0
+  const SC = params.L / 12 * 0.9
+  for (const [s] of a.stunned) {
+    for (let k = 0; k < 3 && n < STAR_CAP; k++, n++) {
+      const ang = time * 4 + k * 2.094 + s.pos.x
+      tmp.pos.set(s.pos.x + Math.cos(ang) * 4.5 * SC, (11 + Math.sin(time * 6 + k) * 0.8) * SC, s.pos.y + Math.sin(ang) * 4.5 * SC)
+      starMesh.setMatrixAt(n, tmp.mOut.compose(tmp.pos, tmp.qT.setFromAxisAngle(AX_Y, ang * 2), ONE))
+    }
+  }
+  starMesh.count = n; starMesh.instanceMatrix.needsUpdate = true
+
+  const want = Math.round(ASSAULT.teams), firing = a.teams.filter((T) => T.state === 'fire').length
+  const tally = `rounds ${a.rounds} · killed ${a.dead} · stunned ${a.stunned.size} · panicked ${a.panicked.size}`
+  const routed = a.teams.filter((T) => T.state === 'flee' || T.state === 'away')
+  let text = !want ? 'no wolves (0 teams)'
+    : !a.teams.length ? `wolves arrive in ${Math.max(0, Math.ceil(ASSAULT.delay - a.t))}s`
+    : sim.run.finished ? `cease fire — ${tally}`
+    : firing ? `${firing} mortar${firing > 1 ? 's' : ''} firing — ${tally}`
+    : a.teams.some((T) => T.state === 'setup') ? 'wolves setting up the mortar…'
+    : a.teams.some((T) => T.state === 'run') ? 'wolves inbound!'
+    : routed.length ? `wolves driven off — back in ${Math.ceil(Math.min(...routed.map((T) => T.back)))}s`
+    : 'wolves wiped out 🐕'
+  if (firing && routed.length) text += `\n${routed.length} team${routed.length > 1 ? 's' : ''} driven off — back in ${Math.ceil(Math.min(...routed.map((T) => T.back)))}s`
+  if (a.shots || a.wolvesDead) text += `\nlaser shots ${a.shots} · wolves killed ${a.wolvesDead}`
+  if (a.battle) text += a.battle.state === 'run' ? '\nbattle stations — dog running to the gun' : '\nbattle stations — dog on the gun'
+  else if (time < v.noteUntil) text += '\n' + v.note
+  if (assaultStatus.textContent !== text) assaultStatus.textContent = text
+}
+
+// ---- cameras -----------------------------------------------------------------
+//   orbit   free camera around the pasture (drag / right-drag / wheel)
+//   top     straight down, north up — the 2D page's view
+//   handler over the handler's shoulder: the view a trial is actually run from
+//   dog     behind the dog, down his eye
+const CAMS = ['orbit', 'top', 'handler', 'dog']
+const CAM_HINTS = {
+  orbit: 'drag to orbit · right-drag to pan · wheel to zoom · 1 again to re-centre',
+  top: 'straight down — north up, same as the 2D page',
+  handler: 'from the handler’s post by the gate',
+  dog: 'behind the dog, down his eye',
+}
+const controls = new OrbitControls(camera, canvas)
+controls.enableDamping = true
+controls.dampingFactor = 0.12
+controls.maxPolarAngle = Math.PI / 2 - 0.04
+controls.minDistance = 50
+controls.maxDistance = 1500
+const camState = { mode: 'orbit', look: new V3(), snap: true }
+const camButtons = Array.from(document.querySelectorAll('#cam-bar button[data-cam]'))
+function fieldCentre() { return new V3(params.canvasW / 2, 0, params.canvasH / 2) }
+function homePose() { // the default orbit view — a raised view from the south: north at the top, east on the right — reads like the 2D canvas
+  // default zoom (owner 2026-11-18, measured off a phone-landscape screenshot): 29° down, the near fence filling ~94 % of the
+  // view width, aimed a touch south of centre. Distance = whichever is farther of the height framing and the width fit.
+  const c = fieldCentre(), pitch = 29 * Math.PI / 180, tanH = Math.tan(camera.fov / 2 * Math.PI / 180)
+  const dH = params.canvasH * 1.147
+  const dW = params.canvasW * 0.45 / (tanH * Math.max(camera.aspect, 0.5) * 0.94) + params.canvasH * 0.38 * Math.cos(pitch)
+  const d = Math.max(dH, dW), tz = c.z + params.canvasH * 0.04
+  return { pos: new V3(c.x, d * Math.sin(pitch), tz + d * Math.cos(pitch)), target: new V3(c.x, 0, tz) }
+}
+function homeOrbit() { const h = homePose(); controls.target.copy(h.target); camera.position.copy(h.pos) }
+// run-start intro (owner 2026-11-18): play opens on the dude and his dog seen from the front — the camera stands on the
+// flock's side of them, looking back — holds a second, then eases out to the default orbit view over a second and a half.
+// Orbit camera only (?cam=top / handler / dog are left alone); picking any camera cancels it; a paused page holds it.
+const INTRO = { hold: 1, pan: 1.5 }
+const camIntro = { t: -1, pos: new V3(), look: new V3() } // t < 0: not running
+function startIntro() {
+  if (camState.mode !== 'orbit') return
+  const h = handlerPos(), d = sim.dog.pos, yaw = Math.atan2(sim.gcm.y - h.y, sim.gcm.x - h.x)
+  const mx = (h.x + d.x) / 2, my = (h.y + d.y) / 2
+  handler.yaw = yaw // he faces the flock (and so the camera) from the first frame
+  camIntro.look.set(mx, 10, my)
+  camIntro.pos.set(mx + Math.cos(yaw) * 70, 21, my + Math.sin(yaw) * 70)
+  camIntro.t = 0
+  controls.enabled = false
+}
+function stepIntro(dt) {
+  camIntro.t += dt
+  const u = Math.min(1, Math.max(0, (camIntro.t - INTRO.hold) / INTRO.pan)), k = u * u * (3 - 2 * u), home = homePose()
+  camera.position.lerpVectors(camIntro.pos, home.pos, k)
+  controls.target.lerpVectors(camIntro.look, home.target, k)
+  camera.lookAt(controls.target)
+  if (u >= 1) { camIntro.t = -1; controls.enabled = true; controls.update() }
+}
+function setCam(mode) {
+  if (!CAMS.includes(mode)) return
+  camIntro.t = -1
+  // orbit always lands on the starting view (owner 2026-11-18): coming back from top / handler / dog the camera was still
+  // sitting where that mode left it — straight overhead after `top` — and it took a second click to re-centre
+  if (mode === 'orbit') homeOrbit()
+  camState.mode = mode
+  camState.snap = true
+  controls.enabled = mode === 'orbit'
+  camera.up.set(0, 1, 0)
+  if (mode === 'orbit') controls.update()
+  for (const b of camButtons) b.classList.toggle('active', b.dataset.cam === mode)
+  camHint.textContent = CAM_HINTS[mode]
+}
+const camWant = { pos: new V3(), look: new V3() }
+function updateCamera(dt, played = dt) { // played: 0 while the page is paused
+  const mode = camState.mode
+  if (mode === 'orbit') { if (camIntro.t >= 0) stepIntro(played); else controls.update(); return }
+  const { pos, look } = camWant
+  if (mode === 'top') {
+    const bb = course.bounds, tanH = Math.tan(camera.fov / 2 * Math.PI / 180)
+    const h = Math.max((bb.y1 - bb.y0) / 2 / tanH, (bb.x1 - bb.x0) / 2 / (tanH * camera.aspect)) * 1.1 // margin clears the camera bar
+    camera.up.set(0, 0, -1)
+    camera.position.set((bb.x0 + bb.x1) / 2, h, (bb.y0 + bb.y1) / 2)
+    camera.lookAt((bb.x0 + bb.x1) / 2, 0, (bb.y0 + bb.y1) / 2)
+    return
+  }
+  if (mode === 'handler') {
+    const h = handlerPos(), g = sim.gcm, dx = g.x - h.x, dy = g.y - h.y, d = Math.hypot(dx, dy) || 1
+    pos.set(h.x - dx / d * 66, 40, h.y - dy / d * 66)
+    look.set(h.x + dx * 0.6, 2, h.y + dy * 0.6)
+  } else { // dog
+    const d = sim.dog, fx = Math.cos(d.facing), fy = Math.sin(d.facing)
+    pos.set(d.pos.x - fx * 78, 38, d.pos.y - fy * 78)
+    look.set(d.pos.x + fx * 55, 4, d.pos.y + fy * 55)
+  }
+  const k = camState.snap ? 1 : ease(mode === 'dog' ? 3.5 : 2.5, dt)
+  camera.position.lerp(pos, k)
+  camState.look.lerp(look, k)
+  camera.lookAt(camState.look)
+  camState.snap = false
+}
+
+function resize() {
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight)
+  renderer.setSize(w, h, false)
+  camera.aspect = w / h
+  camera.updateProjectionMatrix()
+}
+new ResizeObserver(resize).observe(stage)
+resize()
+homeOrbit()
+
+// ---- score card + HUD (same read-outs as the 2D page) --------------------------
+// POC-v14: the score badge, the pops and the count-up tally card live in
+// lib/sheep-score-ui.js (one copy for all three pages) — see ScoreUI.init in §4.
+function hideCard() { ScoreUI.hide() }
+
+function updateHud(fps) {
+  const sc = sim.score(), d = sim.dog
+  hud.textContent =
+    `fps ${fps.toFixed(0)}  cmd ${assault.battle ? 'battle_stations' : d.command}${d.flankEasy ? '·easy' : ''}${d.lieSide ? (d.lieSide < 0 ? '·left' : '·right') : ''}${d.impulse ? ' ⚡' + d.impulse.name : ''}\n` +
+    `intensity ${d.intensity.toFixed(2)}${d.impulseFactor > 1 ? ' ×' + d.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
+    `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
+    ScoreUI.hud(sim)
+  if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
+  if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
+  if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
+  syncObstacleSlider()
+  let sum = 0
+  for (const s of sim.sheep) sum += s.stress
+  const mean = sim.sheep.length ? sum / sim.sheep.length : 0
+  stressFill.style.width = (Math.min(1, mean * 2) * 100).toFixed(1) + '%'
+  stressFill.style.background = `rgb(${Math.round(110 + 145 * mean)},${Math.round(200 - 170 * mean)},80)`
+  ScoreUI.frame(sim) // badge, pops, and the tally card when the run ends
+}
+
+function render3D(dt, time, fps) {
+  if (sim.gate !== course.gate || courseSig() !== course.sig) rebuildCourse()
+  updateSheep(dt, time)
+  updateDog(dt, time)
+  updateBulls(dt, time) // POC-v17
+  updateHandler(dt)
+  updateOverlays()
+  assaultRender(dt, time)
+  for (const f of course.flags) f.rotation.y = f.userData.base + Math.sin(time * 2.2 + f.position.x) * 0.25
+  updateCamera(dt || 1 / 60, dt || 0)
+  updateHud(fps)
+  renderer.render(scene, camera)
+}
+
+// ============================================================================
+// §3 INPUT — same commands, keys and buttons as the 2D page. [throwaway]
+//   Extra here: camera keys (C cycles, 1–4 pick) and O for the overlays.
+// ============================================================================
+const cmdButtons = Array.from(document.querySelectorAll('#controls button[data-cmd]'))
+const VARIANTS = {
+  come_by_easy:   ['come_by',  { easy: true }],
+  away_easy:      ['away',     { easy: true }],
+  lie_down_left:  ['lie_down', { side: -1 }],
+  lie_down_right: ['lie_down', { side: 1 }],
+}
+function displayCommand(d) {
+  if (assault.battle) return 'battle_stations'
+  if (d.flankEasy && (d.command === 'come_by' || d.command === 'away')) return d.command === 'come_by' ? 'come_by_easy' : 'away_easy'
+  if (d.command === 'lie_down' && d.lieSide) return d.lieSide < 0 ? 'lie_down_left' : 'lie_down_right'
+  return d.command
+}
+function updateStrip() {
+  const cmd = displayCommand(sim.dog)
+  for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
+}
+function issue(cmd, flavor) {
+  if (cmd === 'battle_stations') {            // §A: not a sim verb — the assault lib carries the dog to a gun
+    PadUI.flash('BATTLE STATIONS')            // …so it flashes its own name (every sim verb flashes from sim.setCommand)
+    if (!assaultBattleStations(sim)) { assaultView.note = 'battle stations — no wolves in any gun’s sights'; assaultView.noteUntil = clock + 3 }
+    return updateStrip()
+  }
+  assaultStandDown()                          // any other command takes him off the gun
+  const [verb, vopts] = VARIANTS[cmd] || [cmd, {}]
+  sim.setCommand(verb, flavor ? { ...vopts, impulse: flavor } : vopts)
+  updateStrip()
+}
+const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
+function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do'); startIntro() }
+for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
+// heel nip (owner 2026-11-18): not a command — the dog dives, bites and goes back to what he was on (sim.heelNip)
+const nipBtn = document.getElementById('nip-btn')
+function heelNip() { assaultStandDown(); sim.heelNip() }
+nipBtn.addEventListener('click', () => { heelNip(); nipBtn.blur() })
+document.querySelector('[data-action="reset"]').addEventListener('click', restartRun)
+function syncControllers(key) {
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === key) c.updateDisplay()
+}
+function setSeed(seed) {
+  params.seed = seed >>> 0
+  HOOKS.respawn(); hideCard(); issue('that_ll_do'); startIntro()
+  syncControllers('seed')
+}
+function newCourse() { setSeed(Math.floor(Math.random() * 1e6)) }
+seedInput.addEventListener('change', () => {
+  const v = parseInt(seedInput.value, 10)
+  if (Number.isFinite(v) && v >= 0 && (v >>> 0) !== params.seed) setSeed(v)
+  else seedInput.value = params.seed
+})
+seedInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') seedInput.blur() })
+document.getElementById('reseed-btn').addEventListener('click', newCourse)
+// capture (owner 2026-11-18): the 2D page's state snapshot, here too — JSON to the clipboard + console
+function captureState() {
+  const r1 = v => Math.round(v * 10) / 10
+  const out = { camera: { mode: camState.mode, pos: camera.position.toArray().map(r1), target: controls.target.toArray().map(r1), dist: r1(camera.position.distanceTo(controls.target)), aspect: Math.round(camera.aspect * 1000) / 1000, fov: camera.fov }, ...sim.captureState() } // camera first: the view the capture was taken from
+  const text = JSON.stringify(out)
+  console.log('[sheep-poc] state capture:\n' + text)
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
+  const btn = document.getElementById('capture-btn')
+  btn.textContent = 'copied ✓'
+  setTimeout(() => { btn.textContent = 'capture' }, 900)
+  return out
+}
+document.getElementById('capture-btn').addEventListener('click', captureState)
+function togglePanels() { document.body.classList.toggle('panels-hidden') }
+document.getElementById('panels-btn').addEventListener('click', togglePanels)
+const drawerBtn = document.getElementById('drawer-btn')
+function toggleDrawer() {
+  const closed = document.body.classList.toggle('drawer-closed')
+  drawerBtn.textContent = closed ? 'settings' : 'close'
+  drawerBtn.blur()
+}
+drawerBtn.addEventListener('click', toggleDrawer)
+
+// Full-screen is forced on touch devices: browsers only grant it from a user
+// gesture, so every tap made while windowed asks again (the first tap gets it).
+if (coarse && document.documentElement.requestFullscreen) {
+  const goFull = () => {
+    if (document.fullscreenElement) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
+      .catch(() => {})
+  }
+  document.addEventListener('touchend', goFull, { passive: true })
+  document.addEventListener('click', goFull)
+}
+
+const herdInput = document.getElementById('herd-size')
+const herdOut = document.getElementById('herd-size-out')
+{
+  const s = SETTINGS.find((e) => e.key === 'sheepCount')
+  herdInput.min = s.min; herdInput.max = s.max; herdInput.step = s.step
+}
+herdInput.value = params.sheepCount
+herdOut.textContent = params.sheepCount
+herdInput.addEventListener('input', () => { herdOut.textContent = herdInput.value })
+herdInput.addEventListener('change', () => {
+  params.sheepCount = parseInt(herdInput.value, 10)
+  syncControllers('sheepCount')
+  HOOKS.respawn(); startIntro()
+})
+
+let paused = false
+const pauseBtn = document.getElementById('pause-btn')
+function togglePause() {
+  paused = !paused
+  pauseBtn.textContent = paused ? 'resume' : 'pause'
+  pauseBtn.classList.toggle('active', paused)
+}
+pauseBtn.addEventListener('click', togglePause)
+
+for (const b of camButtons) b.addEventListener('click', () => { setCam(b.dataset.cam); b.blur() })
+const overlayBtn = document.getElementById('overlay-btn')
+function toggleOverlays() { overlaysOn = !overlaysOn; overlayBtn.classList.toggle('active', overlaysOn) }
+overlayBtn.classList.add('active')
+overlayBtn.addEventListener('click', () => { toggleOverlays(); overlayBtn.blur() })
+
+const HOTKEYS = {
+  ArrowLeft:  { plain: 'come_by', shift: 'come_by_easy', alt: 'lie_down_left' },
+  ArrowUp:    { plain: 'walk_on', shift: 'easy', alt: ['walk_on', 'lean'], altShift: ['walk_on', 'bark'] },
+  ArrowRight: { plain: 'away', shift: 'away_easy', alt: 'lie_down_right' },
+  ArrowDown:  { plain: 'lie_down' },
+  Enter:      { plain: 'that_ll_do' },
+}
+window.addEventListener('keydown', (ev) => {
+  if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) return
+  const k = ev.key.toLowerCase()
+  // battle stations: ⌘⇧B (Ctrl⇧B off the Mac). A browser may keep that chord for itself (bookmarks bar), so plain B works too
+  if (k === 'b' && !ev.altKey && ((ev.metaKey || ev.ctrlKey) ? ev.shiftKey : true)) { ev.preventDefault(); return issue('battle_stations') }
+  if (!ev.metaKey && !ev.ctrlKey) {
+    if (k === 'f') return sim.finishRun()
+    if (k === 'r') return restartRun()
+    if (k === 'h') return togglePanels()
+    if (k === 'd') return toggleDrawer()
+    if (k === 'p') return togglePause()
+    if (k === 'n') return heelNip()
+    if (k === 'o') return toggleOverlays()
+    if (k === 'c') return setCam(CAMS[(CAMS.indexOf(camState.mode) + 1) % CAMS.length])
+    if (k >= '1' && k <= '4' && !ev.altKey) return setCam(CAMS[+k - 1])
+  }
+  const m = HOTKEYS[ev.key]
+  if (m) {
+    ev.preventDefault()
+    const pick = (ev.altKey && ev.shiftKey && m.altShift) || (ev.altKey && m.alt) || (ev.shiftKey && m.shift) || m.plain
+    const [cmd, flavor] = Array.isArray(pick) ? pick : [pick]
+    issue(cmd, flavor)
+  }
+})
+
+// ============================================================================
+// §4 BOOTSTRAP — the 2D page's fixed-timestep loop, rendering in 3D. [throwaway]
+// ============================================================================
+syncControllers('seed')
+for (const g of guis.roots) g.close() // raw-param panels start folded; the stage is the point of this page
+issue(sim.dog.command)
+setCam(CAMS.includes(query.get('cam')) ? query.get('cam') : 'orbit')
+startIntro()
+
+// POC-v14: the score face. `project` maps a sim point to stage px through the live camera.
+const popV = new V3()
+ScoreUI.init({
+  page: 'assault-3d', stage,
+  project: (x, y) => {
+    popV.set(x, 12, y).project(camera)
+    return popV.z > 1 || popV.z < -1 ? null : { x: (popV.x * 0.5 + 0.5) * stage.clientWidth, y: (-popV.y * 0.5 + 0.5) * stage.clientHeight }
+  },
+  setSeed, newCourse, restart: () => { restartRun(); setCam('orbit'); startIntro() }, // owner 2026-11-18: the end card's replay button always hard-resets the camera to the default orbit view (by way of the run-start intro)
+})
+PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
+
+let last = performance.now() / 1000
+let acc = 0, fps = 0, fpsAcc = 0, fpsFrames = 0, clock = 0
+
+function frame(nowMs) {
+  const now = nowMs / 1000
+  let delta = now - last
+  last = now
+  if (delta > params.maxFrameDelta) delta = params.maxFrameDelta
+  if (delta < 0) delta = 0
+
+  if (paused) acc = 0
+  else {
+    acc += delta
+    while (acc >= params.dt) {
+      sim.step(params.dt)
+      assaultStep(sim, params.dt)
+      acc -= params.dt
+    }
+    clock += delta
+  }
+
+  fpsAcc += delta
+  fpsFrames++
+  if (fpsAcc >= 0.25) {
+    fps = fpsFrames / fpsAcc
+    fpsAcc = 0
+    fpsFrames = 0
+  }
+
+  updateStrip()
+  render3D(paused ? 0 : delta, clock, fps)
+  requestAnimationFrame(frame)
+}
+
+// handles for the console (and for poking at the scene while tuning the look)
+window.__sheep3d = { THREE, sim, scene, camera, renderer, controls, setCam, issue, render3D, camIntro, homePose, handlerPos, ASSAULT, assault, assaultView, assaultStep: (dt) => assaultStep(sim, dt) }
+window.__sheep3dBooted = true
+requestAnimationFrame(frame)
+</script>
+</body>
+</html>

@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
+     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-title" content="Sheep" />
+<!-- no browser zoom on phones (owner 2026-11-18): fast taps on the pads read as a double-tap and zoomed the page -->
+<style>* { touch-action: manipulation; }</style>
+<script>
+  for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, e => e.preventDefault(), { passive: false }) // iOS pinch + double-tap
+  document.addEventListener("touchmove", e => { if (e.touches.length > 1 && !(e.target instanceof HTMLCanvasElement)) e.preventDefault() }, { passive: false }) // two thumbs on the buttons is not a pinch
+  // phone landscape (owner 2026-11-18): the page runs edge to edge (viewport-fit=cover) and keeps clear of the notch / Dynamic Island on
+  // whichever side it sits — the browser's own safe-area insets are the same both sides, so the rotation angle says which side that is
+  function islandSide() {
+    const a = typeof window.orientation === "number" ? window.orientation : (screen.orientation ? screen.orientation.angle : 0)
+    const c = document.documentElement.classList
+    c.toggle("island-left", a === 90) // turned anticlockwise: the top of the phone is on the left
+    c.toggle("island-right", a === -90 || a === 270)
+  }
+  islandSide()
+  addEventListener("orientationchange", islandSide)
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", islandSide)
+</script>
+<title>Sheep PoC — 2D</title>
+<!--
+  The 2D page (the original PoC). The game physics — §0 PARAMS + §1 SIM — is
+  lib/sheep-sim.js and the raw-param panels are lib/sheep-gui.js, both shared
+  with 3d.html and 3d-assault.html; §2 RENDER / §3 INPUT / §4 BOOTSTRAP below
+  are this page's own. Runs from file:// by double-click. index.html is the
+  version picker.
+-->
+<style>
+  /* [throwaway] — centered canvas, dark page, HUD */
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #14181c;
+    color: #cdd6df;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  body { overflow: hidden; }      /* #app owns the viewport; the side column scrolls inside itself */
+  /* [throwaway] POC-v11 napkin layout (docs/napkins/layout.drawio): pasture
+     left; ONE right column — dog controls → debug controls → levers section. */
+  #app {
+    display: flex;
+    gap: 12px;
+    height: 100vh;
+    height: 100dvh;               /* phones: exclude browser chrome */
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  #stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #side {
+    flex: 0 0 320px;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #side section {
+    flex: 0 0 auto;
+    background: rgba(10, 13, 16, 0.55);
+    border: 1px solid #2c353d;
+    border-radius: 4px;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  /* panels (H) — POC-v11: hides just the levers section; the pad + debug box
+     stay (phones have no H key to bring a hidden column back). */
+  body.panels-hidden #side-levers { display: none; }
+  #wrap {
+    position: relative;
+  }
+  canvas {
+    display: block;
+    background: #1c2228;
+    border: 1px solid #2c353d;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  }
+  /* [throwaway] POC-v11 debug box (napkin middle-right): the old pasture-header
+     grouping re-laid vertically — seed row, buttons, layout readout, HUD. */
+  #side-debug { display: flex; flex-direction: column; gap: 6px; }
+  #side-debug .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #side-debug label, #side-debug .row > span:first-child { color: #7b8894; }
+  #side-debug input {
+    width: 84px;
+    padding: 3px 6px;
+    font: inherit;
+    color: #cdd6df;
+    background: #1c2228;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+  }
+  #side-debug button {
+    padding: 3px 8px;
+    font: inherit;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #side-debug button:hover { background: #2c353d; }
+  #side-debug button kbd { margin-left: 4px; font: inherit; color: #7b8894; }
+  #side-debug .layout { color: #9fb0c0; }
+  #hud {
+    white-space: pre;
+    font-size: 12px;
+    color: #9fb0c0;
+    border-top: 1px solid #232b32;
+    padding-top: 6px;
+  }
+  /* [throwaway] command pad — POC-v10 3×3 (owner Q60 + same-day touch-up):
+       rows by gear — flanks on top (Come By / Walk On / Away), the gentle row
+       mid (Come Easy / Easy / Away Easy), the downs on the bottom (Left Down /
+       Lie Down / Right Down); a horizontal rule below the grid with That'll Do
+       centered under it. Finish removed; Reset + pause live in the header. */
+  #controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  #controls .pad {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 32px);
+    grid-template-areas:
+      "comeby  walk  away"
+      "comebye easy  awaye"
+      "lieL    lie   lieR";
+    gap: 6px;
+    align-items: center;
+    justify-items: stretch;
+  }
+  #controls .pad [data-cmd="come_by"]        { grid-area: comeby; }
+  #controls .pad [data-cmd="walk_on"]        { grid-area: walk; }
+  #controls .pad [data-cmd="away"]           { grid-area: away; }
+  #controls .pad [data-cmd="come_by_easy"]   { grid-area: comebye; }
+  #controls .pad [data-cmd="easy"]           { grid-area: easy; }
+  #controls .pad [data-cmd="away_easy"]      { grid-area: awaye; }
+  #controls .pad [data-cmd="lie_down_left"]  { grid-area: lieL; }
+  #controls .pad [data-cmd="lie_down"]       { grid-area: lie; }
+  #controls .pad [data-cmd="lie_down_right"] { grid-area: lieR; }
+  #controls button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 16px;
+    padding: 4px 6px;
+    height: 32px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  #controls button:hover { background: #2c363f; }
+  #controls button.active {
+    background: #2f5d3a;
+    border-color: #4c8a5e;
+    color: #eafaef;
+  }
+  #controls button kbd {
+    opacity: 0.55;
+    font-size: 10px;
+    margin-left: 3px;
+  }
+  #controls .sep { align-self: stretch; height: 1px; background: #37424c; margin: 2px 0; }
+  /* touch-up (owner): reseed / pause / capture in a small row below the pad */
+  #controls .aux { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  #controls .aux button {
+    height: auto;
+    padding: 3px 8px;
+    font-size: 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  #controls .herd { display: none; }   /* phone-only — media query below */
+  #controls .obst { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; }
+  #controls .obst label { color: #7b8894; }
+  #controls .obst input { flex: 1 1 auto; min-width: 0; }
+  #controls .obst #obst-freq-out { color: #9fb0c0; min-width: 9ch; text-align: right; white-space: nowrap; }
+  #card {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 300px;
+    padding: 20px 24px;
+    background: rgba(16, 20, 24, 0.96);
+    border: 1px solid #3a4650;
+    border-radius: 8px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  }
+  #card h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  #card .big { font-size: 44px; font-weight: 700; color: #7fd79a; margin-bottom: 12px; }
+  #card .big small { font-size: 16px; color: #7b8894; font-weight: 400; }
+  #card .row { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; border-top: 1px solid #232b32; }
+  #card .row span:last-child { color: #e08a8a; }
+  #card .foot { margin-top: 12px; font-size: 11px; color: #7b8894; }
+  #card .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  #card .actions button {
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  #card .actions button:hover { background: #2c353d; }
+  #card .actions button.primary { background: #2f5d3a; border-color: #4c8a5e; color: #eafaef; }
+  #card .actions button.primary:hover { background: #38704a; }
+  #card .actions button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-left: 4px; }
+  /* [throwaway] POC-v11: every panel stacks inside the levers section (napkin
+     bottom-right box); the Advanced disclosure still gates the raw panels. */
+  #side-levers { padding: 0; border: none; background: none; display: flex; flex-direction: column; }
+  #side-levers .lil-gui.root { width: 100%; --width: 100%; }
+  body.advanced-closed #panel-sheep, body.advanced-closed #panel-dog, body.advanced-closed #panel-meta { display: none; }
+  .lil-gui .lever-ends { font-size: 11px; color: #7b8894; white-space: normal; padding: 0 6px 4px; }
+  /* [throwaway] settings inspector: hover tooltip + per-category ⓘ grid */
+  #tip {
+    display: none;
+    position: fixed;
+    z-index: 1002;
+    max-width: 260px;
+    padding: 6px 8px;
+    background: rgba(16, 20, 24, 0.96);
+    border: 1px solid #3a4650;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+  #tip .meta { margin-top: 3px; font-size: 11px; color: #7b8894; }
+  .lil-gui .info-btn {
+    all: unset;
+    cursor: pointer;
+    margin-left: auto;
+    padding: 0 6px;
+    color: #7b8894;
+    font-size: 12px;
+  }
+  .lil-gui .info-btn:hover { color: #cdd6df; }
+  #inspector {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+  }
+  #inspector .panel {
+    max-width: min(1060px, 92vw);
+    max-height: 82vh;
+    overflow: auto;
+    padding: 14px 18px;
+    background: rgba(16, 20, 24, 0.98);
+    border: 1px solid #3a4650;
+    border-radius: 8px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  }
+  #inspector h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+  #inspector .close {
+    float: right;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: #7b8894;
+    font: inherit;
+    font-size: 15px;
+  }
+  #inspector .close:hover { color: #cdd6df; }
+  #inspector table { border-collapse: collapse; font-size: 12px; }
+  #inspector th, #inspector td { padding: 4px 10px; text-align: left; vertical-align: top; }
+  #inspector th {
+    position: sticky;
+    top: -14px;
+    background: #10141a;
+    color: #7b8894;
+    font-weight: 600;
+    border-bottom: 1px solid #3a4650;
+  }
+  #inspector tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.025); }
+  #inspector td.k, #inspector td.v { font-family: inherit; color: #9fd4b0; white-space: nowrap; }
+  #inspector td.d { color: #a9b4bf; font-family: system-ui, sans-serif; min-width: 220px; }
+  #inspector .noslider {
+    margin-left: 6px;
+    padding: 0 4px;
+    font-size: 10px;
+    color: #7b8894;
+    border: 1px solid #37424c;
+    border-radius: 3px;
+  }
+  /* [throwaway] POC-v11 phone landscape: phone-size = coarse pointer + short
+     viewport side ≤ 600 px. Portrait → block with a rotate prompt; landscape →
+     compact column + a ⛶ full-screen button (only where the API exists). */
+  #rotate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: #14181c;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    font-size: 15px;
+    color: #cdd6df;
+  }
+  #rotate-overlay .icon { font-size: 54px; animation: tip-over 1.4s ease-in-out infinite alternate; }
+  @keyframes tip-over { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+  #side-fullscreen { display: none; }   /* phone-only — media query below */
+  #fullscreen-btn {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12px;
+    color: #cdd6df;
+    background: #232b32;
+    border: 1px solid #37424c;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+    #rotate-overlay { display: flex; }
+  }
+  @media (pointer: coarse) and (max-height: 600px) {
+    body.can-fullscreen #side-fullscreen { display: block; }
+    #app { padding: 6px; gap: 8px; }
+    /* touch-up (owner 2026-08-24): the phone sidebar is the command pad ONLY,
+       vertically centered; two-word labels break onto two lines (.w2 spans) and
+       EVERY button gets that 2-line size (kbd hints dropped — no keys). */
+    #side { flex: 0 0 240px; justify-content: center; }
+    #side-debug, #side-levers { display: none; }
+    #controls .pad { grid-template-rows: repeat(3, 36px); gap: 4px; }
+    #controls button {
+      font-size: 11px;
+      line-height: 1.2;
+      height: 36px;
+      padding: 2px 4px;
+      border-radius: 12px;
+      white-space: normal;
+    }
+    #controls .w2 { display: block; }
+    #controls > button[data-cmd="that_ll_do"] { width: calc((100% - 8px) / 3); }
+    #controls .aux button { height: auto; font-size: 11px; white-space: nowrap; }
+    #controls .herd { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 11px; }
+    #controls .herd label { color: #7b8894; }
+    #controls .herd input { flex: 1 1 auto; min-width: 0; }
+    #controls .herd #herd-size-out { color: #9fb0c0; min-width: 3ch; text-align: right; }
+    #controls button kbd { display: none; }
+  }
+  #home-link { margin-left: auto; align-self: center; font-size: 12px; color: #9fb0c0; text-decoration: none; }
+  #home-link:hover { color: #e6edf3; text-decoration: underline; }
+  #controls > #nip-btn { width: calc((100% - 8px) / 3); }
+  /* NOTCH / DYNAMIC ISLAND (owner 2026-11-18) — the page keeps clear of it on the side it sits (html.island-left / .island-right,
+     set by islandSide() in the head) and runs out to the screen edge on the other side; trimmed 2026-11-19: the gap is 45 % of the safe-area inset (halved again the same day, owner: still too large) and replaces the edge padding instead of adding to it */
+  html { --il: 0px; --ir: 0px; }
+  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
+  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.45); }
+  #app { padding-left: max(10px, var(--il)); padding-right: max(10px, var(--ir)); }
+  @media (pointer: coarse) and (max-height: 600px) {
+    #app { padding-left: max(6px, var(--il)); padding-right: max(6px, var(--ir)); }
+  }
+</style>
+<!-- [throwaway] lil-gui UMD build (window.lil.GUI) — plain <script> can't import ESM -->
+<script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.umd.min.js"></script>
+<!-- P9 (Q2): slider defaults live in ONE editable sibling file — a pure JSON
+     literal in a `const SHEEP_DEFAULTS =` assignment (a real .json can't be
+     fetched from file://). Missing file → schema defaults + one warning. -->
+<script src="sheep-defaults.json.js?v=20261119a"></script>
+</head>
+<body class="advanced-closed">
+<div id="rotate-overlay">
+  <div class="icon">📱</div>
+  <div>rotate your phone —<br>the pasture plays in landscape</div>
+</div>
+<div id="app">
+<div id="stage">
+  <div id="wrap">
+    <canvas id="field" width="1120" height="720"></canvas>
+    <div id="card"></div>
+  </div>
+</div>
+<div id="side">
+<section id="side-debug">
+  <div class="row">
+    <label for="seed-input">seed</label>
+    <input id="seed-input" type="number" min="0" step="1" inputmode="numeric">
+  </div>
+  <div class="row">
+    <button id="panels-btn" title="show / hide the levers section">panels <kbd>H</kbd></button>
+    <button data-action="reset" title="restart the run on the same course">reset <kbd>R</kbd></button>
+    <a id="home-link" href="index.html" title="back to the version picker">⌂ versions</a>
+  </div>
+  <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
+  <div id="hud">boot…</div>
+</section>
+<section id="side-fullscreen">
+  <button id="fullscreen-btn" title="toggle full-screen">⛶ full-screen</button>
+</section>
+<section id="side-dog">
+  <div id="controls">
+    <div class="pad">
+      <button data-cmd="come_by">come <span class="w2">by</span> <kbd>←</kbd></button>
+      <button data-cmd="walk_on">walk <span class="w2">on</span> <kbd>↑</kbd></button>
+      <button data-cmd="away">away <kbd>→</kbd></button>
+      <button data-cmd="come_by_easy">come <span class="w2">easy</span> <kbd>⇧←</kbd></button>
+      <button data-cmd="easy">easy <kbd>⇧↑</kbd></button>
+      <button data-cmd="away_easy">away <span class="w2">easy</span> <kbd>⇧→</kbd></button>
+      <button data-cmd="lie_down_left">left <span class="w2">down</span> <kbd>⌥←</kbd></button>
+      <button data-cmd="lie_down">lie <span class="w2">down</span> <kbd>↓</kbd></button>
+      <button data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
+    </div>
+    <div class="sep"></div>
+    <button data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
+    <button id="nip-btn" title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; only shown while that can happen — N">heel <span class="w2">nip</span> <kbd>N</kbd></button>
+    <div class="sep"></div>
+    <div class="aux">
+      <button id="reseed-btn" title="draw a new course">reseed ↻</button>
+      <button id="pause-btn" title="freeze the sim — rendering, panels and capture stay live">pause <kbd>P</kbd></button>
+      <button id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture ⎘</button>
+    </div>
+    <div class="herd">
+      <label for="herd-size">herd</label>
+      <input id="herd-size" type="range">
+      <span id="herd-size-out">—</span>
+    </div>
+    <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+      <label for="obst-freq">obstacles</label>
+      <input id="obst-freq" type="range">
+      <span id="obst-freq-out">—</span>
+    </div>
+  </div>
+</section>
+<section id="side-levers">
+  <div id="panel-levers"></div>
+  <div id="panel-sheep"></div>
+  <div id="panel-dog"></div>
+  <div id="panel-meta"></div>
+</section>
+</div>
+</div>
+
+<!-- shared libs: the game physics (DOM-free) + the lil-gui panels built from its schema -->
+<script src="lib/sheep-sim.js?v=20261119b"></script>
+<script src="lib/sheep-gui.js?v=20261118p"></script>
+<script src="lib/sheep-score-ui.js?v=20261118r"></script>
+<script src="lib/sheep-pad-ui.js?v=20261119a"></script>
+<script src="lib/sheep-auto.js?v=20261118p"></script>
+<script src="lib/sheep-demo-ui.js?v=20261118q"></script>
+<script>
+'use strict'
+// ============================================================================
+// §2 RENDER — draw field / fence / FPS. [throwaway]
+// ============================================================================
+const canvas = document.getElementById('field')
+const ctx = canvas.getContext('2d')
+const hud = document.getElementById('hud')
+// POC-v11: seed + layout readouts live in the debug box (right column);
+// refreshed alongside the HUD each frame (input is left alone while the
+// owner is typing in it).
+const stage = document.getElementById('stage')
+const seedInput = document.getElementById('seed-input')
+const layoutOut = document.getElementById('layout-out')
+// POC-v5 P5 (Q14): the canvas follows params.canvasW/H — §1 already reads the
+// bounds from params on every reseed (playRect).
+function resizeCanvas() {
+  if (canvas.width !== params.canvasW) canvas.width = params.canvasW
+  if (canvas.height !== params.canvasH) canvas.height = params.canvasH
+  fitCanvas()
+}
+// POC-v11 scale-to-fit (Q63): contain-fit the fixed-resolution canvas into
+// #stage — CSS size only; the sim keeps playing at params.canvasW/H.
+function fitCanvas() {
+  const scale = Math.min(stage.clientWidth / canvas.width, stage.clientHeight / canvas.height)
+  canvas.style.width = Math.round(canvas.width * scale) + 'px'
+  canvas.style.height = Math.round(canvas.height * scale) + 'px'
+}
+window.addEventListener('resize', fitCanvas)
+// POC-v14: the score badge, the pops and the count-up tally card live in
+// lib/sheep-score-ui.js (one copy for all three pages) — see ScoreUI.init in §4.
+function hideCard() { ScoreUI.hide() }
+
+function render(fps) {
+  const { canvasW, canvasH, fenceInset } = params
+
+  // field background
+  ctx.fillStyle = '#1c2228'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+
+  // subtle grass gradient wash
+  ctx.fillStyle = '#20301f'
+  ctx.fillRect(fenceInset, fenceInset,
+               canvasW - 2 * fenceInset, canvasH - 2 * fenceInset)
+
+  // ideal path (line-axis reference), shaded by current deviation
+  drawPath()
+
+  // perimeter fence with the gate mouth open + pen apron + crush indicator
+  drawFence()
+  drawCrush()
+
+  // obstacles — stands of trees / large rocks (solid; the flock parts round them)
+  drawObstacles()
+  drawDriveGates() // POC-v14 FO1: optional hurdle pairs worth bonus points
+  drawBulls()      // POC-v17: wandering bulls — moving solids the sheep go round
+
+  // gate attraction area (POC-v9 V1) — under the sheep, like the dog's presence
+  if (params.debug.gateAttract) drawGateAttract()
+
+  // field markers (under everything): goal pen center + dog's owner/home
+  drawGoal(params.goal)
+  drawOwner(sim.dog.owner)
+
+  // dotted flock outline — hull of the working flock, pushed out N sheep-lengths
+  if (params.debug.flockOutline) drawFlockOutline()
+  if (params.debug.dogTrack) drawDogTrack()      // C8 flank track (only while flanking)
+
+  // the "eye" (threat viz) sits under the sheep so they read on top (toggle)
+  if (params.debug.eye) drawEye(sim.dog)
+
+  // sheep — triangles pointing along facing (12 × 8 px, nose forward)
+  for (const s of sim.sheep) drawSheep(s)
+
+  // dog on top
+  drawDog(sim.dog)
+
+  // debug overlays (each gated so toggled-off work is skipped, not just hidden)
+  drawDebugOverlays()
+
+  // live flock-stress meter (overlay)
+  drawStressMeter()
+
+  // HUD readout
+  const sc = sim.score()
+  hud.textContent = // POC-v11: 4 short lines — the debug box is ~300 px wide
+    `fps ${fps.toFixed(0)}  cmd ${sim.dog.command}${sim.dog.flankEasy ? '·easy' : ''}${sim.dog.lieSide ? (sim.dog.lieSide < 0 ? '·left' : '·right') : ''}${sim.dog.impulse ? ' ⚡' + sim.dog.impulse.name : ''}\n` +
+    `intensity ${sim.dog.intensity.toFixed(2)}${sim.dog.impulseFactor > 1 ? ' ×' + sim.dog.impulseFactor.toFixed(2) : ''}  crush ${sim.crush.toFixed(1)}/${params.crushThreshold.toFixed(1)}\n` +
+    `trot ${sim.sheep.reduce((n, s) => n + (s.trot ? 1 : 0), 0)}  injuries ${sim.injuries}  penned ${sc.penned}/${sim.sheep.length}\n` +
+    ScoreUI.hud(sim)
+  if (document.activeElement !== seedInput && seedInput.value !== String(params.seed)) seedInput.value = params.seed
+  if (document.activeElement !== herdInput && herdInput.value !== String(params.sheepCount)) { herdInput.value = params.sheepCount; herdOut.textContent = params.sheepCount }
+  if (layoutOut.textContent !== sim.layout) layoutOut.textContent = sim.layout
+  syncObstacleSlider()
+
+  // POC-v14 score face (shared lib)
+  ScoreUI.frame(sim) // badge, pops, and the tally card when the run ends
+  DemoUI.frame(sim)  // demo mode: what the auto-handler is doing, and a pulse on the pad when the command changes
+}
+
+// Sheep body length in px — drawSheep's triangle is SHEEP_LEN × (2/3·SHEEP_LEN).
+const SHEEP_LEN = 12
+
+
+// Light-grey dotted outline around the working flock (not penned, not down):
+// the convex hull offset outward by `perimeterMargin` px, with round corners
+// (Minkowski sum with a disc) so it follows the flock's shape. This is the
+// HERD PERIMETER LINE the flanking dog tracks (C8, owner 2026-08-22).
+// (convexHull itself moved to §1 in POC-v6 P0 — the sim owns `hull`.)
+function drawFlockOutline() {
+  const hull = sim.hull                  // §1 owns the perimeter since POC-v6 P0
+  if (hull.length === 0) return
+  const m = params.perimeterMargin
+  // markers: §1's perimeterMarkers (corner apexes + side midpoints, clockwise,
+  // with outward normals) — the capture snapshot and C10 use the same list, so
+  // what you paste and what the dog steers by match the canvas
+  const markers = sim.perimeterMarkers(m)
+  ctx.save()
+  ctx.strokeStyle = 'rgba(200,208,216,0.55)'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([2, 6])
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  if (hull.length === 1) {
+    const c = hull[0]
+    ctx.arc(c.x, c.y, m, 0, Math.PI * 2)   // lone sheep: a disc (four compass markers)
+  } else {
+    // For each vertex, arc from the previous edge's outward normal to the next
+    // edge's; ctx.arc's implicit lineTo between arcs draws the offset edges.
+    // cross>0 hull order is visually CLOCKWISE on the y-down canvas, so the
+    // marker sequence (corner, side, corner, side, …) already runs clockwise.
+    const n = hull.length
+    const normalAngle = (a, b) => Math.atan2(-(b.x - a.x), b.y - a.y) // (dy, -dx) for cross>0 order
+    for (let i = 0; i < n; i++) {
+      const prev = hull[(i - 1 + n) % n], v = hull[i], next = hull[(i + 1) % n]
+      let a0 = normalAngle(prev, v), a1 = normalAngle(v, next)
+      if (a1 < a0) a1 += Math.PI * 2            // turn is always a left turn (≤ 180°)
+      ctx.arc(v.x, v.y, m, a0, a1)
+    }
+    ctx.closePath()
+  }
+  ctx.stroke()
+  ctx.restore()
+  if (params.debug.outlineMarkers) drawOutlineMarkers(markers)
+}
+
+// The outline's corner apexes + side midpoints in clockwise hull order, each
+// with its outward normal — §1's list (POC-v8: the marker walk moved into
+// FlockSim.perimeterMarkers so C10 can steer by it). Used by the capture
+// snapshot so the numbers in the JSON are the numbers on the canvas.
+function outlineMarkers() { return sim.perimeterMarkers(params.perimeterMargin) }
+// Index of marker #1 — the one nearest the gate.
+function markerStart(markers) {
+  const g = sim.gate
+  let start = 0, best = Infinity
+  for (let i = 0; i < markers.length; i++) {
+    const d = (markers[i].x - g.x) ** 2 + (markers[i].y - g.y) ** 2
+    if (d < best) { best = d; start = i }
+  }
+  return start
+}
+
+// Numbered waypoints on the outline: 1 = the marker nearest the gate, then
+// clockwise. Labels sit just outside the line along each marker's normal.
+function drawOutlineMarkers(markers) {
+  const start = markerStart(markers)
+  ctx.save()
+  ctx.font = '10px ui-monospace, monospace'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  for (let k = 0; k < markers.length; k++) {
+    const mk = markers[(start + k) % markers.length]
+    ctx.fillStyle = k === 0 ? 'rgba(230,236,240,0.95)' : 'rgba(200,208,216,0.8)'
+    ctx.beginPath(); ctx.arc(mk.x, mk.y, k === 0 ? 3.5 : 2.5, 0, Math.PI * 2); ctx.fill()
+    ctx.fillText(String(k + 1), mk.x + mk.nx * 10, mk.y + mk.ny * 10)
+  }
+  ctx.restore()
+}
+
+// POC-v6 C8: the line the flanking dog tracks — the hull offset by
+// perimeterMargin (= the dotted outline since the 2026-08-22 touch-up),
+// sampled by bearing from the GCM (§1 perimeterRadius). Drawn only while he
+// flanks, faint, in the dog's colour, on top of the outline.
+function drawDogTrack() {
+  const cmd = sim.dog.command
+  if (cmd !== 'come_by' && cmd !== 'away') return
+  if (sim.hull.length === 0) return
+  const g = sim.gcm, N = 72
+  ctx.save()
+  ctx.strokeStyle = 'rgba(216,154,99,0.35)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([5, 5])
+  ctx.beginPath()
+  for (let k = 0; k <= N; k++) {
+    const a = k / N * Math.PI * 2
+    const r = sim.perimeterRadius(a, params.perimeterMargin)
+    const x = g.x + r * Math.cos(a), y = g.y + r * Math.sin(a)
+    if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawPath() {
+  const path = sim.idealPath
+  const dev = Math.min(1, sim.distToPath(sim.gcm) / params.lineNorm) // shade by deviation
+  ctx.save()
+  ctx.setLineDash([6, 7])
+  ctx.strokeStyle = `rgba(${Math.round(110 + 130 * dev)},${Math.round(170 - 110 * dev)},120,0.45)`
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(path[0].x, path[0].y)
+  for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.restore()
+}
+
+// Debug overlays — each block is skipped entirely when its toggle is off.
+function drawDebugOverlays() {
+  const d = params.debug
+
+  if (d.spawnHoles) {                     // POC-v5: F6 empty patches + F7 core disc as drawn at spawn
+    ctx.save()
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.setLineDash([4, 4])
+    ctx.lineWidth = 1
+    for (const h of sim.holes) { ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke() }
+    if (sim.focus) {
+      ctx.strokeStyle = 'rgba(255,210,120,0.5)'
+      ctx.beginPath(); ctx.arc(sim.focus.x, sim.focus.y, sim.focus.r, 0, Math.PI * 2); ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  if (d.neighbors) {                      // links between sheep within r_align
+    ctx.save()
+    ctx.strokeStyle = 'rgba(120,165,205,0.22)'
+    ctx.lineWidth = 1
+    const r2 = params.r_align * params.r_align
+    const sh = sim.sheep
+    ctx.beginPath()
+    for (let i = 0; i < sh.length; i++) for (let j = i + 1; j < sh.length; j++) {
+      const dx = sh[i].pos.x - sh[j].pos.x, dy = sh[i].pos.y - sh[j].pos.y
+      if (dx * dx + dy * dy <= r2) { ctx.moveTo(sh[i].pos.x, sh[i].pos.y); ctx.lineTo(sh[j].pos.x, sh[j].pos.y) }
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  if (d.velocity) {                       // per-sheep velocity vectors
+    ctx.save()
+    ctx.strokeStyle = 'rgba(120,225,150,0.75)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    for (const s of sim.sheep) {
+      ctx.moveTo(s.pos.x, s.pos.y)
+      ctx.lineTo(s.pos.x + s.vel.x * 0.3, s.pos.y + s.vel.y * 0.3)
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  if (d.gcm) {                            // flock centroid marker
+    const g = sim.gcm
+    ctx.save()
+    ctx.strokeStyle = '#57d3e0'; ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.arc(g.x, g.y, 8, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(g.x - 11, g.y); ctx.lineTo(g.x + 11, g.y)
+    ctx.moveTo(g.x, g.y - 11); ctx.lineTo(g.x, g.y + 11); ctx.stroke()
+    ctx.restore()
+  }
+
+  if (d.gateZone) {                       // G1 commitment zone at the mouth
+    const g = sim.gate
+    ctx.save()
+    ctx.strokeStyle = 'rgba(95,191,122,0.5)'; ctx.lineWidth = 1
+    ctx.setLineDash([3, 5])
+    ctx.beginPath(); ctx.arc(g.x, g.y, params.gateApproachR, 0, Math.PI * 2); ctx.stroke()
+    if (params.gateAttractR > 0) {        // G2 draw radius (POC-v7), outside the zone
+      ctx.strokeStyle = 'rgba(95,191,122,0.3)'; ctx.setLineDash([2, 7])
+      ctx.beginPath(); ctx.arc(g.x, g.y, params.gateAttractR, 0, Math.PI * 2); ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ctx.restore()
+  }
+
+  if (d.dogTarget) {                      // dog → target
+    const dg = sim.dog
+    ctx.save()
+    ctx.strokeStyle = 'rgba(216,154,99,0.7)'; ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+    ctx.beginPath(); ctx.moveTo(dg.pos.x, dg.pos.y); ctx.lineTo(dg.target.x, dg.target.y); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = '#d89a63'
+    ctx.beginPath(); ctx.arc(dg.target.x, dg.target.y, 3, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+  }
+
+  if (d.state) {                          // collect/drive strategic label
+    const g = sim.gcm, drive = sim.isCohesive()
+    ctx.save()
+    ctx.font = 'bold 12px ui-monospace, monospace'
+    ctx.fillStyle = drive ? '#7fd79a' : '#e0b070'
+    ctx.textAlign = 'center'
+    ctx.fillText(drive ? 'DRIVE' : 'COLLECT', g.x, g.y - 26)
+    if (sim.dog.handoff) {                // C9: where the last flank dropped into easy
+      const h = sim.dog.handoff
+      ctx.strokeStyle = '#e0b070'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.arc(h.x, h.y, 7, 0, Math.PI * 2); ctx.stroke()
+      ctx.font = '10px ui-monospace, monospace'
+      ctx.fillStyle = '#e0b070'
+      ctx.fillText('handoff → easy', h.x, h.y - 11)
+    }
+    ctx.textAlign = 'left'
+    ctx.restore()
+  }
+}
+
+function drawStressMeter() {
+  let sum = 0
+  for (const s of sim.sheep) sum += s.stress
+  const mean = sim.sheep.length ? sum / sim.sheep.length : 0
+  const w = 220, h = 10, x = params.canvasW / 2 - w / 2, y = 12
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = `rgb(${Math.round(110 + 145 * mean)},${Math.round(200 - 170 * mean)},80)`
+  ctx.fillRect(x, y, w * Math.min(1, mean * 2), h)   // ×2: mean rarely exceeds 0.5
+  ctx.strokeStyle = '#4a5560'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h)
+  ctx.fillStyle = '#9fb0c0'; ctx.font = '11px ui-monospace, monospace'
+  ctx.fillText('flock stress', x, y - 3)
+  ctx.restore()
+}
+
+// Perimeter fence (P6): four walls with the gate mouth open on sim.gate's
+// side, posts at the mouth, and the pen apron shaded just outside it.
+// Obstacles (owner 2026-11-14): each is a solid disc in §1; what fills it —
+// the crowns of a stand, the boulders of a rock — comes from obstacleItems()
+// (lib, seeded per obstacle), cached per course since it never changes.
+let obstacleArt = { of: null, list: [] }
+// POC-v14 FO1–FO3: a drive gate = two solid hurdle panels with a gap. Sheep
+// through the gap score; once the whole working flock has been through, the
+// gate is done and turns green.
+function drawDriveGates() {
+  for (const d of sim.driveGates) {
+    const col = d.done ? '#7fd79a' : '#c9a468'
+    ctx.save()
+    ctx.strokeStyle = d.done ? 'rgba(127,215,154,0.55)' : 'rgba(159,208,255,0.55)' // the scoring line across the gap
+    ctx.lineWidth = 1.5; ctx.setLineDash([4, 5])
+    ctx.beginPath(); ctx.moveTo(d.a0.x, d.a0.y); ctx.lineTo(d.a1.x, d.a1.y); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.lineCap = 'round'
+    for (const [a, b] of [[d.a0, d.e0], [d.a1, d.e1]]) {
+      ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 7
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+      ctx.strokeStyle = col; ctx.lineWidth = 4
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+    }
+    for (const pt of [d.a0, d.a1]) {                 // the two gap posts
+      ctx.fillStyle = d.done ? '#eafaef' : '#f1e3c4'; ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    }
+    ctx.fillStyle = d.done ? '#7fd79a' : '#9fd0ff'
+    ctx.font = '600 11px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(d.done ? '✓' : d.passed.size ? String(d.passed.size) : '+', d.x, d.y)
+    ctx.restore()
+  }
+}
+
+// POC-v17: a bull from above — a large black body along his heading, head and
+// cream horns at the front; the faint disc under him is his collision circle.
+function drawBulls() {
+  for (const b of sim.bulls) {
+    const r = b.r
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+    ctx.rotate(b.heading)
+    ctx.strokeStyle = '#111114'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'  // tail
+    ctx.beginPath(); ctx.moveTo(-r * 0.85, 0); ctx.lineTo(-r * 1.12, r * 0.12 * Math.sin(sim.ticks / 40 + b.seed)); ctx.stroke()
+    ctx.fillStyle = '#17171a'; ctx.strokeStyle = '#050506'; ctx.lineWidth = 1.2
+    ctx.beginPath(); ctx.ellipse(-r * 0.08, 0, r * 0.82, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()   // barrel
+    ctx.fillStyle = '#222226'
+    ctx.beginPath(); ctx.ellipse(r * 0.3, 0, r * 0.3, r * 0.44, 0, 0, Math.PI * 2); ctx.fill()                   // shoulders
+    ctx.strokeStyle = '#e9dfc6'; ctx.lineWidth = 2.2                                                            // horns
+    for (const sgn of [1, -1]) { ctx.beginPath(); ctx.moveTo(r * 0.72, sgn * r * 0.2); ctx.quadraticCurveTo(r * 0.74, sgn * r * 0.52, r * 0.98, sgn * r * 0.5); ctx.stroke() }
+    ctx.fillStyle = '#17171a'; ctx.strokeStyle = '#050506'; ctx.lineWidth = 1.2
+    ctx.beginPath(); ctx.ellipse(r * 0.82, 0, r * 0.27, r * 0.24, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()   // head
+    ctx.fillStyle = '#3a3336'
+    ctx.beginPath(); ctx.ellipse(r * 1.02, 0, r * 0.1, r * 0.15, 0, 0, Math.PI * 2); ctx.fill()                  // muzzle
+    ctx.restore()
+  }
+}
+
+function drawObstacles() {
+  if (obstacleArt.of !== sim.obstacles) {
+    obstacleArt = { of: sim.obstacles, list: sim.obstacles.map((o) => ({ o, items: obstacleItems(o) })) }
+  }
+  for (const { o, items } of obstacleArt.list) {
+    if (o.kind === 'hurdle') continue // a drive-gate panel disc — drawDriveGates draws the panel itself
+    // ground shadow / footprint = the collision circle
+    ctx.fillStyle = o.kind === 'rocks' ? 'rgba(0,0,0,0.28)' : 'rgba(10,22,10,0.45)'
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill()
+    for (const it of items) {
+      if (o.kind === 'rocks') {
+        const n = 7, rot = it.tone * 6
+        ctx.beginPath()
+        for (let k = 0; k < n; k++) { // a lumpy heptagon — the wobble is seeded by the tone, so it holds still
+          const a = rot + (k / n) * Math.PI * 2, rr = it.r * (0.82 + 0.18 * Math.sin(it.tone * 40 + k * 2.3))
+          const x = it.x + Math.cos(a) * rr, y = it.y + Math.sin(a) * rr
+          if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y)
+        }
+        ctx.closePath()
+        const v = Math.round(104 + it.tone * 34)
+        ctx.fillStyle = `rgb(${v},${v + 2},${v + 6})`; ctx.fill()
+        ctx.strokeStyle = '#4c5257'; ctx.lineWidth = 1.5; ctx.stroke()
+        ctx.fillStyle = 'rgba(255,255,255,0.10)' // lit top-left face
+        ctx.beginPath(); ctx.arc(it.x - it.r * 0.25, it.y - it.r * 0.25, it.r * 0.45, 0, Math.PI * 2); ctx.fill()
+      } else {
+        ctx.fillStyle = `rgb(${Math.round(34 + it.tone * 18)},${Math.round(86 + it.tone * 34)},${Math.round(40 + it.tone * 14)})`
+        ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2); ctx.fill()
+        ctx.strokeStyle = '#17331a'; ctx.lineWidth = 1; ctx.stroke()
+        ctx.fillStyle = 'rgba(190,230,150,0.16)' // sunlit side of the crown
+        ctx.beginPath(); ctx.arc(it.x - it.r * 0.3, it.y - it.r * 0.3, it.r * 0.5, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#4a3622'                // trunk, seen from above
+        ctx.beginPath(); ctx.arc(it.x, it.y, 1.8, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+  }
+}
+
+function drawFence() {
+  const { gateWidth, fenceInset, canvasW, canvasH } = params
+  const g = sim.gate, half = gateWidth / 2
+  const r = { x0: fenceInset, y0: fenceInset, x1: canvasW - fenceInset, y1: canvasH - fenceInset }
+  const corners = [
+    [{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }], // 0 N
+    [{ x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }], // 1 E
+    [{ x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }], // 2 S
+    [{ x: r.x0, y: r.y1 }, { x: r.x0, y: r.y0 }], // 3 W
+  ]
+  const gA = { x: g.x - g.tx * half, y: g.y - g.ty * half }
+  const gB = { x: g.x + g.tx * half, y: g.y + g.ty * half }
+  ctx.save()
+  // pen apron shading outside the mouth
+  const d = fenceInset - 6
+  ctx.fillStyle = 'rgba(95,191,122,0.10)'
+  ctx.beginPath()
+  ctx.moveTo(gA.x, gA.y)
+  ctx.lineTo(gA.x + g.nx * d, gA.y + g.ny * d)
+  ctx.lineTo(gB.x + g.nx * d, gB.y + g.ny * d)
+  ctx.lineTo(gB.x, gB.y)
+  ctx.closePath(); ctx.fill()
+  // walls (the gate side splits into two segments around the mouth)
+  ctx.strokeStyle = '#8a7a52'
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  for (let side = 0; side < 4; side++) {
+    const [a, b] = corners[side]
+    if (side !== g.side) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); continue }
+    // order the mouth endpoints along a→b so the segments don't overlap it
+    const aFirst = (gA.x - a.x) * (b.x - a.x) + (gA.y - a.y) * (b.y - a.y) <
+                   (gB.x - a.x) * (b.x - a.x) + (gB.y - a.y) * (b.y - a.y)
+    const m1 = aFirst ? gA : gB, m2 = aFirst ? gB : gA
+    ctx.moveTo(a.x, a.y); ctx.lineTo(m1.x, m1.y)
+    ctx.moveTo(m2.x, m2.y); ctx.lineTo(b.x, b.y)
+  }
+  ctx.stroke()
+  ctx.fillStyle = '#c2ab68'             // gate posts
+  ctx.fillRect(gA.x - 3, gA.y - 3, 6, 6)
+  ctx.fillRect(gB.x - 3, gB.y - 3, 6, 6)
+  ctx.restore()
+}
+
+// Gate-mouth heat: warms yellow→red as crush climbs, flares past threshold. Must
+// be visible BEFORE it injures, so the player can read the danger and lie down.
+function drawCrush() {
+  const { crushRadius, crushThreshold } = params
+  const t = crushThreshold > 0 ? sim.crush / crushThreshold : 0
+  if (t < 0.05) return
+  const tc = Math.min(t, 1)
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(sim.gate.x, sim.gate.y, crushRadius, 0, Math.PI * 2)
+  const green = Math.round(180 * (1 - tc))
+  ctx.fillStyle = `rgba(255,${green},40,${(0.10 + 0.30 * Math.min(t, 1.3)).toFixed(3)})`
+  ctx.fill()
+  if (t >= 1) {                          // over threshold → hot ring warning
+    ctx.strokeStyle = 'rgba(255,60,30,0.9)'; ctx.lineWidth = 3; ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// POC-v9 V1: the gate's DRAW area (G2 gateAttractR) as a light-blue
+// transparent overlay — the gate-side counterpart of the dog's presence
+// overlay (drawEye). Outer disc = where the pull fades in; inner disc =
+// full pull (the G2 smoothstep saturates inside half the radius).
+function drawGateAttract() {
+  const R = params.gateAttractR
+  if (R <= 0) return
+  const g = sim.gate
+  ctx.save()
+  ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(110,180,255,0.08)'; ctx.fill()
+  ctx.strokeStyle = 'rgba(110,180,255,0.22)'; ctx.lineWidth = 1; ctx.stroke()
+  ctx.beginPath(); ctx.arc(g.x, g.y, R * 0.5, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(110,180,255,0.10)'; ctx.fill()
+  // POC-v13 G5: the cone the draw has grown toward a trotting line's leaders
+  const c = sim.gateCone
+  if (c && c.len > 0) {
+    const half = params.gateConeDeg / 2 * Math.PI / 180
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.arc(g.x, g.y, R + c.len, c.ang - half, c.ang + half); ctx.closePath()
+    ctx.fillStyle = 'rgba(110,180,255,0.10)'; ctx.fill()
+    ctx.strokeStyle = 'rgba(110,180,255,0.30)'; ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function drawGoal(g) {
+  ctx.save()
+  ctx.strokeStyle = '#5fbf7a'
+  ctx.lineWidth = 2
+  ctx.beginPath(); ctx.arc(g.x, g.y, 16, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(g.x, g.y, 4, 0, Math.PI * 2)
+  ctx.fillStyle = '#5fbf7a'; ctx.fill()
+  ctx.restore()
+}
+
+function drawOwner(o) {
+  ctx.save()
+  ctx.fillStyle = '#8aa2b8'
+  ctx.fillRect(o.x - 4, o.y - 4, 8, 8)
+  ctx.restore()
+}
+
+function drawSheep(s) {
+  if (s.down) {                    // injured → distinct dark-red marker
+    ctx.save()
+    ctx.translate(s.pos.x, s.pos.y)
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2)
+    ctx.fillStyle = '#7a1f1f'; ctx.fill()
+    ctx.strokeStyle = '#e06a6a'; ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(4, 4)
+    ctx.moveTo(4, -4); ctx.lineTo(-4, 4); ctx.stroke()
+    ctx.restore()
+    return
+  }
+  const t = Math.max(0, Math.min(1, s.stress)) // stress tint: wool → alarm red
+  // POC-v14 FO4–FO6: a golden ewe is gold, a lamb is small, a ram is big, dun and horned
+  // POC-v15 FO8–FO10: a black sheep is black, the bellwether pale blue with a bell, a yearling slight and buff
+  const [wr, wg, wb] = s.kind === 'golden' ? [255, 205, 60] : s.kind === 'ram' ? [196, 176, 150] : s.kind === 'black' ? [44, 44, 50] : s.kind === 'bell' ? [150, 200, 240] : s.kind === 'yearling' ? [243, 214, 184] : [230, 233, 236]
+  let cr = Math.round(wr + (220 - wr) * t)
+  let cg = Math.round(wg + (70 - wg) * t)
+  let cb = Math.round(wb + (60 - wb) * t)
+  const fl = ScoreUI.flash(s) // just scored → blink in the score's colour
+  if (fl) { cr = Math.round(cr + (fl.r - cr) * fl.k); cg = Math.round(cg + (fl.g - cg) * fl.k); cb = Math.round(cb + (fl.b - cb) * fl.k) }
+  ctx.save()
+  ctx.translate(s.pos.x, s.pos.y)
+  ctx.rotate(s.facing)
+  if (s.kind === 'lamb') ctx.scale(0.62, 0.62)
+  else if (s.kind === 'ram') ctx.scale(1.3, 1.3)
+  else if (s.kind === 'yearling') ctx.scale(params.yearlingSize, params.yearlingSize)
+  else if (s.kind === 'bell') ctx.scale(1.12, 1.12)
+  ctx.beginPath()
+  const h = SHEEP_LEN / 2, w = SHEEP_LEN / 3
+  ctx.moveTo(h, 0)      // nose (forward = +x, length SHEEP_LEN = 12)
+  ctx.lineTo(-h, w)     // width 8
+  ctx.lineTo(-h, -w)
+  ctx.closePath()
+  ctx.fillStyle = `rgb(${cr},${cg},${cb})`
+  ctx.fill()
+  ctx.strokeStyle = s.kind === 'golden' ? '#8a6a10' : s.kind === 'black' ? '#c9d1d8' : '#3a444d'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  if (s.kind === 'bell') { ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(h - 4, 0, 2, 0, Math.PI * 2); ctx.fill() } // her bell
+  if (s.kind === 'ram') {                          // horns, either side of the nose
+    ctx.strokeStyle = s.stand ? '#ffd24a' : '#5a4632'; ctx.lineWidth = 1.6
+    ctx.beginPath(); ctx.arc(h - 3, 3.2, 2.4, 0.3, Math.PI * 1.5); ctx.stroke()
+    ctx.beginPath(); ctx.arc(h - 3, -3.2, 2.4, -Math.PI * 1.5, -0.3); ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// The "eye": ambient threat circle + directional cone wedge, PER COMMAND since
+// POC-v9: walk-on reaches R_flee·(1+driveConeExt) at the coneK width (E5), easy
+// R_flee·(1+easyConeExt) at easyConeDeg (E6), lie-down R_flee·(1+lieConeExt) at
+// lieConeDeg with its short postureRange ambient flanks (D3). The wedge is the
+// half-strength contour of the falloff. Tuning must see this.
+function drawEye(d) {
+  const { R_flee, coneK, ambient } = params
+  const easy = d.command === 'easy', lying = d.command === 'lie_down'
+  const Rc = lying ? R_flee * (1 + params.lieConeExt)
+           : d.command === 'walk_on' ? R_flee * (1 + params.driveConeExt)
+           : easy ? R_flee * (1 + params.easyConeExt)
+           : R_flee
+  const Ra = lying ? R_flee * params.postureRange : R_flee   // ambient (flank) reach
+  ctx.beginPath()
+  ctx.arc(d.pos.x, d.pos.y, Ra, 0, Math.PI * 2)
+  ctx.fillStyle = `rgba(220,80,80,${(0.04 + 0.12 * ambient).toFixed(3)})`
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(220,80,80,0.25)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  const half = easy ? params.easyConeDeg / 2 * Math.PI / 180
+             : lying ? params.lieConeDeg / 2 * Math.PI / 180
+             : Math.acos(Math.pow(0.5, 1 / Math.max(coneK, 0.01)))
+  ctx.beginPath()
+  ctx.moveTo(d.pos.x, d.pos.y)
+  const mid = d.facing + (d.lieSide || 0) * params.downConeOffsetDeg * Math.PI / 180 // D4: offset downs swing the wedge
+  ctx.arc(d.pos.x, d.pos.y, Rc, mid - half, mid + half)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(235,95,70,0.18)'
+  ctx.fill()
+}
+
+function drawDog(d) {
+  ctx.save()
+  ctx.translate(d.pos.x, d.pos.y)
+  ctx.rotate(d.facing)
+  ctx.beginPath()
+  ctx.moveTo(8, 0)       // nose (16 long)
+  ctx.lineTo(-8, 5.5)    // 11 wide
+  ctx.lineTo(-8, -5.5)
+  ctx.closePath()
+  ctx.fillStyle = '#241812'
+  ctx.fill()
+  ctx.strokeStyle = '#d89a63'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  ctx.restore()
+}
+
+// ============================================================================
+// §3 INPUT — five commands via buttons + hotkeys. [throwaway]
+//   Player→command only: buttons/keys set `dog.command` through sim.setCommand();
+//   §1 does all the steering. No sheep are ever touched by input.
+// ============================================================================
+const cmdButtons = Array.from(document.querySelectorAll('#controls button[data-cmd]'))
+// POC-v10: the four variant buttons are §3-only names — resolved here to the
+// §1 verb + entry opts. §1's COMMANDS stays at the six verbs.
+const VARIANTS = {
+  come_by_easy:   ['come_by',  { easy: true }],
+  away_easy:      ['away',     { easy: true }],
+  lie_down_left:  ['lie_down', { side: -1 }],
+  lie_down_right: ['lie_down', { side: 1 }],
+}
+// The strip shows the dog's ACTUAL state (locked Q5): §4's frame loop calls
+// updateStrip() every render, so auto-easy (E2) lights up. displayCommand maps
+// dog state back to a variant button name (a gentle flank lights Come Easy).
+function displayCommand(d) {
+  if (d.flankEasy && (d.command === 'come_by' || d.command === 'away')) return d.command === 'come_by' ? 'come_by_easy' : 'away_easy'
+  if (d.command === 'lie_down' && d.lieSide) return d.lieSide < 0 ? 'lie_down_left' : 'lie_down_right'
+  return d.command
+}
+function updateStrip() {
+  const cmd = displayCommand(sim.dog)
+  for (const b of cmdButtons) b.classList.toggle('active', b.dataset.cmd === cmd)
+}
+function issue(cmd, flavor) {
+  const [verb, vopts] = VARIANTS[cmd] || [cmd, {}]
+  sim.setCommand(verb, flavor ? { ...vopts, impulse: flavor } : vopts)
+  updateStrip() // an E3 impulse keeps the dog in easy
+}
+const flavorOf = (ev) => (ev.shiftKey ? 'bark' : ev.altKey ? 'lean' : undefined)
+function restartRun() { sim.reseed(params.seed); hideCard(); issue('that_ll_do') }
+for (const b of cmdButtons) b.addEventListener('click', (ev) => issue(b.dataset.cmd, flavorOf(ev)))
+// heel nip (owner 2026-11-18): not a command — the dog dives, bites and goes back to what he was on (sim.heelNip)
+const nipBtn = document.getElementById('nip-btn')
+function heelNip() { sim.heelNip() }
+nipBtn.addEventListener('click', () => { heelNip(); nipBtn.blur() })
+document.querySelector('[data-action="reset"]').addEventListener('click', restartRun) // Reset lives in the header now (touch-up); Finish button removed — F still ends a run
+// pasture header (implemented/POC-v5/pasture-header.md) — the seed control above the canvas.
+// Both routes go through the same §3 actions the lil-gui `PRNG seed` field and
+// `Tools → Reseed` use; the lil-gui seed field is refreshed so they never disagree.
+function syncSeedControllers() {
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === 'seed') c.updateDisplay()
+}
+function setSeed(seed) { // re-lay a typed course (same as editing the lil-gui field)
+  params.seed = seed >>> 0
+  HOOKS.respawn(); hideCard(); issue('that_ll_do')
+  syncSeedControllers()
+}
+function newCourse() { // draw a fresh seed (Tools → Reseed → new flock does the same)
+  setSeed(Math.floor(Math.random() * 1e6))
+}
+seedInput.addEventListener('change', () => {
+  const v = parseInt(seedInput.value, 10)
+  if (Number.isFinite(v) && v >= 0 && (v >>> 0) !== params.seed) setSeed(v)
+  else seedInput.value = params.seed
+})
+seedInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') seedInput.blur() }) // blur → hotkeys work again
+document.getElementById('reseed-btn').addEventListener('click', newCourse)
+// panels (H) — POC-v11: hides just the levers section; the pad + debug box
+// stay (phones have no H key to bring a hidden column back). View state only.
+function togglePanels() { document.body.classList.toggle('panels-hidden') }
+document.getElementById('panels-btn').addEventListener('click', togglePanels)
+
+// POC-v11 phone full-screen (Q64): browsers only grant fullscreen on a user
+// gesture, so it's an explicit ⛶ button, shown by CSS only on phone-size
+// screens AND only when the API exists (iPhone Safari has none → no button).
+// After entering, try to lock landscape (Android honors it); ignore refusals.
+if (document.documentElement.requestFullscreen) {
+  document.body.classList.add('can-fullscreen')
+  const fsBtn = document.getElementById('fullscreen-btn')
+  fsBtn.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else document.documentElement.requestFullscreen()
+      .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
+      .catch(() => {})
+  })
+  // label tracks the actual state (covers Esc / system exits, not just the button)
+  document.addEventListener('fullscreenchange', () => {
+    fsBtn.textContent = document.fullscreenElement ? '⛶ exit full-screen' : '⛶ full-screen'
+  })
+}
+
+// Full-screen is forced on touch devices: every tap made while windowed asks
+// again (the first tap gets it); the ⛶ button stays as the way back out.
+if (window.matchMedia('(pointer: coarse)').matches && document.documentElement.requestFullscreen) {
+  const goFull = (ev) => {
+    if (document.fullscreenElement || (ev.target.closest && ev.target.closest('#fullscreen-btn'))) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) })
+      .catch(() => {})
+  }
+  document.addEventListener('touchend', goFull, { passive: true })
+  document.addEventListener('click', goFull)
+}
+
+// POC-v11 touch-up: phone herd-size slider — a MIRROR of params.sheepCount
+// (the §0 SETTINGS entry stays the single source of min/max/step); release
+// respawns via the same HOOKS.respawn path the lil-gui slider uses, and
+// render() re-syncs the mirror when the lil-gui side changes it instead.
+const herdInput = document.getElementById('herd-size')
+const herdOut = document.getElementById('herd-size-out')
+{
+  const s = SETTINGS.find((e) => e.key === 'sheepCount')
+  herdInput.min = s.min; herdInput.max = s.max; herdInput.step = s.step
+}
+herdInput.value = params.sheepCount
+herdOut.textContent = params.sheepCount
+herdInput.addEventListener('input', () => { herdOut.textContent = herdInput.value })
+herdInput.addEventListener('change', () => {
+  params.sheepCount = parseInt(herdInput.value, 10)
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === 'sheepCount') c.updateDisplay()
+  HOOKS.respawn()
+})
+
+// Pause (POC-v10 touch-up, owner 2026-08-24): P freezes sim stepping — §4
+// zeroes the accumulator while paused; rendering, panels, sliders and
+// capture ⎘ stay live (a frozen scene can still be captured / inspected).
+let paused = false
+const pauseBtn = document.getElementById('pause-btn')
+function togglePause() {
+  paused = !paused
+  pauseBtn.innerHTML = paused ? 'resume <kbd>P</kbd>' : 'pause <kbd>P</kbd>'
+}
+pauseBtn.addEventListener('click', togglePause)
+
+// Capture ⎘ (owner 2026-08-22): a JSON snapshot of the live game state, copied
+// to the clipboard + console, so an edge case can be pasted into a chat and
+// the dog's path discussed against the NUMBERED PERIMETER MARKERS exactly as
+// they appear on the canvas (1 = nearest the gate, then clockwise). Dog angles
+// are degrees, bird's-eye, 0 = +x (east), positive = clockwise on the y-down
+// canvas — the same convention as flankAngle. Everything is rounded to whole
+// px / degrees to keep the paste short.
+function captureState() {
+  const out = sim.captureState() // the snapshot itself is lib/sheep-sim.js — shared with the 3D pages
+  const text = JSON.stringify(out)
+  console.log('[sheep-poc] state capture:\n' + text)
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
+  const btn = document.getElementById('capture-btn')
+  const label = btn.textContent
+  btn.textContent = 'copied ✓'
+  setTimeout(() => { btn.textContent = label }, 900)
+  return out
+}
+document.getElementById('capture-btn').addEventListener('click', captureState)
+// POC-v10 (owner Q57/Q58): arrows replaced the QWEASD letters. Plain arrow =
+// the four core verbs, ⇧ = the gentle variant (⇧↑ easy, ⇧←/⇧→ the gentle
+// flanks), ⌥ = the offset downs, ⏎ recalls; a missing chord falls back to
+// plain (⇧↓ = lie-down). Q61 (owner, same day): the E3 impulse flavors get
+// chords after all — ⌥↑ lean, ⇧⌥↑ bark (also still ⇧/⌥-click on Walk On);
+// a plain ↑ while in easy fires the E3 shove tap via setCommand.
+const HOTKEYS = {
+  ArrowLeft:  { plain: 'come_by', shift: 'come_by_easy', alt: 'lie_down_left' },
+  ArrowUp:    { plain: 'walk_on', shift: 'easy', alt: ['walk_on', 'lean'], altShift: ['walk_on', 'bark'] },
+  ArrowRight: { plain: 'away', shift: 'away_easy', alt: 'lie_down_right' },
+  ArrowDown:  { plain: 'lie_down' },
+  Enter:      { plain: 'that_ll_do' },
+}
+window.addEventListener('keydown', (ev) => {
+  if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) return // typing a seed (or a lil-gui field), not commanding
+  const k = ev.key.toLowerCase()
+  if (k === 'f') return sim.finishRun() // Finish button removed (touch-up) — the F hotkey still ends a run
+  if (k === 'r') return restartRun()
+  if (k === 'h') return togglePanels()
+  if (k === 'p') return togglePause()
+  if (k === 'n') return heelNip()
+  const m = HOTKEYS[ev.key]
+  if (m) {
+    ev.preventDefault() // arrows scroll the page; ⏎ would re-click a focused button
+    const pick = (ev.altKey && ev.shiftKey && m.altShift) || (ev.altKey && m.alt) || (ev.shiftKey && m.shift) || m.plain
+    const [cmd, flavor] = Array.isArray(pick) ? pick : [pick] // Q61: a chord can carry an impulse flavor
+    issue(cmd, flavor)
+  }
+})
+// (initial button highlight is set in §4, once `sim` exists)
+
+// ---- Settings inspector (POC-v2 P1): tooltips + per-category ⓘ grid --------
+// Pure DOM dev-tooling over SETTINGS/gui — never touches §1.
+const fmtNum = (v) => (typeof v === 'number' ? +v.toFixed(4) : v)
+function fmtVal(e, v) {
+  if (e.type === 'point') return `(${fmtNum(v.x)}, ${fmtNum(v.y)})`
+  return String(fmtNum(v))
+}
+function fmtRange(e) {
+  if (e.type === 'enum') return e.options.join(' / ')
+  if (e.type === 'boolean') return 'true / false'
+  if (e.type === 'point') return `x ${e.min.x}–${e.max.x} · y ${e.min.y}–${e.max.y} · ${e.step}`
+  if (e.min === undefined) return '—'
+  return `${e.min}–${e.max} · ${e.step}`
+}
+
+const tip = document.createElement('div')
+tip.id = 'tip'
+document.body.appendChild(tip)
+function attachTip(c, fill) {
+  c.domElement.addEventListener('mouseenter', () => {
+    tip.innerHTML = ''
+    fill(tip)
+    const r = c.domElement.getBoundingClientRect()
+    tip.style.display = 'block'
+    const w = tip.offsetWidth, h = tip.offsetHeight
+    // P9: panels sit on BOTH edges now — show the tip on the field side
+    const left = r.left < window.innerWidth / 2 ? r.right + 10 : r.left - w - 10
+    tip.style.left = Math.max(4, Math.min(window.innerWidth - w - 4, left)) + 'px'
+    tip.style.top = Math.min(window.innerHeight - h - 4, r.top) + 'px'
+  })
+  c.domElement.addEventListener('mouseleave', () => { tip.style.display = 'none' })
+}
+for (const g of guis.roots) for (const c of g.controllersRecursive()) {
+  if (!c._setting) continue // Tools buttons etc.
+  const e = c._setting
+  attachTip(c, (tip) => {
+    tip.appendChild(document.createTextNode(e.description))
+    const meta = document.createElement('div')
+    meta.className = 'meta'
+    const owner = LEVER_OWNER[e.key]
+    meta.textContent = `${e.unit} · ${fmtRange(e)}` + (owner ? ` · lever: ${LEVER_BY_KEY[owner].label} (stamp ${fmtVal(e, leverState.stamped[e.key])})` : '')
+    tip.appendChild(meta)
+  })
+}
+
+// ---- Levers panel (POC-v5 P5) — §3 wiring over the §0 lever data --------------
+// One lil-gui root above everything: a folder per domain, a 0–1 slider per
+// lever, reset buttons. Names carry the stamp-and-release state: `(modified)`
+// when a raw param the lever owns was hand-edited after the stamp, `limited
+// by X` when a guard clamped one of its params. The three raw-param panels
+// sit under an Advanced disclosure (Q16) and are otherwise untouched.
+const leverGui = new lil.GUI({ title: 'Levers', container: document.getElementById('panel-levers') })
+const leverCtrls = {}
+let leverSyncing = false
+function leverName(L) {
+  const lim = leverState.limitedBy[L.key]
+  let n = L.label
+  if (leverModified(L)) n += ' (modified)'
+  if (lim && lim.length) n += ' — limited by ' + lim.map((k) => LEVER_BY_KEY[k].label).join(' & ')
+  return n
+}
+function refreshLeverNames() { for (const L of LEVERS) leverCtrls[L.key].name(leverName(L)) }
+// push written raw values into their sliders (updateDisplay does not fire onChange)
+function refreshRawControllers(keys) {
+  const set = new Set(keys)
+  leverSyncing = true
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && set.has(c._setting.key)) c.updateDisplay()
+  leverSyncing = false
+}
+function moveLevers(moves) { // [{key, t}] — batch: one respawn if a pasture lever changed any raw value (Q15)
+  const touched = []
+  let respawn = false
+  for (const { key, t } of moves) {
+    const L = LEVER_BY_KEY[key]
+    // lil-gui writes leverState.pos BEFORE onChange fires, so compare the
+    // owned raw values, not the position, to know whether anything moved
+    const before = Object.keys(L.params).map(getParam)
+    touched.push(...setLever(key, t))
+    if (L.respawn && Object.keys(L.params).some((pk, i) => getParam(pk) !== before[i])) respawn = true
+  }
+  refreshRawControllers(touched)
+  for (const L of LEVERS) leverCtrls[L.key].updateDisplay()
+  refreshLeverNames()
+  if (respawn) HOOKS.respawn()
+}
+for (const dom of LEVER_DOMAINS) {
+  const f = leverGui.addFolder(dom.title)
+  for (const L of LEVERS.filter((l) => l.domain === dom.key)) {
+    const c = f.add(leverState.pos, L.key, 0, 1, 0.01).name(L.label)
+    c.onChange((t) => { if (!leverSyncing) moveLevers([{ key: L.key, t }]) })
+    c._lever = L
+    leverCtrls[L.key] = c
+    attachTip(c, (tip) => {
+      tip.appendChild(document.createTextNode(L.blurb))
+      const meta = document.createElement('div')
+      meta.className = 'meta'
+      meta.textContent = `0 = ${L.ends[0]} · 1 = ${L.ends[1]}` + (L.respawn ? ' · respawns' : '')
+      tip.appendChild(meta)
+      const owned = document.createElement('div')
+      owned.className = 'meta'
+      owned.textContent = 'owns: ' + Object.keys(L.params).join(', ')
+      tip.appendChild(owned)
+    })
+  }
+  f.add({ f: () => moveLevers(LEVERS.filter((l) => l.domain === dom.key).map((l) => ({ key: l.key, t: 0.5 }))) }, 'f').name('Reset this domain')
+}
+leverGui.add({ f: () => moveLevers(LEVERS.map((l) => ({ key: l.key, t: 0.5 }))) }, 'f').name('Reset all levers to 0.5')
+// Advanced: a collapsed disclosure that shows/hides the three raw-param panels
+// (sheep-left / dog-right split of v3 Q1 preserved inside it).
+const advancedGui = new lil.GUI({ title: 'Advanced — raw params', container: document.getElementById('panel-levers') })
+advancedGui.close()
+advancedGui.onOpenClose((g) => document.body.classList.toggle('advanced-closed', g._closed))
+// a hand-edit anywhere in the raw panels may flip a lever to (modified)
+for (const g of guis.roots) g.onChange(() => { if (!leverSyncing) refreshLeverNames() })
+refreshLeverNames()
+
+const inspector = document.createElement('div')
+inspector.id = 'inspector'
+document.body.appendChild(inspector)
+function closeInspector() { inspector.style.display = 'none'; inspector.innerHTML = '' }
+inspector.addEventListener('click', (ev) => { if (ev.target === inspector) closeInspector() })
+
+function openInspector(category) {
+  // current values are a snapshot at open time — the grid is read-only reference
+  const rows = SETTINGS.filter((e) => e.category === category)
+  const panel = document.createElement('div')
+  panel.className = 'panel'
+  const close = document.createElement('button')
+  close.className = 'close'
+  close.textContent = '✕'
+  close.addEventListener('click', closeInspector)
+  const h = document.createElement('h2')
+  h.textContent = category
+  h.prepend(close)
+  panel.appendChild(h)
+  const table = document.createElement('table')
+  const head = table.createTHead().insertRow()
+  for (const t of ['Label', 'key', 'type', 'range', 'default', 'unit', 'current', 'lever · stamp', 'description']) {
+    const th = document.createElement('th')
+    th.textContent = t
+    head.appendChild(th)
+  }
+  const body = table.createTBody()
+  for (const e of rows) {
+    const [holder, prop] = settingTarget(params, e.key, false)
+    const tr = body.insertRow()
+    const label = tr.insertCell()
+    label.textContent = e.label
+    if (!e.exposed) {
+      const tag = document.createElement('span')
+      tag.className = 'noslider'
+      tag.textContent = 'no slider'
+      label.appendChild(tag)
+    }
+    const owner = LEVER_OWNER[e.key]
+    const stamp = owner ? `${LEVER_BY_KEY[owner].label} · ${fmtVal(e, leverState.stamped[e.key])}${holder[prop] !== leverState.stamped[e.key] ? ' (modified)' : ''}` : '—'
+    const cells = [
+      ['k', e.key], ['', e.type], ['', fmtRange(e)], ['v', fmtVal(e, e.default)],
+      ['', e.unit], ['v', fmtVal(e, holder[prop])], ['', stamp], ['d', e.description],
+    ]
+    for (const [cls, text] of cells) {
+      const td = tr.insertCell()
+      if (cls) td.className = cls
+      td.textContent = text
+    }
+  }
+  panel.appendChild(table)
+  inspector.innerHTML = ''
+  inspector.appendChild(panel)
+  inspector.style.display = 'flex'
+}
+
+// ⓘ button in each schema folder's title row (skip Tools — not a category)
+{
+  const categories = new Set(SETTINGS.map((e) => e.category))
+  for (const g of guis.roots) for (const f of g.foldersRecursive()) {
+    if (!categories.has(f._title)) continue
+    const b = document.createElement('button')
+    b.className = 'info-btn'
+    b.textContent = 'ⓘ'
+    b.title = ''
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); openInspector(f._title) })
+    f.$title.appendChild(b)
+  }
+}
+
+// Esc closes the grid; while it's open, swallow keys so hotkeys don't fire.
+window.addEventListener('keydown', (ev) => {
+  if (inspector.style.display !== 'flex') return
+  if (ev.key === 'Escape') closeInspector()
+  ev.stopImmediatePropagation()
+}, true)
+
+// ============================================================================
+// §4 BOOTSTRAP — fixed-timestep accumulator loop, wire gui, kick off. [throwaway]
+// ============================================================================
+// F4 (POC-v5 P0): every page load is a new course. The ONLY non-seeded draw
+// besides the Reseed button — §1 still receives `seed` as plain data.
+if (params.randomSeedOnLoad) {
+  params.seed = Math.floor(Math.random() * 1e6)
+  for (const g of guis.roots) for (const c of g.controllersRecursive()) if (c._setting && c._setting.key === 'seed') c.updateDisplay()
+}
+const sim = new FlockSim(params)
+// (sheepCount's respawn side effect is wired declaratively — HOOKS.respawn in §0.)
+resizeCanvas() // canvas sized + contain-fit into the stage from the first frame
+
+issue(sim.dog.command) // reflect the initial command in the button strip
+
+// P7(v1) salvage artifact, reshaped by P9: export the tuned §0 params in the
+// sheep-defaults.json.js FORMAT (one `const SHEEP_DEFAULTS =` statement around
+// a pure JSON literal) to the clipboard + console, so a tuning session
+// round-trips into the defaults file by paste. Schema-driven: only entries
+// with export !== false (drops debug.*).
+function exportParams() {
+  const out = {}
+  for (const e of SETTINGS) {
+    if (e.export === false) continue
+    const [holder, prop] = settingTarget(params, e.key, false)
+    out[e.key] = e.type === 'point' ? { ...holder[prop] } : holder[prop]
+  }
+  out.levers = { ...leverState.pos } // Q17: lever positions persist as UI state (buildParams ignores the block)
+  const text = 'const SHEEP_DEFAULTS = ' + JSON.stringify(out, null, 2) + '\n'
+  console.log('[sheep-poc] sheep-defaults.json.js:\n' + text)
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {})
+}
+const fTools = guis.meta.addFolder('Tools')
+fTools.add({ f: newCourse }, 'f').name('Reseed → new flock')
+fTools.add({ f: () => restartRun() }, 'f').name('Reset run')
+fTools.add({ f: exportParams }, 'f').name('Export params → clipboard')
+fTools.add({ f: captureState }, 'f').name('Capture state → clipboard')
+
+// POC-v14: the score face. `project` maps sim px → #wrap px (the canvas is CSS-scaled to fit).
+ScoreUI.init({
+  page: 'pasture-2d', stage: document.getElementById('wrap'), // POC-v15 VH1: the score block sits in the upper left, as on the 3D pages
+  project: (x, y) => { const k = canvas.clientWidth / canvas.width; return { x: x * k, y: y * k } },
+  setSeed, newCourse, restart: restartRun,
+})
+PadUI.init(sim) // the live command's button filled green + every command given flashed under the secondary buttons (lib/sheep-pad-ui.js)
+DemoUI.init({ stage: document.getElementById('wrap') }) // demo mode (A): lib/sheep-demo-ui.js
+
+let last = performance.now() / 1000
+let acc = 0
+let fps = 0
+let fpsAcc = 0
+let fpsFrames = 0
+
+function frame(nowMs) {
+  const now = nowMs / 1000
+  let delta = now - last
+  last = now
+
+  // clamp real elapsed → anti spiral-of-death
+  if (delta > params.maxFrameDelta) delta = params.maxFrameDelta
+
+  // fixed-timestep stepping in dt slices (framerate-independent);
+  // paused (touch-up): drop the elapsed time so resume doesn't fast-forward
+  if (paused) acc = 0
+  else {
+    acc += delta
+    while (acc >= params.dt) {
+      DemoUI.step(sim, params.dt) // demo mode: the auto-handler issues the dog's commands (lib/sheep-demo-ui.js)
+      sim.step(params.dt)
+      acc -= params.dt
+    }
+  }
+
+  // FPS meter (smoothed over ~0.25s windows)
+  fpsAcc += delta
+  fpsFrames++
+  if (fpsAcc >= 0.25) {
+    fps = fpsFrames / fpsAcc
+    fpsAcc = 0
+    fpsFrames = 0
+  }
+
+  updateStrip() // strip follows the dog's actual state (E2 auto-easy; v10 variants via displayCommand)
+  render(fps)
+  requestAnimationFrame(frame)
+}
+
+requestAnimationFrame(frame)
+</script>
+</body>
+</html>
