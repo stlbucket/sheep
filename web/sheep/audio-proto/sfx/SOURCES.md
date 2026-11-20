@@ -15,7 +15,7 @@ None of them is AI-made. Each was cut, mixed to mono (the background stays stere
 | Sheep.Move-1 | freesound_community-sheep-chewing-gras-56417 | Pixabay community (from Freesound) | whole file, crossfaded loop, -30 LUFS |
 | Dog.Pant-1 | freesound_community-dog-panting-6876 | Pixabay community (from Freesound) | 0:00.75 to 0:22.6, crossfaded loop, -30 LUFS |
 | Dog.Whine-1 to 3 | freesound_community-whining-dog-6110 | Pixabay community (from Freesound) | three whines cut out, -24 LUFS each |
-| Pasture.Bed-1 | freesound_community-ambiance-without-people-58819 | Pixabay community (from Freesound) | 0:34 to 1:52.5 (skips a truck and the noises at the end), crossfaded loop, stereo, -34 LUFS |
+| Pasture.Bed-1 | freesound_community-country-day-backyard-birds-with-blackbird-distant-cars-pass-and-plane-middle-and-bird-fight-near-end-18989 | Pixabay community (from Freesound) | downloaded by Kevin on 2026-11-20 (replaces freesound_community-ambiance-without-people-58819); 1:00 to 2:00 (before the plane and the bird fight), last 3 s crossfaded over the first for a 57 s loop, stereo, resampled from 24 kHz, -34.5 LUFS |
 
 The shepherd's voice (audio/shepherd) is Jason's own ElevenLabs recordings (AI-made, model v4, voice
 "Graeme - Professional Scottish Male", stability 0.5, similarity 0.75), recorded 2026-11-19. Each is
