@@ -1,184 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<!-- iPhone: Safari has no full-screen API for pages, so the only way to lose its toolbars is Share → Add to Home Screen;
-     these make the home-screen icon open the game as a standalone app (no address bar, no tab bar). -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<meta name="apple-mobile-web-app-title" content="Sheep" />
-<script>
-  // phone landscape (owner 2026-11-19, same as the game pages): the page runs edge to edge (viewport-fit=cover) and keeps clear of the notch / Dynamic Island on
-  // whichever side it sits — the browser's own safe-area insets are the same both sides, so the rotation angle says which side that is
-  function islandSide() {
-    const a = typeof window.orientation === "number" ? window.orientation : (screen.orientation ? screen.orientation.angle : 0)
-    const c = document.documentElement.classList
-    c.toggle("island-left", a === 90) // turned anticlockwise: the top of the phone is on the left
-    c.toggle("island-right", a === -90 || a === 270)
-  }
-  islandSide()
-  addEventListener("orientationchange", islandSide)
-  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", islandSide)
-</script>
-<title>Sheep PoC</title>
-<!--
-  HOME — pick a version. Every page here runs the same herding physics
-  (lib/sheep-sim.js); they differ only in how it is drawn and what is added:
-
-    2d.html          the original canvas page, with levers + debug tools
-    3d.html          the same sim seen through three.js
-    3d-competition.html  3d.html on a clean course: numbered gates in order, then the pen
-    3d-assault.html  3d.html + the wolf-mortar teams (lib/assault-sim.js)
-
-  PHONES (owner 2026-11-18): the four cards always fit ONE screen, portrait (2 × 2) or
-  landscape (4 across) — the page never scrolls. Each card shows as much of its text
-  as its own height allows (container queries); the keyboard footer is dropped.
-
-  Plain links — works from file:// by double-click. The one script only decides
-  whether to show the iPhone "Add to Home Screen" tip.
--->
-<style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; }
-  html { --il: 0px; --ir: 0px; --sb: env(safe-area-inset-bottom, 0px); }
-  html.island-left { --il: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
-  html.island-right { --ir: calc(max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 0.22); }
-  body {
-    background: #14181c;
-    color: #cdd6df;
-    font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    --py: 48px; --px: 16px;
-    /* NOTCH / DYNAMIC ISLAND (owner 2026-11-19, same as the game pages): the side gap is 22 % of the safe-area inset (halved from the game pages' 45 %, owner: still too large here) on the island side only
-       (html.island-left / .island-right, set by islandSide() in the head) and replaces the edge padding; top and bottom keep clear of the
-       status bar and home bar when held upright (--sb is 0 in phone landscape, where the page ran under the home bar already) */
-    padding: max(var(--py), env(safe-area-inset-top, 0px)) max(var(--px), var(--ir)) max(var(--py), var(--sb)) max(var(--px), var(--il));
-  }
-  /* back to the site homepage (owner 2026-11-19: the game moved down into sheep/) — tucked in the top corner, clear of the island */
-  #site-link { position: absolute; top: max(8px, env(safe-area-inset-top, 0px)); left: max(12px, var(--il)); font-size: 11px; color: #7b8894; text-decoration: none; }
-  #site-link:hover { color: #e6edf3; text-decoration: underline; }
-  header { text-align: center; margin-bottom: 36px; }
-  h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; color: #e6edf3; }
-  header p { margin: 0; color: #7b8894; font-size: 13px; text-wrap: balance; }
-  .versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 720px; }
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 20px;
-    background: #101418;
-    border: 1px solid #232b32;
-    border-radius: 8px;
-    color: inherit;
-    text-decoration: none;
-    transition: border-color 0.12s, transform 0.12s;
-  }
-  .card:hover, .card:focus-visible { border-color: #7fd79a; transform: translateY(-2px); outline: none; }
-  .card .icon { font-size: 34px; line-height: 1; }
-  .card h2 { margin: 4px 0 0; font-size: 17px; font-weight: 600; color: #e6edf3; }
-  .card p { margin: 0; font-size: 13px; color: #9fb0c0; flex: 1 1 auto; }
-  .card .tags { font-size: 11px; color: #7b8894; }
-  .card .go { margin-top: 6px; font-size: 13px; color: #7fd79a; }
-  .card.assault:hover, .card.assault:focus-visible { border-color: #e0a98a; }
-  .card.assault .go { color: #e0a98a; }
-  footer { margin-top: 32px; font-size: 12px; color: #7b8894; text-align: center; }
-  kbd { padding: 0 4px; border: 1px solid #3a4650; border-radius: 3px; font: inherit; font-size: 11px; color: #9fb0c0; }
-  @media (max-width: 720px) {
-    body { --py: 28px; --px: 16px; }
-    .versions { grid-template-columns: 1fr; }
-  }
-  /* iPhone Safari only (set by the script at the foot): how to get the game full screen */
-  #ios-tip { display: none; margin: 4px 0 0; font-size: 12px; line-height: 1.3; color: #9fd0ff; }
-  body.ios-browser #ios-tip { display: block; }
-  /* phones: everything on one screen, no scrolling, either way up */
-  @media (pointer: coarse) and (max-width: 950px) {
-    html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
-    body { height: 100vh; height: 100dvh; --py: 10px; --px: 12px; }
-    header { margin-bottom: 8px; flex: 0 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 2px; }
-    header p { font-size: 12px; line-height: 1.3; }
-    footer { display: none; } /* keyboard keys — nothing to press on a phone */
-    .versions { flex: 1 1 0; min-height: 0; max-width: none; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
-    .card { container-type: size; min-height: 0; min-width: 0; overflow: hidden; padding: 10px; gap: 4px; justify-content: center; transition: none; }
-    .card:hover, .card:focus-visible { transform: none; }
-    .card .icon { font-size: 26px; }
-    .card h2 { margin: 0; font-size: 15px; line-height: 1.2; }
-    .card .go { margin-top: 2px; font-size: 12px; line-height: 1.25; }
-    .card .tags { display: none; }
-    /* the description shows only where the card has the height for it, and never runs past it */
-    .card p { display: none; flex: 0 0 auto; font-size: 12px; line-height: 1.35; overflow: hidden; -webkit-box-orient: vertical; }
-    .card p kbd { display: none; }
-    @container (min-height: 170px) { .card p { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; } }
-    @container (min-height: 215px) { .card p { -webkit-line-clamp: 4; line-clamp: 4; } }
-    @container (min-height: 275px) { .card p { -webkit-line-clamp: 7; line-clamp: 7; } .card .icon { font-size: 32px; } }
-    @container (max-height: 105px) { .card .icon { display: none; } }
-  }
-  @media (pointer: coarse) and (max-width: 950px) and (orientation: landscape) {
-    html { --sb: 0px; }
-    body { --py: 6px; --px: 12px; }
-    header { margin-bottom: 4px; }
-    header p { display: none; }
-    header { display: flex; align-items: baseline; justify-content: center; gap: 12px; }
-    body.ios-browser #ios-tip { display: block; margin: 0; font-size: 11px; }
-    h1 { font-size: 16px; margin: 0; }
-    .versions { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
-  }
-</style>
-</head>
-<body>
-<a id="site-link" href="../index.html" title="back to the function-bucket homepage">← function-bucket</a>
-<header>
-  <h1>🐑 Sheep PoC</h1>
-  <p>Work the dog, gather the flock, pen it through the gate. Pick a version.</p>
-  <p id="ios-tip">Full screen on iPhone: Share <b>→</b> Add to Home Screen, then open it from there.</p>
-</header>
-
-<main class="versions">
-  <a class="card" href="2d.html">
-    <div class="icon">🗺️</div>
-    <h2>2D</h2>
-    <p>The original top-down field. Every debug overlay, the tuning levers and the state-capture tool live here.</p>
-    <div class="tags">canvas · levers · capture ⎘</div>
-    <div class="go">play 2D →</div>
-  </a>
-  <a class="card" href="3d.html">
-    <div class="icon">🏞️</div>
-    <h2>3D</h2>
-    <p>The same simulation in a three.js pasture, with orbit, top, handler and dog cameras.</p>
-    <div class="tags">three.js · 4 cameras</div>
-    <div class="go">play 3D →</div>
-  </a>
-  <a class="card" href="3d-competition.html">
-    <div class="icon">🏁</div>
-    <h2>3D · Competition</h2>
-    <p>A clean trial field: take a small flock through four to six numbered gates, in order, then into the pen. Press <kbd>A</kbd> to watch the dog run it.</p>
-    <div class="tags">three.js · required path · demo</div>
-    <div class="go">play Competition →</div>
-  </a>
-  <a class="card assault" href="3d-assault.html">
-    <div class="icon">🐺</div>
-    <h2>3D · Assault</h2>
-    <p>The 3D pasture under fire: two-wolf mortar teams come over the hills and shell the flock while you pen it.</p>
-    <div class="tags">three.js · wolf mortars</div>
-    <div class="go">play Assault →</div>
-  </a>
-</main>
-
-<footer>
-  same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do
-</footer>
-<script>
-  // iPhone / iPod Safari cannot make a page full screen (no Fullscreen API there) — a home-screen web app is the way.
-  // Show the tip only in the browser, never once it is running from the home screen.
-  (function () {
-    var iphone = /iPhone|iPod/.test(navigator.userAgent)
-    var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)
-    if (iphone && !standalone) document.body.classList.add('ios-browser')
-  })()
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#14181c" />
+    <!-- iPhone: Add to Home Screen opens the game as a standalone app (no toolbars) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Sheep" />
+    <title>Sheep</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%90%91%3C/text%3E%3C/svg%3E" />
+    <script type="module" crossorigin src="./bundle/index-BCTOMJGj.js"></script>
+    <link rel="modulepreload" crossorigin href="./bundle/three-DlhMMrrZ.js">
+    <link rel="stylesheet" crossorigin href="./bundle/index-DYz_8Qbg.css">
+  </head>
+  <body class="drawer-closed">
+    <div id="rotate-overlay">
+      <div class="icon">📱</div>
+      <div>rotate your phone —<br />the pasture plays in landscape</div>
+    </div>
+    <div id="app">
+      <div id="stage">
+        <canvas id="game"></canvas>
+        <div id="center-stack">
+          <div class="top">
+            <button type="button" id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders) — D">settings</button>
+            <button type="button" id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture</button>
+          </div>
+          <div class="aux"><button type="button" id="reseed-btn" title="draw a new course">reseed</button></div>
+          <div id="cam-bar">
+            <button type="button" data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C cycles the cameras)">orbit</button>
+            <button type="button" data-cam="top" title="straight down — matches the 2D page — 2 (C cycles the cameras)">top</button>
+            <button type="button" data-cam="handler" title="over the handler's shoulder, by the gate — 3 (C cycles the cameras)">handler</button>
+            <button type="button" data-cam="dog" title="behind the dog, looking down his eye — 4 (C cycles the cameras)">dog</button>
+            <button type="button" id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O">overlays</button>
+          </div>
+        </div>
+        <div id="stress">flock stress<div class="bar"><div class="fill" id="stress-fill"></div></div></div>
+        <div id="cam-hint"></div>
+        <div id="card"></div>
+        <div id="boot-error"></div>
+      </div>
+      <div id="side">
+        <section id="side-debug">
+          <div class="row">
+            <label for="seed-input">seed</label>
+            <input id="seed-input" type="number" min="0" step="1" inputmode="numeric" />
+          </div>
+          <div class="row">
+            <button type="button" id="reset-btn" title="restart the run on the same course">reset <kbd>R</kbd></button>
+            <button type="button" id="home-link" title="back to the start menu">⌂ modes</button>
+          </div>
+          <div class="row"><span>layout:</span> <span class="layout" id="layout-out">—</span></div>
+          <div id="hud">boot…</div>
+        </section>
+        <section id="side-dog">
+          <div id="controls">
+            <div class="pad">
+              <button type="button" data-cmd="come_by">come <span class="w2">by</span> <kbd>←</kbd></button>
+              <button type="button" data-cmd="walk_on">walk <span class="w2">on</span> <kbd>↑</kbd></button>
+              <button type="button" data-cmd="away">away <kbd>→</kbd></button>
+              <button type="button" data-cmd="come_by_easy">come <span class="w2">easy</span> <kbd>⇧←</kbd></button>
+              <button type="button" data-cmd="easy">easy <kbd>⇧↑</kbd></button>
+              <button type="button" data-cmd="away_easy">away <span class="w2">easy</span> <kbd>⇧→</kbd></button>
+              <button type="button" data-cmd="lie_down_left">left <span class="w2">down</span> <kbd>⌥←</kbd></button>
+              <button type="button" data-cmd="lie_down">lie <span class="w2">down</span> <kbd>↓</kbd></button>
+              <button type="button" data-cmd="lie_down_right">right <span class="w2">down</span> <kbd>⌥→</kbd></button>
+              <button type="button" data-cmd="bark" title="bark — a startle burst: every sheep in a wide ring round the dog jumps, eye or not; unsticks a standing ram, but stresses them all — W">bark <kbd>W</kbd></button>
+              <button type="button" data-cmd="shove" title="shove — for about 2 s the dog walks straight in on the sheep in front, then goes back to his command; forces a stuck group, high stress — S">shove <kbd>S</kbd></button>
+              <button type="button" data-cmd="lean" title="lean — the dog holds his spot and leans in with a longer, stronger eye; the sheep in front ease away slowly (the calm walk on) — L">lean <kbd>L</kbd></button>
+            </div>
+            <button type="button" data-cmd="that_ll_do">that'll <span class="w2">do</span> <kbd>⏎</kbd></button>
+            <button type="button" id="battle-btn" data-cmd="battle_stations" hidden title="the dog runs to the nearest fence gun that bears on a wolf, rears up and shoots — ⌘⇧B, Ctrl⇧B or plain B">battle stations <kbd>B</kbd></button>
+            <button type="button" id="nip-btn" title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; only shown while that can happen — N">heel <span class="w2">nip</span> <kbd>N</kbd></button>
+            <button type="button" id="pause-btn" title="freeze the sim — the camera stays live — P">pause</button>
+            <div class="herd">
+              <label for="herd-size">herd</label>
+              <input id="herd-size" type="range" />
+              <span id="herd-size-out">—</span>
+            </div>
+            <div class="obst" title="how many obstacle groups (tree stands / rocks) a course gets. Courses are random until you move this — then every course gets exactly this many. Release to re-lay the course">
+              <label for="obst-freq">obstacles</label>
+              <input id="obst-freq" type="range" />
+              <span id="obst-freq-out">—</span>
+            </div>
+          </div>
+        </section>
+        <section id="side-assault" hidden>
+          <div id="assault-status">—</div>
+        </section>
+      </div>
+    </div>
+    <div id="start-menu" hidden>
+      <header>
+        <h1>🐑 Sheep</h1>
+        <p>Work the dog, gather the flock, pen it through the gate. Pick a mode.</p>
+      </header>
+      <main class="versions"></main>
+      <footer>same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do · <kbd>W</kbd> bark · <kbd>S</kbd> shove · <kbd>L</kbd> lean · <kbd>A</kbd> demo</footer>
+    </div>
+  </body>
 </html>

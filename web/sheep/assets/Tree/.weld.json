@@ -1,0 +1,20 @@
+{
+  "slot": "Tree",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Tree v1 (lib_01a1f5eb2fad733db5bd647330a3d966, lv_01a1f5eb3a4a758f9b1bf4c5ccf61374), placed by hand while Weld's web import is broken",
+  "files": [
+    "Tree.glb"
+  ],
+  "library": {
+    "asset": "Tree",
+    "asset_id": "lib_01a1f5eb2fad733db5bd647330a3d966",
+    "version_id": "lv_01a1f5eb3a4a758f9b1bf4c5ccf61374",
+    "version": 1,
+    "sha256": {
+      "Tree.glb": "c85dc9ae9e3c1ae40d5514af2ac7bedce44d31c2b01177be784983a18abc8687"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

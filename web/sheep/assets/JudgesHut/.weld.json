@@ -1,0 +1,19 @@
+{
+  "slot": "JudgesHut",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: JudgesHut v1 (lib_01a1f6ce2242746592c2b2643bce5d7c, lv_01a1f6dcece576d6b4b060379934b8d0), generator family `judges_hut` (Art/Generators/judges_hut)",
+  "files": [
+    "SM_JudgesHut.glb",
+    "T_JudgesHut_BC.png",
+    "T_JudgesHut_ORM.png"
+  ],
+  "library": {
+    "asset": "JudgesHut",
+    "asset_id": "lib_01a1f6ce2242746592c2b2643bce5d7c",
+    "version_id": "lv_01a1f6dcece576d6b4b060379934b8d0",
+    "version": 1,
+    "producer": "generator",
+    "family": "judges_hut"
+  }
+}

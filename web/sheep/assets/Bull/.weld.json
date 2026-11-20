@@ -1,0 +1,20 @@
+{
+  "slot": "Bull",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Bull v1 (lib_01a1f5e7d31e7331ba84fae3f68a1adb, lv_01a1f5e7dd9f76019ba7b85944fe0336), placed by hand while Weld's web import is broken",
+  "files": [
+    "Bull.glb"
+  ],
+  "library": {
+    "asset": "Bull",
+    "asset_id": "lib_01a1f5e7d31e7331ba84fae3f68a1adb",
+    "version_id": "lv_01a1f5e7dd9f76019ba7b85944fe0336",
+    "version": 1,
+    "sha256": {
+      "Bull.glb": "8f86d2a091829ea6f75c7372f79f9a0f02c0091cace4c7c0f24f7655763c7e6f"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

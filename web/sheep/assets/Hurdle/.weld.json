@@ -1,0 +1,20 @@
+{
+  "slot": "Hurdle",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Hurdle v1 (lib_01a1f5ebee9473d6af757b713e456e7d, lv_01a1f5ebfb197305a3515682e0d56d05), placed by hand while Weld's web import is broken",
+  "files": [
+    "Hurdle.glb"
+  ],
+  "library": {
+    "asset": "Hurdle",
+    "asset_id": "lib_01a1f5ebee9473d6af757b713e456e7d",
+    "version_id": "lv_01a1f5ebfb197305a3515682e0d56d05",
+    "version": 1,
+    "sha256": {
+      "Hurdle.glb": "1e78a54299eff1b259b01dd24ad4e49badf46f1fdacd22e370388846fc26abbf"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

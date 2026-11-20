@@ -1,0 +1,169 @@
+{
+  "language": "en",
+  "lines": [
+    {
+      "context": "Command pad button: away. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled across the field; it almost sounds like \"ahh weigh\".",
+      "key": "Shepherd.Command.Away",
+      "speaker": "Shepherd",
+      "text": "Away."
+    },
+    {
+      "context": "Command pad button: away + easy",
+      "key": "Shepherd.Command.AwayEasy",
+      "speaker": "Shepherd",
+      "text": "Away easy."
+    },
+    {
+      "context": "Command pad button: walk_on while easy: bark impulse",
+      "key": "Shepherd.Command.Bark",
+      "speaker": "Shepherd",
+      "text": "Bark!"
+    },
+    {
+      "context": "Command pad button: come_by. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled across the field, with a short \"come\" and a longer \"byyyy\" rhythm.",
+      "key": "Shepherd.Command.ComeBy",
+      "speaker": "Shepherd",
+      "text": "Come by."
+    },
+    {
+      "context": "Command pad button: come_by + easy",
+      "key": "Shepherd.Command.ComeEasy",
+      "speaker": "Shepherd",
+      "text": "Come easy."
+    },
+    {
+      "context": "Command pad button: easy. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled, but less aggressively: it is meant to keep the dog restrained.",
+      "key": "Shepherd.Command.Easy",
+      "speaker": "Shepherd",
+      "text": "Easy."
+    },
+    {
+      "context": "Command: hold. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled, with a tone similar to \"easy\" (less aggressive, restraining).",
+      "key": "Shepherd.Command.Hold",
+      "speaker": "Shepherd",
+      "text": "Hold."
+    },
+    {
+      "context": "Command pad button: the neighbor event (v_bsuz6), not in the game yet",
+      "key": "Shepherd.Command.HumpAway",
+      "speaker": "Shepherd",
+      "text": "Hump away!"
+    },
+    {
+      "context": "Command pad button: walk_on while easy: lean impulse",
+      "key": "Shepherd.Command.Lean",
+      "speaker": "Shepherd",
+      "text": "Lean."
+    },
+    {
+      "context": "Command pad button: lie_down, left side",
+      "key": "Shepherd.Command.LeftDown",
+      "speaker": "Shepherd",
+      "text": "Left down."
+    },
+    {
+      "context": "Command pad button: lie_down. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled with urgency.",
+      "key": "Shepherd.Command.LieDown",
+      "speaker": "Shepherd",
+      "text": "Lie down."
+    },
+    {
+      "context": "Command pad button: lie_down, right side",
+      "key": "Shepherd.Command.RightDown",
+      "speaker": "Shepherd",
+      "text": "Right down."
+    },
+    {
+      "context": "Command pad button: walk_on while easy: shove impulse",
+      "key": "Shepherd.Command.Shove",
+      "speaker": "Shepherd",
+      "text": "Shove!"
+    },
+    {
+      "context": "Command pad button: that'll do. Delivery (bucket, 2026-11-19): male Scottish accent. Delivered with pride in a job well done; the dog will know he is to go to his spot.",
+      "key": "Shepherd.Command.ThatllDo",
+      "speaker": "Shepherd",
+      "text": "That'll do."
+    },
+    {
+      "context": "Command pad button: walk_on. Delivery (bucket, 2026-11-19): male Scottish accent. Yelled; it sounds almost like a fact instead of a command.",
+      "key": "Shepherd.Command.WalkOn",
+      "speaker": "Shepherd",
+      "text": "Walk on."
+    },
+    {
+      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
+      "key": "Shepherd.MessUp.FuckingDog",
+      "speaker": "Shepherd",
+      "text": "Fucking dog!"
+    },
+    {
+      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
+      "key": "Shepherd.MessUp.FuckingMutt",
+      "speaker": "Shepherd",
+      "text": "Fucking mutt."
+    },
+    {
+      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
+      "key": "Shepherd.MessUp.GetOverHere",
+      "speaker": "Shepherd",
+      "text": "Get the bloody fuck over here!"
+    },
+    {
+      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
+      "key": "Shepherd.MessUp.KillThatDog",
+      "speaker": "Shepherd",
+      "text": "I'm going to kill that fucking dog."
+    },
+    {
+      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
+      "key": "Shepherd.MessUp.MyCat",
+      "speaker": "Shepherd",
+      "text": "My cat would do better."
+    },
+    {
+      "context": "A short mutter when the player slips (the flock splits, a sheep strays) or the dog messes up.",
+      "key": "Shepherd.MessUp.TheFuck",
+      "speaker": "Shepherd",
+      "text": "The fuck?"
+    },
+    {
+      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
+      "key": "Shepherd.MessUp.WhatsWrong",
+      "speaker": "Shepherd",
+      "text": "The fuck is wrong with this dog?"
+    },
+    {
+      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
+      "key": "Shepherd.MessUp.WhereIsHeGoing",
+      "speaker": "Shepherd",
+      "text": "Where the fuck is he going?"
+    }
+  ],
+  "schema": 1,
+  "strings": {
+    "Shepherd.Command.Away": "Away.",
+    "Shepherd.Command.AwayEasy": "Away easy.",
+    "Shepherd.Command.Bark": "Bark!",
+    "Shepherd.Command.ComeBy": "Come by.",
+    "Shepherd.Command.ComeEasy": "Come easy.",
+    "Shepherd.Command.Easy": "Easy.",
+    "Shepherd.Command.Hold": "Hold.",
+    "Shepherd.Command.HumpAway": "Hump away!",
+    "Shepherd.Command.Lean": "Lean.",
+    "Shepherd.Command.LeftDown": "Left down.",
+    "Shepherd.Command.LieDown": "Lie down.",
+    "Shepherd.Command.RightDown": "Right down.",
+    "Shepherd.Command.Shove": "Shove!",
+    "Shepherd.Command.ThatllDo": "That'll do.",
+    "Shepherd.Command.WalkOn": "Walk on.",
+    "Shepherd.MessUp.FuckingDog": "Fucking dog!",
+    "Shepherd.MessUp.FuckingMutt": "Fucking mutt.",
+    "Shepherd.MessUp.GetOverHere": "Get the bloody fuck over here!",
+    "Shepherd.MessUp.KillThatDog": "I'm going to kill that fucking dog.",
+    "Shepherd.MessUp.MyCat": "My cat would do better.",
+    "Shepherd.MessUp.TheFuck": "The fuck?",
+    "Shepherd.MessUp.WhatsWrong": "The fuck is wrong with this dog?",
+    "Shepherd.MessUp.WhereIsHeGoing": "Where the fuck is he going?"
+  }
+}

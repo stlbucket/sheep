@@ -1,0 +1,20 @@
+{
+  "slot": "Star",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Star v1 (lib_01a1f5ea0faa75ebaa6fe677697529c7, lv_01a1f5ea1a2d71a9ba232deabd6c6f43), placed by hand while Weld's web import is broken",
+  "files": [
+    "Star.glb"
+  ],
+  "library": {
+    "asset": "Star",
+    "asset_id": "lib_01a1f5ea0faa75ebaa6fe677697529c7",
+    "version_id": "lv_01a1f5ea1a2d71a9ba232deabd6c6f43",
+    "version": 1,
+    "sha256": {
+      "Star.glb": "31187a61ab83d919f7de2da6ef6fb1f8e7075266f47144b20bd78b4ab8bfd6d6"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

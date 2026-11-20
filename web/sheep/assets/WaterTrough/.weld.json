@@ -1,0 +1,19 @@
+{
+  "slot": "WaterTrough",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: WaterTrough v1 (lib_01a1f6ce1ac47623b3b326adac4d7781, lv_01a1f6dd2dd977bfb9b4e482a58cd4a5), generator family `water_trough` (Art/Generators/water_trough)",
+  "files": [
+    "SM_WaterTrough.glb",
+    "T_WaterTrough_BC.png",
+    "T_WaterTrough_ORM.png"
+  ],
+  "library": {
+    "asset": "WaterTrough",
+    "asset_id": "lib_01a1f6ce1ac47623b3b326adac4d7781",
+    "version_id": "lv_01a1f6dd2dd977bfb9b4e482a58cd4a5",
+    "version": 1,
+    "producer": "generator",
+    "family": "water_trough"
+  }
+}

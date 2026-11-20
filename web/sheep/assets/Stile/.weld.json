@@ -1,0 +1,19 @@
+{
+  "slot": "Stile",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Stile v1 (lib_01a1f6ce1dca76e7ae6f7ad94f780e1b, lv_01a1f6dcee177169a9481b9d1f783bb7), generator family `stile` (Art/Generators/stile)",
+  "files": [
+    "SM_Stile.glb",
+    "T_Stile_BC.png",
+    "T_Stile_ORM.png"
+  ],
+  "library": {
+    "asset": "Stile",
+    "asset_id": "lib_01a1f6ce1dca76e7ae6f7ad94f780e1b",
+    "version_id": "lv_01a1f6dcee177169a9481b9d1f783bb7",
+    "version": 1,
+    "producer": "generator",
+    "family": "stile"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "slot": "Handler",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Handler v3 (lib_01a1f5e832ed714f9973dc7f070656d9, lv_01a1f6d691a0758894dcc6d9889626f0), generator family `handler` (Art/Generators/handler)",
+  "files": [
+    "SM_Handler.glb",
+    "T_Handler_BC.png",
+    "T_Handler_ORM.png"
+  ],
+  "library": {
+    "asset": "Handler",
+    "asset_id": "lib_01a1f5e832ed714f9973dc7f070656d9",
+    "version_id": "lv_01a1f6d691a0758894dcc6d9889626f0",
+    "version": 3,
+    "producer": "generator",
+    "family": "handler"
+  }
+}

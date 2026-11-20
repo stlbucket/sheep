@@ -1,0 +1,20 @@
+{
+  "slot": "MortarShell",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: MortarShell v1 (lib_01a1f5e9b0e377be8dcfbf5c5094b23d, lv_01a1f5e9bb6a767ab23cd6116c49db4b), placed by hand while Weld's web import is broken",
+  "files": [
+    "MortarShell.glb"
+  ],
+  "library": {
+    "asset": "MortarShell",
+    "asset_id": "lib_01a1f5e9b0e377be8dcfbf5c5094b23d",
+    "version_id": "lv_01a1f5e9bb6a767ab23cd6116c49db4b",
+    "version": 1,
+    "sha256": {
+      "MortarShell.glb": "9be2619cdc4d4c6c1d82354bde0e970f2b068e30beef609c23e9076f98019f92"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

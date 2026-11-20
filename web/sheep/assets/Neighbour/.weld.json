@@ -1,0 +1,19 @@
+{
+  "slot": "Neighbour",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Neighbour v1 (lib_01a1f6ce06e372a4848c8e2ce79dfeb8, lv_01a1f6d96bfe756eaae2162b33dec55f), generator family `neighbour` (Art/Generators/neighbour)",
+  "files": [
+    "SM_Neighbour.glb",
+    "T_Neighbour_BC.png",
+    "T_Neighbour_ORM.png"
+  ],
+  "library": {
+    "asset": "Neighbour",
+    "asset_id": "lib_01a1f6ce06e372a4848c8e2ce79dfeb8",
+    "version_id": "lv_01a1f6d96bfe756eaae2162b33dec55f",
+    "version": 1,
+    "producer": "generator",
+    "family": "neighbour"
+  }
+}

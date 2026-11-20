@@ -1,0 +1,19 @@
+{
+  "slot": "Rosette",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Rosette v1 (lib_01a1f6ce25be729dae223c353d4eb9fb, lv_01a1f6dd540c761591fcf4ec132abc86), generator family `rosette` (Art/Generators/rosette)",
+  "files": [
+    "SM_Rosette.glb",
+    "T_Rosette_BC.png",
+    "T_Rosette_ORM.png"
+  ],
+  "library": {
+    "asset": "Rosette",
+    "asset_id": "lib_01a1f6ce25be729dae223c353d4eb9fb",
+    "version_id": "lv_01a1f6dd540c761591fcf4ec132abc86",
+    "version": 1,
+    "producer": "generator",
+    "family": "rosette"
+  }
+}

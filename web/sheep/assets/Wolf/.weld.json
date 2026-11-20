@@ -1,0 +1,20 @@
+{
+  "slot": "Wolf",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Wolf v1 (lib_01a1f5e892aa76b6b17b9461f64b6d19, lv_01a1f5e89d0a7239b97b88ed071d604f), placed by hand while Weld's web import is broken",
+  "files": [
+    "Wolf.glb"
+  ],
+  "library": {
+    "asset": "Wolf",
+    "asset_id": "lib_01a1f5e892aa76b6b17b9461f64b6d19",
+    "version_id": "lv_01a1f5e89d0a7239b97b88ed071d604f",
+    "version": 1,
+    "sha256": {
+      "Wolf.glb": "c554a2e7b46f2f74c4df5d19e154989c142621119947a39936dbee0bcb2534f3"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

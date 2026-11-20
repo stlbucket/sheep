@@ -1,0 +1,20 @@
+{
+  "slot": "FencePanel",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: FencePanel v1 (lib_01a1f5ea6ed871dba36666cd15b29f1f, lv_01a1f5ea78e8733ea00868677621a2c3), placed by hand while Weld's web import is broken",
+  "files": [
+    "FencePanel.glb"
+  ],
+  "library": {
+    "asset": "FencePanel",
+    "asset_id": "lib_01a1f5ea6ed871dba36666cd15b29f1f",
+    "version_id": "lv_01a1f5ea78e8733ea00868677621a2c3",
+    "version": 1,
+    "sha256": {
+      "FencePanel.glb": "50d8e4c5b32d1da9fd9b639fb68d64996ab41d3076ccff4483f7cc610b1bad35"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

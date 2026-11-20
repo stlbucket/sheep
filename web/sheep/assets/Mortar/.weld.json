@@ -1,0 +1,20 @@
+{
+  "slot": "Mortar",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Mortar v1 (lib_01a1f5e8f22a77fba75f78904cf78dcb, lv_01a1f5e8fd6070e8a6fa04b8bdcc5247), placed by hand while Weld's web import is broken",
+  "files": [
+    "Mortar.glb"
+  ],
+  "library": {
+    "asset": "Mortar",
+    "asset_id": "lib_01a1f5e8f22a77fba75f78904cf78dcb",
+    "version_id": "lv_01a1f5e8fd6070e8a6fa04b8bdcc5247",
+    "version": 1,
+    "sha256": {
+      "Mortar.glb": "067a66343ea3bde1631730305514b6f0f4f3be23a2a4086407ad6735c35b8994"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

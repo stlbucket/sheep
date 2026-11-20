@@ -1,0 +1,20 @@
+{
+  "slot": "Rock",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Rock v1 (lib_01a1f5eb8f1c71f7a5227d9986e7c0f0, lv_01a1f5eb99c073e19b01ada18d08cabb), placed by hand while Weld's web import is broken",
+  "files": [
+    "Rock.glb"
+  ],
+  "library": {
+    "asset": "Rock",
+    "asset_id": "lib_01a1f5eb8f1c71f7a5227d9986e7c0f0",
+    "version_id": "lv_01a1f5eb99c073e19b01ada18d08cabb",
+    "version": 1,
+    "sha256": {
+      "Rock.glb": "176dd55c0db29b9116e74e0f845b2bd04f67806ffec5ca6843245bc3e5ed3dce"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

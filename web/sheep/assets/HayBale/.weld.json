@@ -1,0 +1,19 @@
+{
+  "slot": "HayBale",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: HayBale v1 (lib_01a1f6ce157970c4b44a164797d227b4, lv_01a1f6d683dd727b8a8e7fd2af7c1244), generator family `hay_bale` (Art/Generators/hay_bale)",
+  "files": [
+    "SM_HayBale.glb",
+    "T_HayBale_BC.png",
+    "T_HayBale_ORM.png"
+  ],
+  "library": {
+    "asset": "HayBale",
+    "asset_id": "lib_01a1f6ce157970c4b44a164797d227b4",
+    "version_id": "lv_01a1f6d683dd727b8a8e7fd2af7c1244",
+    "version": 1,
+    "producer": "generator",
+    "family": "hay_bale"
+  }
+}

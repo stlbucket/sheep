@@ -1,0 +1,19 @@
+{
+  "slot": "Ram",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Ram v1 (lib_01a1f6ce09ab7002ae8a7fb18f572bda, lv_01a1f6d9688273dcbb1d7b2929c6f5fc), generator family `flock_sheep` (Art/Generators/flock_sheep)",
+  "files": [
+    "SM_Ram.glb",
+    "T_Ram_BC.png",
+    "T_Ram_ORM.png"
+  ],
+  "library": {
+    "asset": "Ram",
+    "asset_id": "lib_01a1f6ce09ab7002ae8a7fb18f572bda",
+    "version_id": "lv_01a1f6d9688273dcbb1d7b2929c6f5fc",
+    "version": 1,
+    "producer": "generator",
+    "family": "flock_sheep"
+  }
+}

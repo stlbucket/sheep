@@ -1,0 +1,19 @@
+{
+  "slot": "Lamb",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: Lamb v1 (lib_01a1f6ce0eaf7229b38d4853d54e6828, lv_01a1f6d93a2c73a994daf3c3620ba60b), generator family `flock_sheep` (Art/Generators/flock_sheep)",
+  "files": [
+    "SM_Lamb.glb",
+    "T_Lamb_BC.png",
+    "T_Lamb_ORM.png"
+  ],
+  "library": {
+    "asset": "Lamb",
+    "asset_id": "lib_01a1f6ce0eaf7229b38d4853d54e6828",
+    "version_id": "lv_01a1f6d93a2c73a994daf3c3620ba60b",
+    "version": 1,
+    "producer": "generator",
+    "family": "flock_sheep"
+  }
+}

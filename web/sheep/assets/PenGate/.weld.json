@@ -1,0 +1,20 @@
+{
+  "slot": "PenGate",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: PenGate v1 (lib_01a1f5eacfa371608d82c2fc56ed631e, lv_01a1f5eada607247b32e0c632c21e8c9), placed by hand while Weld's web import is broken",
+  "files": [
+    "PenGate.glb"
+  ],
+  "library": {
+    "asset": "PenGate",
+    "asset_id": "lib_01a1f5eacfa371608d82c2fc56ed631e",
+    "version_id": "lv_01a1f5eada607247b32e0c632c21e8c9",
+    "version": 1,
+    "sha256": {
+      "PenGate.glb": "056df9f3f1736926623affb68e106986dd99b22ee2e59cabdf517dcb5cd6783f"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

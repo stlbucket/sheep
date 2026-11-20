@@ -1,0 +1,978 @@
+{
+  "schema": 1,
+  "engine": "web",
+  "generated_at": "2026-11-20T02:08:42.513050Z",
+  "generator": "weld 0.5.0",
+  "buses": [
+    {
+      "bus": "master",
+      "volume": 1.0
+    },
+    {
+      "bus": "effects",
+      "parent": "master",
+      "volume": 1.0
+    },
+    {
+      "bus": "music",
+      "parent": "master",
+      "volume": 1.0
+    },
+    {
+      "bus": "voice",
+      "parent": "master",
+      "volume": 1.0
+    },
+    {
+      "bus": "ambience",
+      "parent": "master",
+      "volume": 1.0
+    },
+    {
+      "bus": "ui",
+      "parent": "master",
+      "volume": 1.0
+    }
+  ],
+  "ducking": {
+    "duck_db": {
+      "ambience": -6.0,
+      "effects": -3.0,
+      "music": -8.0
+    },
+    "attack_ms": 80,
+    "release_ms": 400
+  },
+  "limiter": {
+    "ceiling_db": -1.0
+  },
+  "subtitles": {
+    "mode": "on",
+    "chars_per_second": 15.0,
+    "min_ms": 1500,
+    "speaker_tags": true
+  },
+  "slots": [
+    {
+      "key": "Dog.Bark",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "variant",
+          "file": "audio/Dog/Bark/00",
+          "gain_db": -3.3,
+          "duration_ms": 900
+        },
+        {
+          "index": 1,
+          "role": "variant",
+          "file": "audio/Dog/Bark/01",
+          "gain_db": -1.2,
+          "duration_ms": 300
+        },
+        {
+          "index": 2,
+          "role": "variant",
+          "file": "audio/Dog/Bark/02",
+          "gain_db": 4.1,
+          "duration_ms": 390
+        },
+        {
+          "index": 3,
+          "role": "variant",
+          "file": "audio/Dog/Bark/03",
+          "gain_db": 0.6,
+          "duration_ms": 380
+        }
+      ]
+    },
+    {
+      "key": "Dog.Pant",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "loop",
+          "file": "audio/Dog/Pant/00",
+          "gain_db": 7.2,
+          "duration_ms": 20850
+        }
+      ]
+    },
+    {
+      "key": "Dog.Whine",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 1,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "variant",
+          "file": "audio/Dog/Whine/00",
+          "gain_db": 6.5,
+          "duration_ms": 1250
+        },
+        {
+          "index": 1,
+          "role": "variant",
+          "file": "audio/Dog/Whine/01",
+          "gain_db": 6.4,
+          "duration_ms": 3420
+        },
+        {
+          "index": 2,
+          "role": "variant",
+          "file": "audio/Dog/Whine/02",
+          "gain_db": 6.4,
+          "duration_ms": 2450
+        }
+      ]
+    },
+    {
+      "key": "Gate.Latch",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Pasture.Bed",
+      "category": "ambience",
+      "bus": "ambience",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "loop",
+          "file": "audio/Pasture/Bed/00",
+          "gain_db": 10.5,
+          "duration_ms": 76000
+        }
+      ]
+    },
+    {
+      "key": "Pasture.Birds",
+      "category": "ambience",
+      "bus": "ambience",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Pasture.Wind",
+      "category": "ambience",
+      "bus": "ambience",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Sheep.BleatAlarm",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "variant",
+          "file": "audio/Sheep/BleatAlarm/00",
+          "gain_db": 3.3,
+          "duration_ms": 3970
+        }
+      ]
+    },
+    {
+      "key": "Sheep.BleatCalm",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "variant",
+          "file": "audio/Sheep/BleatCalm/00",
+          "gain_db": 6.5,
+          "duration_ms": 1697
+        },
+        {
+          "index": 1,
+          "role": "variant",
+          "file": "audio/Sheep/BleatCalm/01",
+          "gain_db": 6.5,
+          "duration_ms": 2040
+        },
+        {
+          "index": 2,
+          "role": "variant",
+          "file": "audio/Sheep/BleatCalm/02",
+          "gain_db": 8.4,
+          "duration_ms": 862
+        }
+      ]
+    },
+    {
+      "key": "Sheep.BleatFar",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 2,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/00",
+          "gain_db": 9.4,
+          "duration_ms": 1330
+        },
+        {
+          "index": 1,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/01",
+          "gain_db": 9.4,
+          "duration_ms": 1060
+        },
+        {
+          "index": 2,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/02",
+          "gain_db": 9.4,
+          "duration_ms": 1180
+        },
+        {
+          "index": 3,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/03",
+          "gain_db": 9.4,
+          "duration_ms": 1430
+        },
+        {
+          "index": 4,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/04",
+          "gain_db": 9.4,
+          "duration_ms": 710
+        },
+        {
+          "index": 5,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/05",
+          "gain_db": 9.4,
+          "duration_ms": 790
+        },
+        {
+          "index": 6,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/06",
+          "gain_db": 9.4,
+          "duration_ms": 1830
+        },
+        {
+          "index": 7,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/07",
+          "gain_db": 9.5,
+          "duration_ms": 1230
+        },
+        {
+          "index": 8,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/08",
+          "gain_db": 9.4,
+          "duration_ms": 1260
+        },
+        {
+          "index": 9,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/09",
+          "gain_db": 9.4,
+          "duration_ms": 1110
+        },
+        {
+          "index": 10,
+          "role": "variant",
+          "file": "audio/Sheep/BleatFar/10",
+          "gain_db": 9.4,
+          "duration_ms": 800
+        }
+      ]
+    },
+    {
+      "key": "Sheep.Move",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": [
+        {
+          "index": 0,
+          "role": "loop",
+          "file": "audio/Sheep/Move/00",
+          "gain_db": -0.5,
+          "duration_ms": 89900
+        }
+      ]
+    },
+    {
+      "key": "Sheep.Squeal",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "three_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Shepherd.Command",
+      "category": "dialogue",
+      "bus": "voice",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Shepherd.MessUp",
+      "category": "dialogue",
+      "bus": "voice",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 1,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 12000
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Sting.Chain",
+      "category": "sting",
+      "bus": "music",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Sting.Frenzy",
+      "category": "sting",
+      "bus": "music",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Sting.Jackpot",
+      "category": "sting",
+      "bus": "music",
+      "playback": {
+        "space": "two_d",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.Away",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.ComeBy",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.Easy",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.LieDown",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.ThatllDo",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    },
+    {
+      "key": "Whistle.WalkOn",
+      "category": "sfx",
+      "bus": "effects",
+      "playback": {
+        "space": "other",
+        "priority": 128,
+        "ignores_time_dilation": false
+      },
+      "select": {
+        "no_repeat": 0,
+        "pitch_spread_cents": 0.0,
+        "volume_spread_db": 0.0,
+        "cooldown_ms": 0
+      },
+      "load": "lazy",
+      "entries": []
+    }
+  ],
+  "lines": [
+    {
+      "key": "Shepherd.Command.Away",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Away.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Away/00",
+      "gain_db": 2.9,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.AwayEasy",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Away easy.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/AwayEasy/00",
+      "gain_db": 3.7,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.Bark",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Bark!",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Bark/00",
+      "gain_db": 3.4,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.ComeBy",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Come by.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/ComeBy/00",
+      "gain_db": 2.0,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.ComeEasy",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Come easy.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/ComeEasy/00",
+      "gain_db": 5.5,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.Easy",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Easy.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Easy/00",
+      "gain_db": 5.4,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.Hold",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Hold.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Hold/00",
+      "gain_db": 4.9,
+      "duration_ms": 877
+    },
+    {
+      "key": "Shepherd.Command.HumpAway",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Hump away!",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/HumpAway/00",
+      "gain_db": 2.3,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.Lean",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Lean.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Lean/00",
+      "gain_db": 3.7,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.LeftDown",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Left down.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/LeftDown/00",
+      "gain_db": 4.2,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.LieDown",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Lie down.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/LieDown/00",
+      "gain_db": 2.7,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.RightDown",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Right down.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/RightDown/00",
+      "gain_db": 2.6,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.Shove",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Shove!",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/Shove/00",
+      "gain_db": 3.2,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.ThatllDo",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "That'll do.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/ThatllDo/00",
+      "gain_db": 4.6,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.Command.WalkOn",
+      "slot": "Shepherd.Command",
+      "speaker": "Shepherd",
+      "text": "Walk on.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/Command/WalkOn/00",
+      "gain_db": 2.6,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.MessUp.FuckingDog",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "Fucking dog!",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/FuckingDog/00",
+      "gain_db": 9.3,
+      "duration_ms": 1391
+    },
+    {
+      "key": "Shepherd.MessUp.FuckingMutt",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "Fucking mutt.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/FuckingMutt/00",
+      "gain_db": 9.4,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.MessUp.GetOverHere",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "Get the bloody fuck over here!",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/GetOverHere/00",
+      "gain_db": 9.9,
+      "duration_ms": 2165
+    },
+    {
+      "key": "Shepherd.MessUp.KillThatDog",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "I'm going to kill that fucking dog.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/KillThatDog/00",
+      "gain_db": 5.7,
+      "duration_ms": 2334
+    },
+    {
+      "key": "Shepherd.MessUp.MyCat",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "My cat would do better.",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/MyCat/00",
+      "gain_db": 6.9,
+      "duration_ms": 1534
+    },
+    {
+      "key": "Shepherd.MessUp.TheFuck",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "The fuck?",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/TheFuck/00",
+      "gain_db": 8.5,
+      "duration_ms": 1500
+    },
+    {
+      "key": "Shepherd.MessUp.WhatsWrong",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "The fuck is wrong with this dog?",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/WhatsWrong/00",
+      "gain_db": 8.2,
+      "duration_ms": 2293
+    },
+    {
+      "key": "Shepherd.MessUp.WhereIsHeGoing",
+      "slot": "Shepherd.MessUp",
+      "speaker": "Shepherd",
+      "text": "Where the fuck is he going?",
+      "priority": 128,
+      "interrupt": {
+        "wait_ms": 0,
+        "on_busy": "drop"
+      },
+      "file": "audio/Shepherd/MessUp/WhereIsHeGoing/00",
+      "gain_db": 8.2,
+      "duration_ms": 1800
+    }
+  ]
+}

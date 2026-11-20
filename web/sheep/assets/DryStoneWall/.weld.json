@@ -1,0 +1,19 @@
+{
+  "slot": "DryStoneWall",
+  "aiGenerated": false,
+  "provenance": "Made in Blender by a weld_kit generator (procedural code, no AI model)",
+  "source": "Weld asset library: DryStoneWall v2 (lib_01a1f6ce11707046afb0566cc9927bf5, lv_01a1f6e0f9ea72e29ed1a6967babc724), generator family `dry_stone_wall` (Art/Generators/dry_stone_wall)",
+  "files": [
+    "SM_DryStoneWall.glb",
+    "T_DryStoneWall_BC.png",
+    "T_DryStoneWall_ORM.png"
+  ],
+  "library": {
+    "asset": "DryStoneWall",
+    "asset_id": "lib_01a1f6ce11707046afb0566cc9927bf5",
+    "version_id": "lv_01a1f6e0f9ea72e29ed1a6967babc724",
+    "version": 2,
+    "producer": "generator",
+    "family": "dry_stone_wall"
+  }
+}

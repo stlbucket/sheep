@@ -1,0 +1,20 @@
+{
+  "slot": "GrassGround",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: GrassGround v1 (lib_01a1f5ec4ea874f5b93c308c6f54f11f, lv_01a1f5ec5760730384a605d9a6d4586b), placed by hand while Weld's web import is broken",
+  "files": [
+    "GrassGround.png"
+  ],
+  "library": {
+    "asset": "GrassGround",
+    "asset_id": "lib_01a1f5ec4ea874f5b93c308c6f54f11f",
+    "version_id": "lv_01a1f5ec5760730384a605d9a6d4586b",
+    "version": 1,
+    "sha256": {
+      "GrassGround.png": "cfe15824a63bcf8b463d36d6640cdbf4f381051849f92f9ad4239d5eddbb973d"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

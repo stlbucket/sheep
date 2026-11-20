@@ -1,0 +1,20 @@
+{
+  "slot": "StrawGround",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: StrawGround v1 (lib_01a1f5ecaecb705889f883d88e5f36a6, lv_01a1f5ecb7ea72dcb3ce7fe644d2da2c), placed by hand while Weld's web import is broken",
+  "files": [
+    "StrawGround.png"
+  ],
+  "library": {
+    "asset": "StrawGround",
+    "asset_id": "lib_01a1f5ecaecb705889f883d88e5f36a6",
+    "version_id": "lv_01a1f5ecb7ea72dcb3ce7fe644d2da2c",
+    "version": 1,
+    "sha256": {
+      "StrawGround.png": "a92a0315d8668c69a63492b636259ffe8f75b7b835d3fa886669387025191a5f"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}

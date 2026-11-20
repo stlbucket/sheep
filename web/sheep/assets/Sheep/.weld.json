@@ -1,0 +1,20 @@
+{
+  "slot": "Sheep",
+  "aiGenerated": true,
+  "provenance": "AI-generated; not hand-made",
+  "source": "Weld asset library: Sheep v2 (lib_01a1f5e6c670766992c2ae218d920935, lv_01a1f60b401d7783882d6cb8b572d26b), placed by hand while Weld's web import is broken",
+  "files": [
+    "Sheep.glb"
+  ],
+  "library": {
+    "asset": "Sheep",
+    "asset_id": "lib_01a1f5e6c670766992c2ae218d920935",
+    "version_id": "lv_01a1f60b401d7783882d6cb8b572d26b",
+    "version": 2,
+    "sha256": {
+      "Sheep.glb": "f66f87bb7d85d2f40b202ba7e837c555505a176866ee397d51fb49fbf380a743"
+    },
+    "license": "ISC",
+    "recipe": "import from hand: Sheep web prototype (tools/export-assets.cjs)"
+  }
+}
