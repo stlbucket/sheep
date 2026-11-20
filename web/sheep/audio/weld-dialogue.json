@@ -90,54 +90,6 @@
       "key": "Shepherd.Command.WalkOn",
       "speaker": "Shepherd",
       "text": "Walk on."
-    },
-    {
-      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
-      "key": "Shepherd.MessUp.FuckingDog",
-      "speaker": "Shepherd",
-      "text": "Fucking dog!"
-    },
-    {
-      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
-      "key": "Shepherd.MessUp.FuckingMutt",
-      "speaker": "Shepherd",
-      "text": "Fucking mutt."
-    },
-    {
-      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
-      "key": "Shepherd.MessUp.GetOverHere",
-      "speaker": "Shepherd",
-      "text": "Get the bloody fuck over here!"
-    },
-    {
-      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
-      "key": "Shepherd.MessUp.KillThatDog",
-      "speaker": "Shepherd",
-      "text": "I'm going to kill that fucking dog."
-    },
-    {
-      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
-      "key": "Shepherd.MessUp.MyCat",
-      "speaker": "Shepherd",
-      "text": "My cat would do better."
-    },
-    {
-      "context": "A short mutter when the player slips (the flock splits, a sheep strays) or the dog messes up.",
-      "key": "Shepherd.MessUp.TheFuck",
-      "speaker": "Shepherd",
-      "text": "The fuck?"
-    },
-    {
-      "context": "The dog is messing up (a strike, bolting from the flock) or the player slipped (a split, a stray, a sheep pushed hard). Profanity: off when the swearing setting is off. Delivery: male Scottish accent, shouted at the dog.",
-      "key": "Shepherd.MessUp.WhatsWrong",
-      "speaker": "Shepherd",
-      "text": "The fuck is wrong with this dog?"
-    },
-    {
-      "context": "The dog is bolting far from the flock. Profanity: off when the swearing setting is off.",
-      "key": "Shepherd.MessUp.WhereIsHeGoing",
-      "speaker": "Shepherd",
-      "text": "Where the fuck is he going?"
     }
   ],
   "schema": 1,
@@ -156,14 +108,6 @@
     "Shepherd.Command.RightDown": "Right down.",
     "Shepherd.Command.Shove": "Shove!",
     "Shepherd.Command.ThatllDo": "That'll do.",
-    "Shepherd.Command.WalkOn": "Walk on.",
-    "Shepherd.MessUp.FuckingDog": "Fucking dog!",
-    "Shepherd.MessUp.FuckingMutt": "Fucking mutt.",
-    "Shepherd.MessUp.GetOverHere": "Get the bloody fuck over here!",
-    "Shepherd.MessUp.KillThatDog": "I'm going to kill that fucking dog.",
-    "Shepherd.MessUp.MyCat": "My cat would do better.",
-    "Shepherd.MessUp.TheFuck": "The fuck?",
-    "Shepherd.MessUp.WhatsWrong": "The fuck is wrong with this dog?",
-    "Shepherd.MessUp.WhereIsHeGoing": "Where the fuck is he going?"
+    "Shepherd.Command.WalkOn": "Walk on."
   }
 }
