@@ -2,7 +2,7 @@
   "schema": 1,
   "engine": "web",
   "generated_at": "2026-11-20T02:08:42.513050Z",
-  "generator": "weld 0.5.0",
+  "generator": "game 0.5.0",
   "buses": [
     {
       "bus": "master",
@@ -205,8 +205,8 @@
           "index": 0,
           "role": "loop",
           "file": "audio/Pasture/Bed/00",
-          "gain_db": 10.5,
-          "duration_ms": 57000
+          "gain_db": 7.4,
+          "duration_ms": 24220
         }
       ]
     },
@@ -747,16 +747,16 @@
       "duration_ms": 1500
     },
     {
-      "key": "Shepherd.Command.Lean",
+      "key": "Shepherd.Command.Stand",
       "slot": "Shepherd.Command",
       "speaker": "Shepherd",
-      "text": "Lean.",
+      "text": "Stand.",
       "priority": 128,
       "interrupt": {
         "wait_ms": 0,
         "on_busy": "drop"
       },
-      "file": "audio/Shepherd/Command/Lean/00",
+      "file": "audio/Shepherd/Command/Stand/00",
       "gain_db": 3.7,
       "duration_ms": 1500
     },
