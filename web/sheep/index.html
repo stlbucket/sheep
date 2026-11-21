@@ -13,9 +13,9 @@
     <meta name="apple-mobile-web-app-title" content="ODHD" />
     <title>ODHD</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%90%91%3C/text%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./bundle/index-BT_GCeDr.js"></script>
+    <script type="module" crossorigin src="./bundle/index-CX-1Yt22.js"></script>
     <link rel="modulepreload" crossorigin href="./bundle/three-DlhMMrrZ.js">
-    <link rel="stylesheet" crossorigin href="./bundle/index-B9We8pym.css">
+    <link rel="stylesheet" crossorigin href="./bundle/index-BL7BAo5B.css">
   </head>
   <body class="drawer-closed">
     <div id="rotate-overlay">
@@ -87,17 +87,22 @@
       <button type="button" id="nip-btn" hidden title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; only shown while that can happen — N">heel nip <kbd>N</kbd></button>
     </div>
     <div id="start-menu" hidden>
+      <button type="button" id="install-btn" hidden title="add ODHD to your home screen: it then opens full screen">install app</button>
       <header>
         <h1>🐑 ODHD</h1>
         <p>Work the dog, gather the flock, pen it through the gate. Pick a mode.</p>
-        <div id="install" hidden>
-          <span class="msg">ODHD is an app: add it to your home screen to play full screen. Want to?</span>
-          <button type="button" id="install-yes">add to home screen</button>
-          <button type="button" id="install-no">not now</button>
-        </div>
       </header>
       <main class="versions"></main>
       <footer>same controls everywhere — <kbd>←</kbd> come by · <kbd>↑</kbd> walk on · <kbd>→</kbd> away · <kbd>↓</kbd> lie down · <kbd>⏎</kbd> that'll do · <kbd>A</kbd> demo · the <b>controls</b> button explains every command</footer>
+    </div>
+    <div id="install-pop" hidden>
+      <div class="box" role="dialog" aria-modal="true" aria-label="install ODHD">
+        <p class="msg">Install ODHD on your home screen? It then opens full screen, like an app.</p>
+        <div class="btns">
+          <button type="button" id="install-no">cancel</button>
+          <button type="button" id="install-yes">install</button>
+        </div>
+      </div>
     </div>
   </body>
 </html>
