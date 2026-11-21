@@ -11,9 +11,9 @@
     <meta name="apple-mobile-web-app-title" content="Sheep" />
     <title>Sheep</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%90%91%3C/text%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./bundle/index-CcxG1IgG.js"></script>
+    <script type="module" crossorigin src="./bundle/index-2OiuNDU4.js"></script>
     <link rel="modulepreload" crossorigin href="./bundle/three-DlhMMrrZ.js">
-    <link rel="stylesheet" crossorigin href="./bundle/index-Mn9E02YN.css">
+    <link rel="stylesheet" crossorigin href="./bundle/index-BZ-znqit.css">
   </head>
   <body class="drawer-closed">
     <div id="rotate-overlay">
@@ -23,16 +23,17 @@
     <div id="app">
       <div id="stage">
         <canvas id="game"></canvas>
+        <div id="cam-group" class="cams">
+          <button type="button" data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C switches between orbit and top)">orbit</button>
+          <button type="button" data-cam="top" title="straight down — matches the 2D page — 2 (C switches between orbit and top)">top</button>
+        </div>
         <div id="center-stack">
           <div class="top">
             <button type="button" id="drawer-btn" title="open / close the settings drawer (seed, HUD, sliders) — D">settings</button>
             <button type="button" id="capture-btn" title="copy a JSON snapshot of the current game state (gate, perimeter markers, dog, sheep) to the clipboard + console">capture</button>
           </div>
           <div class="aux"></div>
-          <div id="cam-bar">
-            <button type="button" data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C switches between orbit and top)">orbit</button>
-            <button type="button" data-cam="top" title="straight down — matches the 2D page — 2 (C switches between orbit and top)">top</button>
-          </div>
+          <div id="cam-bar"></div>
           <div class="sys">
             <button type="button" id="menu-btn" title="back to the start menu — pick a mode" aria-label="home"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 1.5 7.5h2V14h3.5v-4h2v4h3.5V7.5h2z" /></svg></button>
             <button type="button" id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O" aria-label="overlays"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 3.5C4.5 3.5 2 6.2 1 8c1 1.8 3.5 4.5 7 4.5s6-2.7 7-4.5c-1-1.800-3.500-4.500-7-4.500zm0 7.500a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1.600a1.400 1.400 0 1 0 0-2.800 1.400 1.400 0 0 0 0 2.800z" /></svg></button>
