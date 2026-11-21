@@ -1,0 +1,11 @@
+{
+  "slot": "Mod",
+  "aiGenerated": true,
+  "provider": "Anthropic",
+  "model": "Claude",
+  "provenance": "Built in Blender by a procedural script that an AI model (Claude) wrote; not hand-made",
+  "source": "Art/Generators/gate_friends/build.py (run with Blender 5.1), 2026-11-21",
+  "files": [
+    "Mod.glb"
+  ]
+}
