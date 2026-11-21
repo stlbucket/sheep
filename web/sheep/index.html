@@ -13,9 +13,9 @@
     <meta name="apple-mobile-web-app-title" content="ODHD" />
     <title>ODHD</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%90%91%3C/text%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./bundle/index-B_e6kbOj.js"></script>
+    <script type="module" crossorigin src="./bundle/index-jrRansY1.js"></script>
     <link rel="modulepreload" crossorigin href="./bundle/three-CX4HHUIT.js">
-    <link rel="stylesheet" crossorigin href="./bundle/index-DNLw-CJ1.css">
+    <link rel="stylesheet" crossorigin href="./bundle/index-Dc-DME4k.css">
   </head>
   <body class="drawer-closed">
     <div id="rotate-overlay">
@@ -39,7 +39,7 @@
           <div class="sys">
             <button type="button" id="menu-btn" title="back to the start menu — pick a mode" aria-label="home"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 1.5 7.5h2V14h3.5v-4h2v4h3.5V7.5h2z" /></svg></button>
             <button type="button" id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O" aria-label="overlays"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 3.5C4.5 3.5 2 6.2 1 8c1 1.8 3.5 4.5 7 4.5s6-2.7 7-4.5c-1-1.800-3.500-4.500-7-4.500zm0 7.500a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1.600a1.400 1.400 0 1 0 0-2.800 1.400 1.400 0 0 0 0 2.800z" /></svg></button>
-            <button type="button" id="pause-btn" title="freeze the sim — the camera stays live; while paused, click a sheep to see its attributes — P" aria-label="pause"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z" /></svg></button>
+            <button type="button" id="pause-btn" title="freeze the sim — the camera stays live; while paused, click a sheep or the dog to see its attributes — P" aria-label="pause"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z" /></svg></button>
             <button type="button" id="sheep-btn" title="who is on the field: One Dude, his dog, every kind of sheep and the bulls" aria-label="who is on the field"><svg viewBox="0 0 16 16" aria-hidden="true"><text x="8" y="13.500" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="800">?</text></svg></button>
             <button type="button" id="mute-btn" title="mute / unmute every sound — M" aria-label="mute"><svg class="i-on" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.500 6h2.500L8 2.500v11L4 10H1.500z" /><path fill="none" stroke="currentColor" stroke-width="1.400" stroke-linecap="round" d="M10.300 5.800a3.200 3.200 0 0 1 0 4.400M12.200 3.700a6 6 0 0 1 0 8.600" /></svg><svg class="i-off" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.500 6h2.500L8 2.500v11L4 10H1.500z" /><path fill="none" stroke="currentColor" stroke-width="1.500" stroke-linecap="round" d="M10.500 6l4 4M14.500 6l-4 4" /></svg></button>
             <button type="button" id="settings-btn" title="settings: sound volume" aria-label="settings"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.600" fill="none" stroke="currentColor" stroke-width="2.400" stroke-dasharray="2.199 2.199" /><circle cx="8" cy="8" r="3.500" fill="none" stroke="currentColor" stroke-width="2.200" /></svg></button>
@@ -86,10 +86,12 @@
         </section>
       </div>
       <button type="button" id="nip-btn" hidden title="heel nip — the dog dives at the heels of the sheep standing him off and it runs from him; in a stand-off, press it when the marker is in the green; only shown while a nip can happen — N or space">nip <kbd>N</kbd></button>
-      <button type="button" id="come-in-btn" hidden title="come in — the dog goes straight in on the golden ewe inside the gold ring round him (two thirds of his pressure radius) and meets her; only shown while one is in reach — I or space">come in <kbd>I</kbd></button>
+      <button type="button" id="take-this-btn" hidden title="take this — the dog goes straight in on the golden ewe inside the gold ring round him (two thirds of his pressure radius) and meets her; only shown while one is in reach — I or space">take this <kbd>I</kbd></button>
       <button type="button" id="turn-btn" hidden title="turn — the golden ewe's game: press it while the marker going round her is on the green and she walks away from her group; on the red she bolts through it; only shown while the ring is live — T or space">turn <kbd>T</kbd></button>
       <button type="button" id="leave-it-btn" hidden title="leave it — the dog lets go of the golden ewe he took and every command works the whole flock again; only shown while he has one — V">leave it <kbd>V</kbd></button>
-      <button type="button" id="take-these-btn" hidden title="take these — the small group of sheep within half the dog's pressure radius becomes his flock: every command works it alone and the outline goes round it; only shown while one is in reach — G or space; with two buttons up, space is the right-hand one and shift-space the left-hand one">take these <kbd>G</kbd></button>
+      <button type="button" id="take-these-btn" hidden title="take these — the small group of sheep inside the gold ring round the dog becomes his flock: every command works it alone and the outline goes round it; only shown while one is in reach (the gold ring); the line shows which group it is — G or space; with two buttons up, space is the right-hand one and shift-space the left-hand one">take these <kbd>G</kbd></button>
+      <button type="button" id="take-those-btn" hidden title="take those — with two small groups in reach, the further one: it becomes the dog's flock as take these does; the line shows which group it is — H, or shift-space">take those <kbd>H</kbd></button>
+      <svg id="take-lines" aria-hidden="true"><line id="take-line-these" /><line id="take-line-those" /></svg>
       <button type="button" id="leave-these-btn" hidden title="leave these — the dog lets go of the group he took and every command works the whole flock again; only shown while he has one — V">leave these <kbd>V</kbd></button>
       <div id="standoff" hidden title="the stand-off: press when the marker is in the green to nip the ram's heel — N or space, the nip button, or tap here">
         <div class="so-title">stand-off</div>
