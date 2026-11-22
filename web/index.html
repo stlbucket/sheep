@@ -11,6 +11,7 @@
 
   TO ADD A LINK: copy one <a class="door"> block in <main> below.
   The game lives in sheep/ (its own menu is sheep/index.html); the music page is bucket-music.html.
+  The dice jam lives in song-dice/: a build of ~/function-bucket/song-dice (Nuxt), copied in with `npm run dice:copy`, never edited by hand.
 -->
 <style>
   :root {
@@ -85,7 +86,7 @@
 
 <header class="wrap">
   <h1>function-bucket</h1>
-  <p>Things Bucket makes: a sheepdog game and a lot of bass lines.</p>
+  <p>Things Bucket makes: a sheepdog game, a lot of bass lines and a dice jam.</p>
 </header>
 
 <main class="wrap">
@@ -100,6 +101,12 @@
     <h2>Bucket on bass</h2>
     <p>Afrobeat, soul and alt-country out of Seattle and St. Louis &mdash; recordings with me on bass, band by band.</p>
     <span class="go">listen &rarr;</span>
+  </a>
+  <a class="door" href="song-dice/index.html">
+    <span class="kind">Jam tool</span>
+    <h2>Extra Thick Dice Jam</h2>
+    <p>One button rolls a jam to play: key, tonality, mode, chord movement, tempo and meter, each off a twenty-sided die. The rules are on the second tab.</p>
+    <span class="go">roll &rarr;</span>
   </a>
 </main>
 

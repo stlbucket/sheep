@@ -6,7 +6,8 @@
     "test": "node test/sim.test.js",
     "test:pages": "node test/pages.test.js",
     "test:all": "node test/sim.test.js && node test/pages.test.js",
-    "sheep:copy": "test -f ../odhd-reddit/dist/index.html || { echo 'No build found: run pnpm build in ../odhd-reddit first'; exit 1; } && rsync -a --delete ../odhd-reddit/dist/ web/sheep/"
+    "sheep:copy": "test -f ../odhd-reddit/dist/index.html || { echo 'No build found: run pnpm build in ../odhd-reddit first'; exit 1; } && rsync -a --delete ../odhd-reddit/dist/ web/sheep/",
+    "dice:copy": "test -f ~/function-bucket/song-dice/.output/public/index.html || { echo 'No build found: in ~/function-bucket/song-dice run NUXT_APP_BASE_URL=/web/song-dice/ NUXT_APP_BUILD_ASSETS_DIR=/assets/ npx nuxt generate'; exit 1; } && rsync -a --delete ~/function-bucket/song-dice/.output/public/ web/song-dice/"
   },
   "repository": {
     "type": "git",
