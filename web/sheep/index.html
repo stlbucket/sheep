@@ -13,9 +13,9 @@
     <meta name="apple-mobile-web-app-title" content="ODHD" />
     <title>ODHD</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%90%91%3C/text%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./bundle/index-BSC-oOj4.js"></script>
+    <script type="module" crossorigin src="./bundle/index-DzjX1Zf1.js"></script>
     <link rel="modulepreload" crossorigin href="./bundle/three-C1IcyzPO.js">
-    <link rel="stylesheet" crossorigin href="./bundle/index-DLi7FcM_.css">
+    <link rel="stylesheet" crossorigin href="./bundle/index-CFJ-jr6O.css">
   </head>
   <body class="drawer-closed">
     <!-- the loading screen (plan M9; src/ui/boot.ts, boot.css): shown while html.booting -->
@@ -31,8 +31,10 @@
         <div id="face-off" hidden aria-live="off"></div>
         <canvas id="game"></canvas>
         <div id="cam-group" class="cams">
-          <button type="button" data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C switches between orbit and top)">orbit</button>
-          <button type="button" data-cam="top" title="straight down — matches the 2D page — 2 (C switches between orbit and top)">top</button>
+          <button type="button" data-cam="orbit" title="free camera — drag to orbit, right-drag to pan, wheel to zoom; press again to return to the starting view — 1 (C goes to the next view)">orbit</button>
+          <button type="button" data-cam="top" title="straight down — matches the 2D page — 2 (C goes to the next view)">top</button>
+          <button type="button" data-cam="handler" title="from over the handler's head, always looking at the dog — 3 (C goes to the next view)">handler</button>
+          <button type="button" data-cam="dog" title="from behind the dog, down his eye — 4 (C goes to the next view)">dog</button>
         </div>
         <div id="center-stack">
           <div class="top">
@@ -42,7 +44,7 @@
           <div class="aux"><button type="button" id="reseed-btn" title="new game: draw a new course and start again" aria-label="new game"><span class="t">new</span><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2.500h2V7h4.500v2H9v4.500H7V9H2.500V7H7z" /></svg></button></div>
           <div id="cam-bar"></div>
           <div class="sys">
-            <button type="button" id="cam-toggle" title="switch between the top view and the orbit view" aria-label="switch camera"><svg class="i-top" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.800" d="M3 3h10v10H3z" /></svg><svg class="i-orbit" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round" d="M5 4.500h6l3 8H2z" /></svg></button>
+            <button type="button" id="cam-toggle" title="next view: orbit, top, handler, dog" aria-label="switch camera"><svg class="i-top" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.800" d="M3 3h10v10H3z" /></svg><svg class="i-orbit" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round" d="M5 4.500h6l3 8H2z" /></svg><svg class="i-handler" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3.600" r="2.300" /><path d="M4 14.500V10a4 4 0 0 1 8 0v4.500z" /></svg><svg class="i-dog" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="11" rx="3.400" ry="2.800" /><circle cx="3.200" cy="7.400" r="1.500" /><circle cx="6.200" cy="4.600" r="1.600" /><circle cx="9.800" cy="4.600" r="1.600" /><circle cx="12.800" cy="7.400" r="1.500" /></svg></button>
             <button type="button" id="menu-btn" title="back to the start menu — pick a mode" aria-label="home"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 1.5 7.5h2V14h3.5v-4h2v4h3.5V7.5h2z" /></svg></button>
             <button type="button" id="overlay-btn" title="show / hide the ground overlays (eye, outline, path, gate draw) — O" aria-label="overlays"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 3.5C4.5 3.5 2 6.2 1 8c1 1.8 3.5 4.5 7 4.5s6-2.7 7-4.5c-1-1.800-3.500-4.500-7-4.500zm0 7.500a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1.600a1.400 1.400 0 1 0 0-2.800 1.400 1.400 0 0 0 0 2.800z" /></svg></button>
             <button type="button" id="pause-btn" title="freeze the sim — the camera stays live; while paused, click a sheep or the dog to see its attributes — P" aria-label="pause"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z" /></svg></button>
